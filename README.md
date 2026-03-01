@@ -275,7 +275,7 @@ Platform: R 4.5.2, Apple clang 17.0.0, macOS (Darwin 25.3.0), Apple Silicon
 (aarch64). Median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$);
 2,000 iterations for $n > 100$.
 
-| $n$ | Function | `revss` ($\mu$s) | `robscale` ($\mu$s) | Speedup |
+| $n$ | Function | `revss` ($\mu$ s) | `robscale` ($\mu$ s) | Speedup |
 |---:|:---|---:|---:|---:|
 | 3 | `adm` | 8.86 | 0.86 | 10x |
 | 3 | `robLoc` | 21.77 | 1.56 | 14x |
