@@ -4,7 +4,8 @@ bibentry(
   author   = person("Dennis Alexis Valin", "Dittrich"),
   year     = "2026",
   note     = "R package version 0.1.0",
-  url      = "https://github.com/davdittrich/robscale"
+  url      = "https://github.com/davdittrich/robscale",
+  doi      = "10.5281/zenodo.18828607"
 )
 
 bibentry(

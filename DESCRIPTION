@@ -11,7 +11,8 @@ Description: High-performance C++ implementation (via Rcpp) of the robust
     numerically identical results to the 'revss' package with significantly
     improved performance through sorting networks and compiled iteration loops.
 License: MIT + file LICENSE
-URL: https://github.com/davdittrich/robscale
+URL: https://github.com/davdittrich/robscale,
+    https://doi.org/10.5281/zenodo.18828607
 BugReports: https://github.com/davdittrich/robscale/issues
 Encoding: UTF-8
 Imports: Rcpp (>= 1.0.0)
