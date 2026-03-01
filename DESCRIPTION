@@ -1,0 +1,21 @@
+Package: robscale
+Type: Package
+Title: Fast Robust Estimation in Very Small Samples
+Version: 0.1.0
+Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
+    role = c("aut", "cre"), email = "davd@economicscience.net",
+    comment = c(ORCID = "0000-0002-4438-8276")))
+Description: High-performance C++ implementation (via Rcpp) of the robust
+    location and scale M-estimators described in Rousseeuw & Verboven (2002)
+    <doi:10.1016/S0167-9473(02)00078-6> for very small samples. Provides
+    numerically identical results to the 'revss' package with significantly
+    improved performance through sorting networks and compiled iteration loops.
+License: MIT + file LICENSE
+URL: https://github.com/davdittrich/robscale
+BugReports: https://github.com/davdittrich/robscale/issues
+Encoding: UTF-8
+Imports: Rcpp (>= 1.0.0)
+LinkingTo: Rcpp
+Suggests: tinytest, revss, microbenchmark
+NeedsCompilation: yes
+RoxygenNote: 7.3.3

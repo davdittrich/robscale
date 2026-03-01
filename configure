@@ -1,0 +1,27 @@
+#!/bin/sh
+# Detect platform-specific compiler flags for robscale
+
+# Detect -fopenmp-simd support
+OPENMP_SIMD_FLAG=""
+echo "int main(){return 0;}" > conftest.cpp
+if ${CXX:-c++} -fopenmp-simd -c conftest.cpp -o conftest.o 2>/dev/null; then
+  OPENMP_SIMD_FLAG="-fopenmp-simd"
+  echo "  -fopenmp-simd supported"
+else
+  echo "  -fopenmp-simd not supported, skipping"
+fi
+rm -f conftest.cpp conftest.o
+
+# Detect macOS Accelerate framework (vForce for vectorized tanh)
+ACCELERATE_LIBS=""
+if [ "$(uname -s)" = "Darwin" ]; then
+  ACCELERATE_LIBS="-framework Accelerate"
+  echo "  macOS detected, linking Accelerate framework"
+fi
+
+# Generate Makevars from template
+sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
+    -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
+    src/Makevars.in > src/Makevars
+
+echo "  Generated src/Makevars"
