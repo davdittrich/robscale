@@ -1,10 +1,12 @@
 ## Test environments
 
-* macOS Tahoe (aarch64), R 4.5.2, Apple clang 17.0.0
+* macOS Tahoe 26.3 (aarch64), R 4.5.2, Apple clang 17.0.0
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 1 note
+
+* NOTE: New submission
 
 ## Notes
 
