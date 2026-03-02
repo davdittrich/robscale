@@ -29,9 +29,9 @@ regime of $n \leq 20$.
 Beyond compiled execution, `robscale` departs from `revss` in three algorithmic
 choices: it replaces the scoring fixed-point iteration for location with true
 Newton--Raphson, it exploits the algebraic identity $\psi_{\log}(x) = \tanh(x/2)$
-to enable platform-vectorized transcendental evaluation, and it uses the
-Floyd--Rivest selection algorithm for $O(n)$ median computation instead of
-$O(n \log n)$ sorting.
+to enable platform-vectorized transcendental evaluation, and it uses $O(n)$ selection
+(sorting networks for $n \leq 8$, `std::nth_element` beyond) for median
+computation instead of $O(n \log n)$ sorting.
 
 ## Installation
 
@@ -103,11 +103,32 @@ for the iteration formula.
 **Fallback logic:** When `scale` is unknown and $n < 4$, or when `scale` is
 known and $n < 3$, the function returns `median(x)` without iteration.
 Providing a known `scale` lowers the minimum sample size from 4 to 3 because the
-MAD (which is unreliable at $n = 3$) is no longer needed.
+MAD (which is unreliable at $n = 3$) is no longer needed. The flowchart below
+shows the full control flow including fallbacks and the Newton--Raphson loop.
 
 ```r
 robLoc(c(1, 2, 3, 5, 7, 8))
 robLoc(c(1, 2, 3), scale = 1.5)   # known scale enables n = 3
+```
+
+```mermaid
+flowchart TD
+    A["minobs = 3 (scale known) or 4 (unknown)"] --> B["med = median(x)"]
+    B --> C{n < minobs?}
+    C -->|Yes| D([Return med])
+    C -->|No| E{Scale known?}
+    E -->|Yes| F[s = scale]
+    E -->|No| G["s = MAD(x)"]
+    F --> H{s = 0?}
+    G --> H
+    H -->|Yes| I([Return med])
+    H -->|No| J[t = med]
+    J --> K["ψᵢ = tanh((xᵢ − t) / 2s)"]
+    K --> L["Σψ and Σ(1 − ψ²)"]
+    L --> M["t += 2s · Σψ / Σ(1 − ψ²)"]
+    M --> N{"|v| ≤ tol?"}
+    N -->|No| K
+    N -->|Yes| O([Return t])
 ```
 
 ### `robScale(x, loc = NULL, implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
@@ -128,11 +149,33 @@ location, 3 for known), the function checks for MAD implosion:
 
 Providing a known `loc` centers the data at that value and uses the
 median-distance-to-zero ($1.4826 \cdot \text{median}(|x_i - \mu|)$) as the
-initial scale, lowering the minimum sample size from 4 to 3.
+initial scale, lowering the minimum sample size from 4 to 3. The flowchart
+below shows the full control flow including the known/unknown branching,
+implosion fallback, and multiplicative iteration loop.
 
 ```r
 robScale(c(1, 2, 3, 5, 7, 8))
 robScale(c(1, 2, 3, 5, 7, 8), loc = 5)   # known location
+```
+
+```mermaid
+flowchart TD
+    A{Location known?}
+    A -->|Yes| B["w = x − loc<br>s = 1.4826 · median|w|<br>t = 0, minobs = 3"]
+    A -->|No| C["med = median(x)<br>s = MAD(x)<br>t = med, minobs = 4"]
+    B --> D{n < minobs?}
+    C --> D
+    D -->|Yes| E{"MAD ≤ implbound?"}
+    E -->|Yes| F(["Return ADM(x)"])
+    E -->|No| G(["Return MAD(x)"])
+    D -->|No| H{s = 0?}
+    H -->|Yes| I([Return 0])
+    H -->|No| J["ψᵢ = tanh((xᵢ − t) / (c · s))"]
+    J --> K["sum_rho = Σψᵢ²"]
+    K --> L["v = √(2 · sum_rho / n)<br>s *= v"]
+    L --> M{"|v − 1| ≤ tol?"}
+    M -->|No| J
+    M -->|Yes| N([Return s])
 ```
 
 ## Algorithmic innovations
@@ -216,18 +259,17 @@ At small $n$, the scoring iteration count is higher because the starting value
 (the median) can be far from the M-estimate in units of the auxiliary scale.
 Newton--Raphson absorbs this gap in fewer steps.
 
-### 3. Floyd--Rivest selection for median computation
+### 3. $O(n)$ median selection
 
 Both the median and the MAD require computing a quantile---the median of the
 data, and the median of the absolute deviations. `revss` uses R's `median()`
 and `mad()`, which call `sort()` internally: an $O(n \log n)$ operation.
 
-`robscale` uses the Floyd--Rivest selection algorithm (Floyd & Rivest, 1975), an
-average-case $O(n)$ algorithm that partitions the array around the $k$th smallest
-element without fully sorting it. For the even-$n$ case, a single linear scan
-over the upper partition locates the $(k{+}1)$th element needed for averaging.
+`robscale` uses a tiered $O(n)$ median selection strategy. For even $n$, a
+single linear scan over the upper partition locates the $(k{+}1)$th element
+needed for averaging.
 
-For $n \leq 8$, the selection step is replaced by a full sort using optimal
+For $n \leq 8$---the core target regime---the selection step uses optimal
 sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4). These are branchless
 compare-and-swap sequences with the minimum number of comparisons for each $n$:
 
@@ -240,8 +282,12 @@ compare-and-swap sequences with the minimum number of comparisons for each $n$:
 | 7 | 16 |
 | 8 | 19 |
 
-For $n > 8$, the Floyd--Rivest algorithm dispatches to `std::nth_element` for
-partitions below 600 elements.
+For $9 \leq n < 600$, the code delegates to `std::nth_element` (introselect),
+which provides $O(n)$ worst-case selection with median-of-three pivot
+selection. For $n \geq 600$, the Floyd--Rivest algorithm (Floyd & Rivest,
+1975) applies a statistical narrowing step that reduces the active window to
+$O(n^{2/3})$ elements before partitioning---a constant-factor improvement that
+amortizes the overhead of its `log`/`exp`/`sqrt` computation only at scale.
 
 ### 4. Arena allocation on the stack
 
