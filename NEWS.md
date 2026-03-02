@@ -1,3 +1,18 @@
+# robscale 0.1.1
+
+* Consistent NA handling: `adm()` now raises an error when `na.rm = FALSE` and
+  NAs are present, matching `robLoc()` and `robScale()` behavior.
+* Replaced manual `new[]`/`delete[]` with `std::unique_ptr` for RAII memory
+  safety in all C++ estimator functions.
+* Removed unused scoring-iteration constants (`PSI_NORM_CONST`,
+  `INV_PSI_NORM_CONST`) from `robust_core.h`.
+* Hoisted loop-invariant `half_inv_s` above the Newton--Raphson loop in
+  `rob_loc.cpp`.
+* Added Mermaid algorithm flowcharts for `robLoc` and `robScale` to README.
+* Expanded test suite: explicit-center tests for `adm()`, `maxit` edge cases
+  for `robLoc()` and `robScale()`, sorting network verification for n = 2--8.
+* Added `cph` role to `Authors@R` in DESCRIPTION.
+
 # robscale 0.1.0
 
 Initial release.
