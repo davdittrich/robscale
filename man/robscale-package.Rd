@@ -26,7 +26,7 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Dennis Alexis Valin Dittrich \email{davd@economicscience.net} (\href{https://orcid.org/0000-0002-4438-8276}{ORCID})
+\strong{Maintainer}: Dennis Alexis Valin Dittrich \email{davd@economicscience.net} (\href{https://orcid.org/0000-0002-4438-8276}{ORCID}) [copyright holder]
 
 }
 \keyword{internal}

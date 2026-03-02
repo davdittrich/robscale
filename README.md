@@ -36,8 +36,11 @@ computation instead of $O(n \log n)$ sorting.
 ## Installation
 
 ```r
-# Requires a C++17 compiler (GCC >= 7, Clang >= 5, MSVC >= 19.14)
-remotes::install_github("davdittrich/robscale")
+install.packages("robscale")
+
+# Development version:
+# install.packages("remotes")
+# remotes::install_github("davdittrich/robscale")
 ```
 
 ## Motivating example
