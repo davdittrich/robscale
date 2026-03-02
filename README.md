@@ -113,22 +113,22 @@ robLoc(c(1, 2, 3), scale = 1.5)   # known scale enables n = 3
 
 ```mermaid
 flowchart TD
-    A["minobs = 3 (scale known) or 4 (unknown)"] --> B["med = median(x)"]
+    A[Set minobs: 3 if scale known, 4 if unknown] --> B[med = median x]
     B --> C{n < minobs?}
-    C -->|Yes| D([Return med])
-    C -->|No| E{Scale known?}
-    E -->|Yes| F[s = scale]
-    E -->|No| G["s = MAD(x)"]
+    C -- Yes --> D([Return med])
+    C -- No --> E{Scale known?}
+    E -- Yes --> F[s = scale]
+    E -- No --> G[s = MAD x]
     F --> H{s = 0?}
     G --> H
-    H -->|Yes| I([Return med])
-    H -->|No| J[t = med]
-    J --> K["ψᵢ = tanh((xᵢ − t) / 2s)"]
-    K --> L["Σψ and Σ(1 − ψ²)"]
-    L --> M["t += 2s · Σψ / Σ(1 − ψ²)"]
-    M --> N{"|v| ≤ tol?"}
-    N -->|No| K
-    N -->|Yes| O([Return t])
+    H -- Yes --> I([Return med])
+    H -- No --> J[t = med]
+    J --> K[psi_i = tanh of x_i - t over 2s]
+    K --> L[Sum psi and sum 1 - psi squared]
+    L --> M[t += 2s * sum_psi / sum_dpsi]
+    M --> N{Converged?}
+    N -- No --> K
+    N -- Yes --> O([Return t])
 ```
 
 ### `robScale(x, loc = NULL, implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
@@ -161,21 +161,25 @@ robScale(c(1, 2, 3, 5, 7, 8), loc = 5)   # known location
 ```mermaid
 flowchart TD
     A{Location known?}
-    A -->|Yes| B["w = x − loc<br>s = 1.4826 · median|w|<br>t = 0, minobs = 3"]
-    A -->|No| C["med = median(x)<br>s = MAD(x)<br>t = med, minobs = 4"]
-    B --> D{n < minobs?}
-    C --> D
-    D -->|Yes| E{"MAD ≤ implbound?"}
-    E -->|Yes| F(["Return ADM(x)"])
-    E -->|No| G(["Return MAD(x)"])
-    D -->|No| H{s = 0?}
-    H -->|Yes| I([Return 0])
-    H -->|No| J["ψᵢ = tanh((xᵢ − t) / (c · s))"]
-    J --> K["sum_rho = Σψᵢ²"]
-    K --> L["v = √(2 · sum_rho / n)<br>s *= v"]
-    L --> M{"|v − 1| ≤ tol?"}
-    M -->|No| J
-    M -->|Yes| N([Return s])
+    A -- Yes --> B1[w = x - loc]
+    B1 --> B2[s = 1.4826 * median abs w]
+    B2 --> B3[t = 0, minobs = 3]
+    A -- No --> C1[med = median x]
+    C1 --> C2[s = MAD x, t = med]
+    C2 --> C3[minobs = 4]
+    B3 --> D{n < minobs?}
+    C3 --> D
+    D -- Yes --> E{MAD le implbound?}
+    E -- Yes --> F([Return ADM x])
+    E -- No --> G([Return MAD x])
+    D -- No --> H{s = 0?}
+    H -- Yes --> I([Return 0])
+    H -- No --> J[psi_i = tanh of x_i - t over c * s]
+    J --> K[sum_rho = sum of psi_i squared]
+    K --> L[v = sqrt of 2 * sum_rho / n, then s *= v]
+    L --> M{Converged?}
+    M -- No --> J
+    M -- Yes --> N([Return s])
 ```
 
 ## Algorithmic innovations
