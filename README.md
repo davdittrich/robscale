@@ -27,7 +27,7 @@ comparisons) while running 6--33x faster, with the largest gains in the target
 regime of $n \leq 20$.
 
 Beyond compiled execution, `robscale` departs from `revss` in three algorithmic
-choices: it replaces the IRLS fixed-point iteration for location with true
+choices: it replaces the scoring fixed-point iteration for location with true
 Newton--Raphson, it exploits the algebraic identity $\psi_{\log}(x) = \tanh(x/2)$
 to enable platform-vectorized transcendental evaluation, and it uses the
 Floyd--Rivest selection algorithm for $O(n)$ median computation instead of
@@ -178,8 +178,8 @@ merely a cosmetic rewrite:
 
 ### 2. Newton--Raphson iteration for location
 
-`revss` iterates the location estimator using IRLS (iteratively reweighted least
-squares) fixed-point iteration (Rousseeuw & Verboven 2002, Eq. 21):
+`revss` iterates the location estimator using the scoring fixed-point iteration
+(Rousseeuw & Verboven 2002, Eq. 21):
 
 $$T^{(k+1)} = T^{(k)} + S \cdot \frac{\frac{1}{n}\sum \psi_{\log}\!\left(\frac{x_i - T^{(k)}}{S}\right)}{\alpha}$$
 
@@ -200,20 +200,19 @@ transcendental function calls.
 
 Newton--Raphson achieves *quadratic* convergence near the solution: the number
 of correct digits approximately doubles per iteration. The practical effect is
-a reduction from 5--16 iterations (IRLS) to 3--4 iterations (Newton--Raphson)
+a reduction from 4--8 iterations (scoring) to 3 iterations (Newton--Raphson)
 for reaching the same tolerance of $\sqrt{\epsilon_{\text{mach}}} \approx 1.49
 \times 10^{-8}$:
 
-| $n$ | IRLS iterations | Newton iterations |
+| $n$ | Scoring iterations | Newton--Raphson iterations |
 |---:|---:|---:|
-| 4 | 16 | 4 |
-| 5 | 12 | 4 |
-| 8 | 5 | 3 |
-| 20 | 5 | 3 |
-| 100 | 8 | 3 |
-| 1000 | 8 | 3 |
+| 4 | 7 | 3 |
+| 5 | 8 | 3 |
+| 8 | 7 | 3 |
+| 20 | 6 | 3 |
+| 100 | 5 | 3 |
 
-At small $n$, the IRLS iteration count is high because the starting value
+At small $n$, the scoring iteration count is higher because the starting value
 (the median) can be far from the M-estimate in units of the auxiliary scale.
 Newton--Raphson absorbs this gap in fewer steps.
 
@@ -305,7 +304,7 @@ Platform: R 4.5.2, Apple clang 17.0.0, macOS (Darwin 25.3.0), Apple Silicon
 **Interpretation.** Speedups are largest in the target regime ($n \leq 20$):
 10--33x for individual functions. The `robLoc` speedup exceeds what compiled
 execution alone would predict because the Newton--Raphson iteration converges in
-3--4 steps where IRLS requires 5--16 (see
+3 steps where the scoring iteration requires 4--8 (see
 [Newton--Raphson iteration](#2-newtonraphson-iteration-for-location)).
 
 At larger $n$, the advantage narrows. The `adm` function has no iteration loop,
@@ -329,7 +328,7 @@ The test suite (`inst/tinytest/test_cross_check.R`) compares `robscale` and
 - Tolerance: $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$
 
 All 5,400 comparisons pass. The Newton--Raphson iteration converges to the same
-fixed point as IRLS---it solves the same estimating equation---so the results
+fixed point as the scoring iteration---it solves the same estimating equation---so the results
 differ only by rounding at the level of the convergence tolerance.
 
 ## Mathematical background
@@ -360,7 +359,7 @@ where $c = 0.37394112142347236$ is the constant that yields 50% breakdown point.
 
 | Symbol | Value | Definition |
 |:---|:---|:---|
-| $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; IRLS normalization constant |
+| $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
 | $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
 | $C_{\text{MAD}}$ | `1.4826` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
