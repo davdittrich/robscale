@@ -274,8 +274,9 @@ single linear scan over the upper partition locates the $(k{+}1)$th element
 needed for averaging.
 
 For $n \leq 8$---the core target regime---the selection step uses optimal
-sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4). These are branchless
-compare-and-swap sequences with the minimum number of comparisons for each $n$:
+sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4). These are conditional
+compare-and-swap sequences---typically compiled to branchless machine code at
+`-O2`---with the minimum number of comparisons for each $n$:
 
 | $n$ | Comparators |
 |---:|---:|

@@ -19,12 +19,13 @@ Gaussian.  Defaults to \eqn{\sqrt{\pi/2} \approx 1.2533}{sqrt(pi/2) ~
 absolute deviation.}
 
 \item{na.rm}{Logical.  If \code{TRUE}, \code{NA} values are stripped from
-\code{x} before computation.}
+\code{x} before computation.  If \code{FALSE} (the default), the presence
+of any \code{NA} raises an error.}
 }
 \value{
 A single numeric value: the scaled mean absolute deviation from the
-  center.  Returns \code{NA} if \code{x} has length zero (after removal of
-  \code{NA}s when \code{na.rm = TRUE}).
+  center.  Returns \code{NA} if \code{x} has length zero after removal of
+  \code{NA}s.
 }
 \description{
 Compute the mean absolute deviation from the median, scaled by a consistency

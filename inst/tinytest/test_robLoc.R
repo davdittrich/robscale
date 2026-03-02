@@ -57,3 +57,9 @@ expect_equal(robLoc(c(3, 7)), median(c(3, 7)))
 expect_equal(robLoc(c(5, 5, 5, 5)), 5)
 expect_equal(robLoc(c(5, 5, 5, 5, 5)), 5)
 expect_equal(robLoc(c(5, 5, 5, 5), scale = 1), 5)
+
+## maxit/tol: single iteration differs from converged result
+full <- robLoc(x5)
+partial <- robLoc(x5, maxit = 1L)
+expect_false(isTRUE(all.equal(partial, full)))
+expect_equal(robLoc(x5, maxit = 0L), median(x5), tolerance = tol)

@@ -9,7 +9,14 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
 
   // Arena: [0..n) working copy, [n..2n) abs values / reused as tmp, [2n..3n) extra
   double buf_stack[STACK_BUF_SIZE * 3];
-  double* arena = (n * 3 <= STACK_BUF_SIZE * 3) ? buf_stack : new double[n * 3];
+  std::unique_ptr<double[]> heap;
+  double* arena;
+  if (n * 3 <= STACK_BUF_SIZE * 3) {
+    arena = buf_stack;
+  } else {
+    heap.reset(new double[n * 3]);
+    arena = heap.get();
+  }
   double* w = arena;
   double* abs_buf = arena + n;
   double* extra = arena + 2 * n;
@@ -37,24 +44,17 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
       std::memcpy(extra, xp, n * sizeof(double));
       double med_orig = median_select(extra, n);
       double mad_orig = mad_select(xp, n, med_orig, abs_buf);
-      double result = (mad_orig <= implbound)
+      return (mad_orig <= implbound)
         ? adm_core(xp, n, med_orig, ADM_CONSISTENCY)
         : mad_orig;
-      if (n * 3 > STACK_BUF_SIZE * 3) delete[] arena;
-      return result;
     } else {
-      double result = (s <= implbound)
+      return (s <= implbound)
         ? adm_core(xp, n, t, ADM_CONSISTENCY)
         : s;
-      if (n * 3 > STACK_BUF_SIZE * 3) delete[] arena;
-      return result;
     }
   }
 
-  if (s == 0.0) {
-    if (n * 3 > STACK_BUF_SIZE * 3) delete[] arena;
-    return 0.0;
-  }
+  if (s == 0.0) return 0.0;
 
   // Multiplicative iteration with bulk_tanh
   const double* data = has_loc ? w : xp;
@@ -77,6 +77,5 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     if (std::abs(v - 1.0) <= tol) break;
   }
 
-  if (n * 3 > STACK_BUF_SIZE * 3) delete[] arena;
   return s;
 }
