@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include "sort_net.h"
 
 // --- Platform-specific vectorized tanh ---
@@ -33,8 +34,6 @@ inline void bulk_tanh(double* inout, int n) {
 }
 
 // Key constants from Rousseeuw & Verboven (2002)
-constexpr double PSI_NORM_CONST       = 0.413241928283814;
-constexpr double INV_PSI_NORM_CONST   = 1.0 / 0.413241928283814;
 constexpr double RHO_SCALE_CONST      = 0.37394112142347236;
 constexpr double INV_RHO_SCALE_CONST  = 1.0 / 0.37394112142347236;
 constexpr double MAD_CONSISTENCY      = 1.4826;

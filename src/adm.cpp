@@ -12,9 +12,15 @@ double adm_impl(Rcpp::NumericVector x, double center, double constant) {
 double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   double buf_stack[STACK_BUF_SIZE];
-  double* buf = (n <= STACK_BUF_SIZE) ? buf_stack : new double[n];
+  std::unique_ptr<double[]> heap;
+  double* buf;
+  if (n <= STACK_BUF_SIZE) {
+    buf = buf_stack;
+  } else {
+    heap.reset(new double[n]);
+    buf = heap.get();
+  }
   std::memcpy(buf, x.begin(), n * sizeof(double));
   double med = median_select(buf, n);
-  if (n > STACK_BUF_SIZE) delete[] buf;
   return adm_core(x.begin(), n, med, constant);
 }

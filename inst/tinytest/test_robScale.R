@@ -51,3 +51,9 @@ expect_equal(robScale(c(3, 7)), mad(c(3, 7)), tolerance = tol)
 expect_equal(robScale(c(5, 5, 5, 5)), 0)
 expect_equal(robScale(c(5, 5, 5, 5, 5)), 0)
 expect_equal(robScale(c(5, 5, 5, 5), loc = 5), 0)
+
+## maxit/tol: single iteration differs from converged result
+full <- robScale(y)
+partial <- robScale(y, maxit = 1L)
+expect_false(isTRUE(all.equal(partial, full)))
+expect_equal(robScale(y, maxit = 0L), mad(y), tolerance = tol)

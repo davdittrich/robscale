@@ -6,7 +6,7 @@
 \alias{robscale-package}
 \title{robscale: Fast Robust Estimation in Very Small Samples}
 \description{
-High-performance C++ implementation (via Rcpp) of the robust location and scale M-estimators described in Rousseeuw & Verboven (2002) \doi{10.1016/S0167-9473(02)00078-6} for very small samples. Provides numerically identical results to the 'revss' package with significantly improved performance through sorting networks and compiled iteration loops.
+High-performance C++ implementation (via 'Rcpp') of the robust location and scale M-estimators described in Rousseeuw & Verboven (2002) \doi{10.1016/S0167-9473(02)00078-6} for very small samples. Provides numerically identical results to the 'revss' package with significantly improved performance through sorting networks and compiled iteration loops.
 }
 \references{
 Rousseeuw, P. J. and Verboven, S. (2002) Robust estimation in very small
@@ -15,6 +15,15 @@ samples. \emph{Computational Statistics & Data Analysis}, \bold{40}(4),
 
 Nair, K. R. (1947) A Note on the Mean Deviation from the Median.
 \emph{Biometrika}, \bold{34}(3/4), 360--362. \doi{10.2307/2332448}
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/davdittrich/robscale}
+  \item \doi{10.5281/zenodo.18828607}
+  \item Report bugs at \url{https://github.com/davdittrich/robscale/issues}
+}
+
 }
 \author{
 \strong{Maintainer}: Dennis Alexis Valin Dittrich \email{davd@economicscience.net} (\href{https://orcid.org/0000-0002-4438-8276}{ORCID})

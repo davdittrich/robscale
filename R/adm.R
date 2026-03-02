@@ -12,7 +12,8 @@
 #'   1.2533} (Nair, 1947).  Set to \code{1} for the raw (unscaled) mean
 #'   absolute deviation.
 #' @param na.rm Logical.  If \code{TRUE}, \code{NA} values are stripped from
-#'   \code{x} before computation.
+#'   \code{x} before computation.  If \code{FALSE} (the default), the presence
+#'   of any \code{NA} raises an error.
 #'
 #' @details
 #' The average distance to the median (ADM) is defined as
@@ -38,8 +39,8 @@
 #' estimator in \code{\link{robScale}} when the MAD collapses to zero.
 #'
 #' @return A single numeric value: the scaled mean absolute deviation from the
-#'   center.  Returns \code{NA} if \code{x} has length zero (after removal of
-#'   \code{NA}s when \code{na.rm = TRUE}).
+#'   center.  Returns \code{NA} if \code{x} has length zero after removal of
+#'   \code{NA}s.
 #'
 #' @references
 #' Nair, K. R. (1947) A Note on the Mean Deviation from the Median.
@@ -70,6 +71,10 @@
 adm <- function(x, center, constant = 1.2533141373155001, na.rm = FALSE) {
   if (na.rm) {
     x <- x[!is.na(x)]
+  } else {
+    if (anyNA(x)) {
+      stop("There are NAs in the data yet na.rm is FALSE")
+    }
   }
   if (length(x) == 0L) return(NA_real_)
   if (missing(center)) {
