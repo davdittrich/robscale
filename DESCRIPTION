@@ -5,7 +5,7 @@ Version: 0.1.0
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
-Description: High-performance C++ implementation (via Rcpp) of the robust
+Description: High-performance C++ implementation (via 'Rcpp') of the robust
     location and scale M-estimators described in Rousseeuw & Verboven (2002)
     <doi:10.1016/S0167-9473(02)00078-6> for very small samples. Provides
     numerically identical results to the 'revss' package with significantly
