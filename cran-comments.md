@@ -1,3 +1,9 @@
+## Resubmission
+
+This is a resubmission. In the previous submission, CRAN requested that
+'Rcpp' be single-quoted in the DESCRIPTION. This has been addressed; no other
+changes were requested.
+
 ## Test environments
 
 * macOS Tahoe 26.3 (aarch64), R 4.5.2, Apple clang 17.0.0
@@ -10,7 +16,7 @@
 
 ## Notes
 
-* This is the first submission of the `robscale` package.
+* This is the first release of the `robscale` package.
 * The package reimplements the robust estimators from the CRAN package `revss`
   (listed in Suggests) in C++17 via Rcpp. The API is intentionally identical to
   `revss` to serve as a drop-in replacement.
