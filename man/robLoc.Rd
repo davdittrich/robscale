@@ -68,11 +68,11 @@ computed for the numerator.  Starting value:
 \eqn{S = \mathrm{MAD}(x)}{S = MAD(x)} unless \code{scale} is supplied.
 
 \strong{Performance and SIMD.}
-This implementation is highly optimized using C++17. On supported platforms,
-transcendental evaluations (\code{tanh}) are vectorized using the \bold{SLEEF}
-SIMD library (targeting AVX2, AVX512, or NEON), Apple Accelerate, or
-OpenMP SIMD directives. This typically yields a 15--30x speedup over R
-implementations like \code{revss}.
+This C++17 implementation uses platform-specific SIMD vectorization to accelerate
+transcendental evaluations (\code{tanh}). On Linux, it uses the \bold{SLEEF}
+library (targeting AVX2, AVX512, or NEON); on macOS, it uses \bold{Apple Accelerate}.
+These optimizations reduce execution time by a factor of 15--30 compared to
+interpreted R implementations like \code{revss}.
 
 \strong{Decoupled estimation.}
 Location and scale are estimated separately: \code{robLoc} holds the

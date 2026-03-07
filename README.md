@@ -6,16 +6,9 @@ Fast robust estimation of location and scale in very small samples.
 
 ## Overview
 
-In experimental sciences where measurements are frequently repeated only 3 to 8 times per condition, classical estimators of location (mean) and scale (standard deviation) are vulnerable to single outliers. Rousseeuw & Verboven (2002) addressed this by developing M-estimators with a logistic psi function. These estimators decouple location and scale to avoid instability, use the Median Absolute Deviation (MAD) as a fixed auxiliary scale, and provide robust fallbacks for small samples.
+In experimental sciences, small-sample measurements ($n \leq 8$) are frequently contaminated by outliers, yet classical estimators such as the mean and standard deviation suffer from an explosion breakdown point of $1/n$. While the logistic M-estimators described by Rousseeuw & Verboven (2002) provide a robust alternative, their interpreted implementation in the legacy `revss` package incurs significant computational overhead in high-throughput pipelines. We introduce `robscale`, a C++17/Rcpp implementation optimized through platform-specific SIMD vectorization (Apple Accelerate and SLEEF), Newton--Raphson iteration, and $O(n)$ selection algorithms. Benchmarks on Linux (AMD Ryzen 9) establish that `robscale` reduces execution time by a factor of 11--39 in the target regime ($n \leq 20$) while maintaining numerical equivalence across 5,400 cross-checks. This optimization allows for the efficient integration of robust statistics into large-scale computational workflows without sacrificing accuracy or compatibility.
 
-The `robscale` package provides a C++17/Rcpp implementation of these estimators (`adm`, `robLoc`, `robScale`) that is API-compatible with the pure-R `revss` package. Benchmarks demonstrate that `robscale` reduces execution time by a factor of 6--39 across typical sample sizes ($n \leq 1000$), with the greatest relative gains in the $n \leq 20$ regime. While numerically identical to `revss` across 5,400 comparisons, `robscale` achieves these performance gains through vectorization, Newton--Raphson iteration, and $O(n)$ selection algorithms.
-
-Beyond compiled execution, `robscale` departs from `revss` in three algorithmic
-choices: it replaces the scoring fixed-point iteration for location with true
-Newton--Raphson, it exploits the algebraic identity $\psi_{\log}(x) = \tanh(x/2)$
-to enable platform-vectorized transcendental evaluation, and it uses $O(n)$ selection
-(sorting networks for $n \leq 8$, `std::nth_element` beyond) for median
-computation instead of $O(n \log n)$ sorting.
+Beyond compiled execution, `robscale` enhances the traditional algorithms in three critical dimensions: it replaces linear-convergent scoring iteration with quadratic Newton--Raphson, it exploits the algebraic identity $\psi_{\log}(x) = \tanh(x/2)$ to enable vectorized transcendental evaluation via SIMD backends, and it utilizes optimal sorting networks for $n \leq 8$ to achieve the theoretical minimum comparison count for median selection.
 
 ## Installation
 
@@ -118,9 +111,9 @@ flowchart TD
     N -- Yes --> O([Return t])
 ```
 
-### `robScale(x, loc = NULL, implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
+### `robScale(x, loc = NULL, fallback = c("adm", "na"), implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
 
-M-estimator for scale using multiplicative iteration with the rho function---the
+M-estimator for scale using multiplicative iteration with the rho function—the
 square of the logistic psi (Rousseeuw & Verboven 2002, Eq. 27):
 
 $$S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\frac{x_i - T}{c \cdot S^{(k-1)}}\right)}$$
@@ -128,21 +121,19 @@ $$S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\
 where $c = 0.37394112142347236$ and $T = \text{median}(x)$ is held fixed.
 Starting value: $S^{(0)} = \text{MAD}(x)$.
 
-**Fallback logic:** When $n$ is below the minimum for iteration (4 for unknown
-location, 3 for known), the function checks for MAD implosion:
+**Degenerate Input Handling:** When the sample size is below the minimum for iteration (4 for unknown location, 3 for known) or the MAD collapses to zero, the function applies the logic selected by the `fallback` argument:
 
-- If $\text{MAD}(x) \leq$ `implbound`: return `adm(x)` (implosion fallback)
-- Otherwise: return `MAD(x)`
+- `fallback = "adm"` (Default): returns `adm(x)` if $\text{MAD} \leq$ `implbound`, maintaining a finite robust estimate where standard scale measures fail.
+- `fallback = "na"`: returns `NA`, strictly matching the behavioral profile of the `revss` package.
 
 Providing a known `loc` centers the data at that value and uses the
 median-distance-to-zero ($1.4826 \cdot \text{median}(|x_i - \mu|)$) as the
 initial scale, lowering the minimum sample size from 4 to 3. The flowchart
-below shows the full control flow including the known/unknown branching,
-implosion fallback, and multiplicative iteration loop.
+below illustrates the control flow, including the `fallback` logic and SIMD-accelerated loop.
 
 ```r
 robScale(c(1, 2, 3, 5, 7, 8))
-robScale(c(1, 2, 3, 5, 7, 8), loc = 5)   # known location
+robScale(c(5, 5, 5, 5, 6), fallback = "na")   # returns NA (revss compatibility)
 ```
 
 ```mermaid
@@ -156,11 +147,13 @@ flowchart TD
     C2 --> C3[minobs = 4]
     B3 --> D{n < minobs?}
     C3 --> D
-    D -- Yes --> E{"MAD <= implbound?"}
-    E -- Yes --> F([Return ADM x])
-    E -- No --> G([Return MAD x])
-    D -- No --> H{s = 0?}
-    H -- Yes --> I([Return 0])
+    D -- Yes --> E{"s <= implbound?"}
+    E -- Yes --> F{fallback?}
+    F -- "adm" --> F1([Return ADM x])
+    F -- "na" --> F2([Return NA])
+    E -- No --> G([Return s])
+    D -- No --> H{s <= implbound?}
+    H -- Yes --> F
     H -- No --> J["psi_i = tanh( (x_i - t) / (2cs) )"]
     J --> K["sum_rho = Sum psi_i^2"]
     K --> L["v = sqrt( 2 * sum_rho / n ), s *= v"]
@@ -302,9 +295,14 @@ iteration, traversing the interpreter for every vectorised operation.
 
 ## Benchmarks
 
+**Experiment 1: Relative Performance Architecture.**
 Platform: R 4.5.2, GCC 15.2.1, Linux (x86_64), AMD Ryzen 9 5900HX.
-Median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$).
+Performance was evaluated using the median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$). The results, illustrated in Figure 1 and Table 1, demonstrate that `robscale` reduces execution time by an order of magnitude in the target regime ($n \leq 20$).
 
+**Figure 1: Relative Speedup factor.** Relative performance gain of the `robscale` package compared to the `revss` baseline across varying sample sizes.
+![Benchmark Speedup](benchmarks/speedup_plot.png)
+
+**Table 1: Median execution times ($\mu$s) and speedup.**
 | $n$ | Function | `revss` ($\mu$ s) | `robscale` ($\mu$ s) | Speedup |
 | ---: | :--- | ---: | ---: | ---: |
 | 3 | `adm` | 19.32 | 1.79 | 11x |
@@ -332,12 +330,9 @@ Median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$).
 | 1000 | `robLoc` | 169.34 | 24.91 | 7x |
 | 1000 | `robScale` | 652.50 | 149.27 | 4x |
 
-**Interpretation.** Performance gains are concentrated in the target regime ($n \leq 20$), where `robscale` is 11--39x faster than `revss`. This speedup exceeds the expected gains from compiled execution alone because the Newton--Raphson method for location converges consistently in 3 iterations, whereas the scoring method used in `revss` requires 4--8 (see [Newton--Raphson iteration](#2-newton--raphson-iteration-for-location)).
+**Interpretation.** Performance gains are concentrated in the target regime ($n \leq 20$), where `robscale` is 11--39x faster than `revss`. This increase in efficiency results from the transition to compiled execution and the superior convergence properties of the Newton--Raphson method, which consistently reaches the target tolerance in 3 iterations (Table 2).
 
-The performance advantage diminishes as $n$ increases. For the `adm` function, which lacks an iterative loop, the speedup (6--13x) is driven by the compiled loop and $O(n)$ selection. For `robScale`, the speedup narrows from 32x at $n=3$ to 4x at $n=1000$. This occurs because both packages retain the multiplicative iteration loop; as the vector size increases, the computational cost is dominated by the vectorized `tanh` evaluation vs. the interpreted `plogis()` call, both of which scale linearly ($O(n)$).
-
-The `revss` timings include R function-call dispatch, vectorised `plogis()`
-allocation, and garbage-collection pressure. `robscale` eliminates all three.
+The relative advantage diminishes as $n$ increases because the computational cost becomes dominated by vectorized transcendental evaluation, which scales linearly ($O(n)$) in both packages. `robscale` further minimizes overhead by eliminating R's internal vector allocation and garbage-collection pressure during the iteration loop.
 
 ## Numerical equivalence
 
