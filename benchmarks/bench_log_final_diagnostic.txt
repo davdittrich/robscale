@@ -1,0 +1,187 @@
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+
+Attaching package: ‘robscale’
+
+The following objects are masked from ‘package:fastqnsn’:
+
+    qn, sn
+
+=== ENVIRONMENT ===
+Date: 2026-03-07 18:35:38 CET 
+R version: R version 4.5.2 (2025-10-31) 
+robscale version: dev (devtools::load_all)
+fastqnsn version: 1.1.0 
+robscale QnSn Config:
+$simd_level
+[1] 2
+
+$qn_exact_threshold
+[1] 176
+
+$qn_parallel_threshold
+[1] 8192
+
+$sn_stack_threshold
+[1] 2048
+
+$sn_parallel_threshold
+[1] 12288
+
+$l2_cache_size
+[1] 524288
+
+$num_logical_cores
+[1] 16
+
+─ Session info ───────────────────────────────────────────────────────────────
+ setting  value
+ version  R version 4.5.2 (2025-10-31)
+ os       Arch Linux
+ system   x86_64, linux-gnu
+ ui       X11
+ language (EN)
+ collate  en_US.UTF-8
+ ctype    en_US.UTF-8
+ tz       Europe/Berlin
+ date     2026-03-07
+ pandoc   3.5 @ /usr/bin/pandoc
+ quarto   1.8.27 @ /usr/bin/quarto
+
+─ Packages ───────────────────────────────────────────────────────────────────
+ package        * version  date (UTC) lib source
+ boot           * 1.3-32   2025-08-29 [1] RSPM (R 4.5.1)
+ cli              3.6.5    2025-04-23 [1] RSPM (R 4.5.0)
+ dichromat        2.0-0.1  2022-05-02 [1] RSPM (R 4.5.0)
+ distributional   0.6.0    2026-01-14 [1] RSPM (R 4.5.2)
+ dplyr          * 1.2.0    2026-02-03 [1] RSPM (R 4.5.2)
+ farver           2.1.2    2024-05-13 [1] RSPM (R 4.5.0)
+ fastqnsn       * 1.1.0    2026-03-07 [1] local
+ generics         0.1.4    2025-05-09 [1] RSPM (R 4.5.1)
+ ggdist         * 3.3.3    2025-04-23 [1] RSPM (R 4.5.0)
+ ggplot2        * 4.0.2    2026-02-03 [1] RSPM (R 4.5.2)
+ glue             1.8.0    2024-09-30 [1] RSPM (R 4.5.0)
+ gtable           0.3.6    2024-10-25 [1] RSPM (R 4.5.0)
+ lifecycle        1.0.5    2026-01-08 [1] RSPM (R 4.5.2)
+ magrittr         2.0.4    2025-09-12 [1] RSPM (R 4.5.2)
+ microbenchmark * 1.5.0    2024-09-04 [1] CRAN (R 4.5.2)
+ pillar           1.11.1   2025-09-17 [1] RSPM (R 4.5.2)
+ pkgconfig        2.0.3    2019-09-22 [1] RSPM (R 4.5.0)
+ purrr            1.2.1    2026-01-09 [1] RSPM (R 4.5.2)
+ R6               2.6.1    2025-02-15 [1] RSPM (R 4.5.0)
+ RColorBrewer     1.1-3    2022-04-03 [1] RSPM (R 4.5.0)
+ Rcpp             1.1.1    2026-01-10 [1] RSPM (R 4.5.2)
+ RcppParallel     5.1.11-1 2025-08-27 [1] RSPM (R 4.5.2)
+ rlang            1.1.7    2026-01-09 [1] RSPM (R 4.5.2)
+ robscale       * 0.1.1    2026-03-07 [1] local
+ S7               0.2.1    2025-11-14 [1] RSPM (R 4.5.2)
+ scales         * 1.4.0    2025-04-24 [1] RSPM (R 4.5.0)
+ sessioninfo    * 1.2.3    2025-02-05 [1] RSPM (R 4.5.0)
+ tibble           3.3.1    2026-01-11 [1] RSPM (R 4.5.2)
+ tidyr          * 1.3.2    2025-12-19 [1] RSPM (R 4.5.2)
+ tidyselect       1.2.1    2024-03-11 [1] RSPM (R 4.5.0)
+ vctrs            0.7.1    2026-01-23 [1] RSPM (R 4.5.2)
+ withr            3.0.2    2024-10-28 [1] RSPM (R 4.5.0)
+
+ [1] /home/dd/R/x86_64-pc-linux-gnu-library/4.5
+ [2] /usr/lib/R/library
+ * ── Packages attached to the search path.
+
+──────────────────────────────────────────────────────────────────────────────
+CPU governor: powersave 
+
+=== NUMERICAL EQUIVALENCE CHECK: SKIPPED (Already Validated) ===
+
+=== BENCHMARK START ===
+[2026-03-07 18:35:39.455667] n = 8 (20000 iters)... done
+[2026-03-07 18:35:41.080147] n = 10 (20000 iters)... done
+[2026-03-07 18:35:41.987389] n = 16 (20000 iters)... done
+[2026-03-07 18:35:42.893238] n = 32 (20000 iters)... done
+[2026-03-07 18:35:44.0726] n = 64 (20000 iters)... done
+[2026-03-07 18:35:45.192685] n = 128 (20000 iters)... done
+[2026-03-07 18:35:46.922058] n = 256 (5000 iters)... done
+[2026-03-07 18:35:47.85093] n = 512 (5000 iters)... done
+[2026-03-07 18:35:49.54395] n = 1024 (5000 iters)... done
+[2026-03-07 18:35:53.135132] n = 2048 (5000 iters)... done
+[2026-03-07 18:35:59.795437] n = 4096 (500 iters)... done
+[2026-03-07 18:36:01.835721] n = 8192 (500 iters)... done
+[2026-03-07 18:36:05.350241] n = 12288 (500 iters)... done
+[2026-03-07 18:36:08.981137] n = 16384 (500 iters)... done
+[2026-03-07 18:36:13.14537] n = 32768 (50 iters)... done
+[2026-03-07 18:36:14.616488] n = 65536 (50 iters)... done
+[2026-03-07 18:36:16.686479] n = 131072 (50 iters)... done
+[2026-03-07 18:36:20.093221] n = 262144 (50 iters)... done
+[2026-03-07 18:36:26.074072] n = 524288 (50 iters)... done
+[2026-03-07 18:36:37.10763] n = 1048576 (10 iters)... done
+[2026-03-07 18:36:42.469304] n = 10000000 (10 iters)... done
+
+=== ANALYSIS: BOOTSTRAP CIs ===
+
+=== MONOTONICITY CHECK ===
+WARNING: Non-monotonic timing for Qn robscale at n = 256
+WARNING: Non-monotonic timing for Qn fastqnsn at n = 12288
+
+=== GENERATING PLOTS ===
+
+=== SUMMARY TABLE ===
+        n estimator   robscale   fastqnsn ratio ci_lo ci_hi regression
+        8        Sn       1.55       1.42 1.088 1.084 1.092      FALSE
+        8        Qn       1.82       1.49 1.221 1.215 1.222       TRUE
+       10        Sn       1.74       1.44 1.208 1.208 1.208       TRUE
+       10        Qn       1.96       1.51 1.298 1.297 1.298       TRUE
+       16        Sn       1.96       1.49 1.315 1.315 1.322       TRUE
+       16        Qn       2.28       1.59 1.434 1.428 1.434       TRUE
+       32        Sn       2.08       1.67 1.246 1.245 1.246       TRUE
+       32        Qn       4.04       2.03 1.985 1.980 1.985       TRUE
+       64        Sn       2.84       2.01 1.408 1.408 1.408       TRUE
+       64        Qn      11.32       3.51 3.228 3.220 3.228       TRUE
+      128        Sn       4.40       2.74 1.602 1.602 1.603       TRUE
+      128        Qn      35.06       8.81 3.980 3.975 3.980       TRUE
+      256        Sn       7.88       4.32 1.824 1.820 1.828       TRUE
+      256        Qn      21.67      20.24 1.071 1.069 1.072      FALSE
+      512        Sn      15.05       9.43 1.595 1.586 1.605       TRUE
+      512        Qn      84.55      79.52 1.063 1.059 1.067      FALSE
+     1024        Sn      40.65      29.20 1.392 1.383 1.399       TRUE
+     1024        Qn     248.88     243.74 1.021 1.019 1.023      FALSE
+     2048        Sn      94.04      62.79 1.498 1.491 1.505       TRUE
+     2048        Qn     530.99     518.82 1.023 1.022 1.025      FALSE
+     4096        Sn     198.37     137.74 1.440 1.430 1.451       TRUE
+     4096        Qn    1276.68    1254.13 1.018 1.015 1.020      FALSE
+     8192        Sn     375.97     207.87 1.809 1.801 1.818       TRUE
+     8192        Qn    2595.51    2560.70 1.014 1.013 1.014      FALSE
+    12288        Sn     538.02     313.03 1.719 1.685 1.779       TRUE
+    12288        Qn    2618.61    2268.51 1.154 1.149 1.160       TRUE
+    16384        Sn     672.46     317.58 2.117 2.064 2.147       TRUE
+    16384        Qn    2959.69    2614.00 1.132 1.125 1.137       TRUE
+    32768        Sn    1312.56     627.77 2.091 1.897 2.171       TRUE
+    32768        Qn    5829.35    5385.63 1.082 1.053 1.127      FALSE
+    65536        Sn    2711.54    1206.33 2.248 2.214 2.328       TRUE
+    65536        Qn   11221.99   10437.22 1.075 1.018 1.124      FALSE
+   131072        Sn    6080.85    2568.05 2.368 2.302 2.410       TRUE
+   131072        Qn   22439.13   21478.04 1.045 1.023 1.067      FALSE
+   262144        Sn   11668.26    4776.25 2.443 2.360 2.470       TRUE
+   262144        Qn   43839.42   43462.46 1.009 0.995 1.029      FALSE
+   524288        Sn   22447.92    9770.88 2.297 2.181 2.385       TRUE
+   524288        Qn   82584.26   81338.80 1.015 0.994 1.049      FALSE
+  1048576        Sn   52501.11   21165.13 2.481 2.231 2.678       TRUE
+  1048576        Qn  195710.18  199468.46 0.981 0.953 1.090      FALSE
+ 10000000        Sn  661309.73  267593.77 2.471 2.202 2.843       TRUE
+ 10000000        Qn 2438411.15 2462875.35 0.990 0.911 1.030      FALSE
+
+=== VERDICT ===
+FAIL: 28 significant regressions detected (>10%).
+H1 (large-n parity < 5%):  INCONCLUSIVE 
+H2 (small-n overhead < 20%):  INCONCLUSIVE 
+
+Benchmark Complete.

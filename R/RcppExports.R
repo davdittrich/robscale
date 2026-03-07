@@ -9,6 +9,26 @@ adm_impl_auto <- function(x, constant) {
     .Call(`_robscale_adm_impl_auto`, x, constant)
 }
 
+C_sn_fast <- function(x) {
+    .Call(`_robscale_C_sn_fast`, x)
+}
+
+C_sn_int_fast <- function(x) {
+    .Call(`_robscale_C_sn_int_fast`, x)
+}
+
+C_qn_fast <- function(x) {
+    .Call(`_robscale_C_qn_fast`, x)
+}
+
+C_qn_int_fast <- function(x) {
+    .Call(`_robscale_C_qn_int_fast`, x)
+}
+
+get_qnsn_config <- function() {
+    .Call(`_robscale_get_qnsn_config`)
+}
+
 rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }

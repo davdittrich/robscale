@@ -1,25 +1,26 @@
 Package: robscale
 Type: Package
-Title: Robust Estimation in Small Samples via SIMD-Accelerated Iteration
+Title: Robust Location and Scale Estimation with SIMD-Accelerated C++ Kernels
 Version: 0.1.1
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
-Description: Provides a high-performance C++ implementation of the robust
-    location and scale M-estimators described in Rousseeuw & Verboven (2002)
-    <doi:10.1016/S0167-9473(02)00078-6>. This package optimizes the logistic
-    M-estimators for measurements with very small sample sizes ($n \leq 8$) using
-    platform-specific SIMD vectorization (Apple Accelerate and SLEEF),
-    Newton--Raphson iteration, and sorting networks. Across 5,400 cross-checks,
-    'robscale' maintains numerical equivalence to the 'revss' package while
-    reducing execution time by a factor of 11--39 in the target regime.
+Description: Provides high-performance C++ implementations of robust location
+    and scale estimators. The M-estimators of Rousseeuw & Verboven (2002)
+    <doi:10.1016/S0167-9473(02)00078-6> target very small samples (n <= 8)
+    with SIMD-accelerated tanh iteration. The Rousseeuw-Croux Qn and Sn
+    estimators (Rousseeuw & Croux, 1993) use cache-aware algorithm dispatch,
+    Floyd-Rivest selection, and multi-threaded kernels (via RcppParallel) to
+    scale from n=2 to n=10^8 with 2--14x speedup over robustbase.
 License: MIT + file LICENSE
 URL: https://github.com/davdittrich/robscale,
     https://doi.org/10.5281/zenodo.18828607
 BugReports: https://github.com/davdittrich/robscale/issues
 Encoding: UTF-8
-Imports: Rcpp (>= 1.0.0)
-LinkingTo: Rcpp
-Suggests: tinytest, revss, microbenchmark
+Imports: Rcpp (>= 1.0.0), RcppParallel (>= 5.0.0)
+LinkingTo: Rcpp, RcppParallel, BH
+Suggests: testthat (>= 3.0.0), revss, microbenchmark
+SystemRequirements: GNU make, TBB (Intel Threading Building Blocks), C++17
+Config/testthat/edition: 3
 NeedsCompilation: yes
 RoxygenNote: 7.3.3

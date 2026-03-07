@@ -11,7 +11,7 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
   double buf_stack[STACK_BUF_SIZE * 2];
   std::unique_ptr<double[]> heap;
   double* arena;
-  if (n * 2 <= STACK_BUF_SIZE * 2) {
+  if (ROBSCALE_LIKELY(n * 2 <= STACK_BUF_SIZE * 2)) {
     arena = buf_stack;
   } else {
     heap.reset(new double[n * 2]);
@@ -23,11 +23,11 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
   std::memcpy(buf, x.begin(), n * sizeof(double));
   double med = median_select(buf, n);
 
-  if (n < minobs) return med;
+  if (ROBSCALE_UNLIKELY(n < minobs)) return med;
 
   double s = has_scale ? scale_val : mad_select(x.begin(), n, med, dev);
 
-  if (s == 0.0) return med;
+  if (ROBSCALE_UNLIKELY(s == 0.0)) return med;
 
   // True Newton-Raphson iteration with bulk_tanh
   double t = med;
