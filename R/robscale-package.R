@@ -1,3 +1,10 @@
+#' Fast Robust Estimation of Location and Scale
+#'
+#' Fast C++17 implementation of the robust location and scale estimators
+#' of Rousseeuw & Verboven (2002) for very small samples. Exploits the tanh
+#' identity for the logistic psi function and provides platform-vectorized
+#' transcendental evaluation (SLEEF, Accelerate, OpenMP SIMD).
+#'
 #' @keywords internal
 #' @references
 #' Rousseeuw, P. J. and Verboven, S. (2002) Robust estimation in very small

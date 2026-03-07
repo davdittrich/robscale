@@ -6,25 +6,9 @@ Fast robust estimation of location and scale in very small samples.
 
 ## Overview
 
-Classical estimators of location (mean) and scale (standard deviation) can be
-destroyed by a single outlier when the sample size is small. In experimental
-sciences---analytical chemistry, materials testing, clinical trials---measurements
-are often repeated only 3 to 8 times per condition, making this vulnerability a
-practical concern rather than a theoretical one.
+In experimental sciences where measurements are frequently repeated only 3 to 8 times per condition, classical estimators of location (mean) and scale (standard deviation) are vulnerable to single outliers. Rousseeuw & Verboven (2002) addressed this by developing M-estimators with a logistic psi function. These estimators decouple location and scale to avoid instability, use the Median Absolute Deviation (MAD) as a fixed auxiliary scale, and provide robust fallbacks for small samples.
 
-Rousseeuw & Verboven (2002) developed M-estimators using a logistic psi function
-that remain well-behaved at these sample sizes. Their estimators decouple location
-and scale estimation to avoid the positive-feedback instability of Huber's
-Proposal 2, use the MAD as a fixed auxiliary scale, and fall back gracefully when
-the sample is too small even for iteration. The
-[revss](https://CRAN.R-project.org/package=revss) package by Avraham Adler
-provides a faithful pure-R implementation of these estimators.
-
-`robscale` is a C++17/Rcpp reimplementation of the same three estimators---`adm`,
-`robLoc`, and `robScale`---with an API-compatible interface. It produces
-numerically identical results to `revss` (verified across 5,400 systematic
-comparisons) while running 6--33x faster, with the largest gains in the target
-regime of $n \leq 20$.
+The `robscale` package provides a C++17/Rcpp implementation of these estimators (`adm`, `robLoc`, `robScale`) that is API-compatible with the pure-R `revss` package. Benchmarks demonstrate that `robscale` reduces execution time by a factor of 6--39 across typical sample sizes ($n \leq 1000$), with the greatest relative gains in the $n \leq 20$ regime. While numerically identical to `revss` across 5,400 comparisons, `robscale` achieves these performance gains through vectorization, Newton--Raphson iteration, and $O(n)$ selection algorithms.
 
 Beyond compiled execution, `robscale` departs from `revss` in three algorithmic
 choices: it replaces the scoring fixed-point iteration for location with true
@@ -69,7 +53,7 @@ barely move.
 ## API reference
 
 | Function | Purpose | Key arguments |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | `adm(x)` | Average distance to the median | `center`, `constant` |
 | `robLoc(x)` | Robust M-estimate of location | `scale` |
 | `robScale(x)` | Robust M-estimate of scale | `loc`, `implbound` |
@@ -100,7 +84,7 @@ adm(c(1, 2, 3, 5, 7, 8), constant = 1)   # without consistency correction
 M-estimator for location using Newton--Raphson iteration with the logistic psi
 function (Rousseeuw & Verboven 2002, Eq. 21). Starting value:
 $T^{(0)} = \text{median}(x)$. Auxiliary scale: $S = \text{MAD}(x)$ (or the
-user-supplied `scale`). See [Algorithmic innovations](#algorithmic-innovations)
+user-supplied `scale`). See [Methodological enhancements](#methodological-enhancements)
 for the iteration formula.
 
 **Fallback logic:** When `scale` is unknown and $n < 4$, or when `scale` is
@@ -185,13 +169,9 @@ flowchart TD
     M -- Yes --> N([Return s])
 ```
 
-## Algorithmic innovations
+## Methodological enhancements
 
-Both `robscale` and `revss` implement the estimators of Rousseeuw & Verboven
-(2002). They solve the same estimating equations and produce the same numerical
-results. The two packages differ in *how* the computation is carried out. This
-section describes the algorithmic choices in `robscale` that diverge from the
-`revss` implementation, and their performance consequences.
+The `robscale` package implements the estimators defined by Rousseeuw & Verboven (2002). While it produces identical numerical results to the `revss` package, it uses different computational strategies to improve performance.
 
 ### 1. The tanh identity for the logistic psi function
 
@@ -218,13 +198,11 @@ merely a cosmetic rewrite:
   values bounded. The `tanh` function handles this internally with a single code
   path.
 
-- **Platform vectorization.** Standard library `tanh` implementations are
-  available in vectorized form on major platforms. On macOS, `robscale` calls
-  Apple Accelerate's `vvtanh`, which processes the entire argument array in a
-  single SIMD pass. On x86_64 Linux with GCC or Clang, `#pragma omp simd` hints
-  allow the compiler to generate SIMD-vectorized `tanh` without requiring
-  `-ffast-math` or the OpenMP runtime library. On Windows, the scalar
-  `std::tanh` fallback still benefits from branch elimination.
+- **Platform vectorization.** `robscale` uses platform-specific libraries to evaluate `tanh` in bulk. The implementation ranks and selects the fastest available backend:
+  1. **Apple Accelerate.** On macOS (Darwin), it uses `vvtanh` for array-wide SIMD processing.
+  2. **SLEEF.** On Linux (x86_64), it uses the SLEEF library to target AVX2 or AVX512 instruction sets.
+  3. **OpenMP SIMD.** A compiler-guided fallback via `#pragma omp simd`.
+  4. **Scalar.** Standard `std::tanh` fallback.
 
 ### 2. Newton--Raphson iteration for location
 
@@ -255,7 +233,7 @@ for reaching the same tolerance of $\sqrt{\epsilon_{\text{mach}}} \approx 1.49
 \times 10^{-8}$:
 
 | $n$ | Scoring iterations | Newton--Raphson iterations |
-|---:|---:|---:|
+| ---: | ---: | ---: |
 | 4 | 7 | 3 |
 | 5 | 8 | 3 |
 | 8 | 7 | 3 |
@@ -282,7 +260,7 @@ compare-and-swap sequences---typically compiled to branchless machine code at
 `-O2`---with the minimum number of comparisons for each $n$:
 
 | $n$ | Comparators |
-|---:|---:|
+| ---: | ---: |
 | 3 | 3 |
 | 4 | 5 |
 | 5 | 9 |
@@ -324,49 +302,39 @@ iteration, traversing the interpreter for every vectorised operation.
 
 ## Benchmarks
 
-Platform: R 4.5.2, Apple clang 17.0.0, macOS (Darwin 25.3.0), Apple Silicon
-(aarch64). Median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$);
-2,000 iterations for $n > 100$.
+Platform: R 4.5.2, GCC 15.2.1, Linux (x86_64), AMD Ryzen 9 5900HX.
+Median of 10,000 `microbenchmark` iterations per cell ($n \leq 100$).
 
 | $n$ | Function | `revss` ($\mu$ s) | `robscale` ($\mu$ s) | Speedup |
-|---:|:---|---:|---:|---:|
-| 3 | `adm` | 8.86 | 0.86 | 10x |
-| 3 | `robLoc` | 21.77 | 1.56 | 14x |
-| 3 | `robScale` | 48.50 | 1.68 | 29x |
-| 4 | `adm` | 10.37 | 0.86 | 12x |
-| 4 | `robLoc` | 56.05 | 1.72 | 33x |
-| 4 | `robScale` | 93.28 | 3.03 | 31x |
-| 5 | `adm` | 8.53 | 0.82 | 10x |
-| 5 | `robLoc` | 43.95 | 1.64 | 27x |
-| 5 | `robScale` | 95.94 | 3.20 | 30x |
-| 8 | `adm` | 10.33 | 0.86 | 12x |
-| 8 | `robLoc` | 36.24 | 1.68 | 22x |
-| 8 | `robScale` | 79.62 | 2.87 | 28x |
-| 20 | `adm` | 10.58 | 0.90 | 12x |
-| 20 | `robLoc` | 37.56 | 1.80 | 21x |
-| 20 | `robScale` | 90.53 | 3.94 | 23x |
-| 100 | `adm` | 11.07 | 1.03 | 11x |
-| 100 | `robLoc` | 53.18 | 2.58 | 21x |
-| 100 | `robScale` | 113.41 | 8.61 | 13x |
-| 500 | `adm` | 14.74 | 1.76 | 8x |
-| 500 | `robLoc` | 103.14 | 6.19 | 17x |
-| 500 | `robScale` | 288.64 | 35.10 | 8x |
-| 1000 | `adm` | 18.16 | 3.16 | 6x |
-| 1000 | `robLoc` | 163.14 | 10.82 | 15x |
-| 1000 | `robScale` | 484.78 | 65.56 | 7x |
+| ---: | :--- | ---: | ---: | ---: |
+| 3 | `adm` | 19.32 | 1.79 | 11x |
+| 3 | `robLoc` | 43.92 | 2.87 | 15x |
+| 3 | `robScale` | 102.46 | 3.18 | 32x |
+| 4 | `adm` | 21.30 | 1.68 | 13x |
+| 4 | `robLoc` | 84.04 | 3.15 | 27x |
+| 4 | `robScale` | 147.60 | 4.31 | 34x |
+| 5 | `adm` | 17.64 | 1.67 | 11x |
+| 5 | `robLoc` | 59.67 | 3.06 | 20x |
+| 5 | `robScale` | 180.18 | 4.91 | 37x |
+| 8 | `adm` | 21.87 | 1.76 | 12x |
+| 8 | `robLoc` | 83.05 | 3.22 | 26x |
+| 8 | `robScale` | 256.35 | 6.52 | 39x |
+| 20 | `adm` | 21.94 | 1.83 | 12x |
+| 20 | `robLoc` | 86.27 | 3.69 | 23x |
+| 20 | `robScale` | 217.32 | 7.93 | 27x |
+| 100 | `adm` | 23.44 | 2.10 | 11x |
+| 100 | `robLoc` | 91.51 | 5.38 | 17x |
+| 100 | `robScale` | 245.32 | 20.75 | 12x |
+| 500 | `adm` | 30.92 | 3.15 | 10x |
+| 500 | `robLoc` | 125.58 | 13.65 | 9x |
+| 500 | `robScale` | 516.81 | 98.45 | 5x |
+| 1000 | `adm` | 32.28 | 5.22 | 6x |
+| 1000 | `robLoc` | 169.34 | 24.91 | 7x |
+| 1000 | `robScale` | 652.50 | 149.27 | 4x |
 
-**Interpretation.** Speedups are largest in the target regime ($n \leq 20$):
-10--33x for individual functions. The `robLoc` speedup exceeds what compiled
-execution alone would predict because the Newton--Raphson iteration converges in
-3 steps where the scoring iteration requires 4--8 (see
-[Newton--Raphson iteration](#2-newtonraphson-iteration-for-location)).
+**Interpretation.** Performance gains are concentrated in the target regime ($n \leq 20$), where `robscale` is 11--39x faster than `revss`. This speedup exceeds the expected gains from compiled execution alone because the Newton--Raphson method for location converges consistently in 3 iterations, whereas the scoring method used in `revss` requires 4--8 (see [Newton--Raphson iteration](#2-newton--raphson-iteration-for-location)).
 
-At larger $n$, the advantage narrows. The `adm` function has no iteration loop,
-so its speedup (6--12x) reflects only the compiled loop and $O(n)$ median
-selection. The `robScale` narrowing at large $n$ (7--8x) is expected: the
-iteration count is the same in both implementations (multiplicative iteration is
-retained), so the per-iteration cost of vectorized `tanh` vs interpreted
-`plogis()` becomes the dominant factor, and both scale as $O(n)$.
+The performance advantage diminishes as $n$ increases. For the `adm` function, which lacks an iterative loop, the speedup (6--13x) is driven by the compiled loop and $O(n)$ selection. For `robScale`, the speedup narrows from 32x at $n=3$ to 4x at $n=1000$. This occurs because both packages retain the multiplicative iteration loop; as the vector size increases, the computational cost is dominated by the vectorized `tanh` evaluation vs. the interpreted `plogis()` call, both of which scale linearly ($O(n)$).
 
 The `revss` timings include R function-call dispatch, vectorised `plogis()`
 allocation, and garbage-collection pressure. `robscale` eliminates all three.
@@ -412,7 +380,7 @@ where $c = 0.37394112142347236$ is the constant that yields 50% breakdown point.
 **Key constants** (full double precision):
 
 | Symbol | Value | Definition |
-|:---|:---|:---|
+| :--- | :--- | :--- |
 | $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
 | $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |

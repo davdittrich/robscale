@@ -4,9 +4,12 @@
 \name{robscale-package}
 \alias{robscale}
 \alias{robscale-package}
-\title{robscale: Fast Robust Estimation in Very Small Samples}
+\title{Fast Robust Estimation of Location and Scale}
 \description{
-High-performance C++ implementation (via 'Rcpp') of the robust location and scale M-estimators described in Rousseeuw & Verboven (2002) \doi{10.1016/S0167-9473(02)00078-6} for very small samples. Provides numerically identical results to the 'revss' package with significantly improved performance through sorting networks and compiled iteration loops.
+Fast C++17 implementation of the robust location and scale estimators
+of Rousseeuw & Verboven (2002) for very small samples. Exploits the tanh
+identity for the logistic psi function and provides platform-vectorized
+transcendental evaluation (SLEEF, Accelerate, OpenMP SIMD).
 }
 \references{
 Rousseeuw, P. J. and Verboven, S. (2002) Robust estimation in very small
