@@ -51,8 +51,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // rob_scale_impl
-double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val, double implbound, int maxit, double tol);
-RcppExport SEXP _robscale_rob_scale_impl(SEXP xSEXP, SEXP has_locSEXP, SEXP loc_valSEXP, SEXP implboundSEXP, SEXP maxitSEXP, SEXP tolSEXP) {
+double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val, double implbound, int maxit, double tol, int fallback);
+RcppExport SEXP _robscale_rob_scale_impl(SEXP xSEXP, SEXP has_locSEXP, SEXP loc_valSEXP, SEXP implboundSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP fallbackSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -62,7 +62,8 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type implbound(implboundSEXP);
     Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
     Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
-    rcpp_result_gen = Rcpp::wrap(rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol));
+    Rcpp::traits::input_parameter< int >::type fallback(fallbackSEXP);
+    rcpp_result_gen = Rcpp::wrap(rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol, fallback));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -71,7 +72,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_rob_loc_impl", (DL_FUNC) &_robscale_rob_loc_impl, 5},
-    {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 6},
+    {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 7},
     {NULL, NULL, 0}
 };
 

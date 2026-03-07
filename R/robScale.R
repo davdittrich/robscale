@@ -7,9 +7,11 @@
 #' @param loc Optional numeric scalar giving a known location.  When supplied,
 #'   the observations are centered at \code{loc} and the minimum sample size
 #'   for iteration is lowered from 4 to 3 (see \sQuote{Details}).
-#' @param implbound Implosion bound: the smallest value the MAD is allowed to
-#'   take before it is considered to have \dQuote{imploded} (collapsed to
-#'   zero).  Defaults to \code{1e-4}.
+#' @param fallback Character string specifying the action to take when the
+#'   MAD collapses (implodes) or when the sample size is below the minimum
+#'   required for iteration.  Options are \code{"adm"} (the default), which
+#'   falls back to the \code{\link{adm}} estimator, or \code{"na"}, which
+#'   returns \code{NA} for compatibility with \code{revss}.
 #' @param na.rm Logical.  If \code{TRUE}, \code{NA} values are stripped from
 #'   \code{x} before computation.  If \code{FALSE} (the default), the presence
 #'   of any \code{NA} raises an error.
@@ -71,16 +73,19 @@
 #' (Rousseeuw & Verboven, 2002, Sec.\sspace{}5).
 #'
 #' \strong{Fallback.}
-#' When \eqn{n} is below the minimum for iteration:
+#' When \eqn{n} is below the minimum for iteration or when the MAD collapses:
 #' \itemize{
-#'   \item if \eqn{\mathrm{MAD}(x) \le}{MAD(x) <=} \code{implbound}
-#'     (implosion), the function returns \code{\link{adm}(x)};
-#'   \item otherwise, it returns \eqn{\mathrm{MAD}(x)}{MAD(x)}.
+#'   \item if \code{fallback = "adm"} (the default), the function returns
+#'     \code{\link{adm}(x)};
+#'   \item if \code{fallback = "na"}, the function returns \code{NA} for
+#'     compatibility with \code{revss}.
 #' }
+#' If the MAD is non-zero and non-imploded, it is used as the starting value.
 #'
 #' @return A single numeric value: the robust M-estimate of scale.
 #'   Returns \code{NA} if \code{x} has length zero (after removal of
-#'   \code{NA}s when \code{na.rm = TRUE}).
+#'   \code{NA}s when \code{na.rm = TRUE}) or if the MAD collapses and
+#'   \code{fallback = "na"}.
 #'
 #' @references
 #' Rousseeuw, P. J. and Verboven, S. (2002) Robust estimation in very small
@@ -110,7 +115,8 @@
 #'
 #' @keywords univar robust
 #' @export
-robScale <- function(x, loc = NULL, implbound = 1e-4, na.rm = FALSE,
+robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
+                     implbound = 1e-4, na.rm = FALSE,
                      maxit = 80L, tol = sqrt(.Machine$double.eps)) {
   if (na.rm) {
     x <- x[!is.na(x)]
@@ -120,7 +126,11 @@ robScale <- function(x, loc = NULL, implbound = 1e-4, na.rm = FALSE,
     }
   }
   if (length(x) == 0L) return(NA_real_)
+  
+  fallback <- match.arg(fallback)
+  fallback_code <- if (fallback == "adm") 0L else 1L
+
   has_loc <- !is.null(loc)
   loc_val <- if (has_loc) loc else 0.0
-  rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol)
+  rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
 }
