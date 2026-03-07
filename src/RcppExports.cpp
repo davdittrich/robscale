@@ -35,6 +35,60 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// C_sn_fast
+double C_sn_fast(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_sn_fast(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_sn_fast(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_sn_int_fast
+double C_sn_int_fast(Rcpp::IntegerVector x);
+RcppExport SEXP _robscale_C_sn_int_fast(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_sn_int_fast(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_qn_fast
+double C_qn_fast(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_qn_fast(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_qn_fast(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_qn_int_fast
+double C_qn_int_fast(Rcpp::IntegerVector x);
+RcppExport SEXP _robscale_C_qn_int_fast(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::IntegerVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_qn_int_fast(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// get_qnsn_config
+Rcpp::List get_qnsn_config();
+RcppExport SEXP _robscale_get_qnsn_config() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(get_qnsn_config());
+    return rcpp_result_gen;
+END_RCPP
+}
 // rob_loc_impl
 double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val, int maxit, double tol);
 RcppExport SEXP _robscale_rob_loc_impl(SEXP xSEXP, SEXP has_scaleSEXP, SEXP scale_valSEXP, SEXP maxitSEXP, SEXP tolSEXP) {
@@ -71,6 +125,11 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
+    {"_robscale_C_sn_fast", (DL_FUNC) &_robscale_C_sn_fast, 1},
+    {"_robscale_C_sn_int_fast", (DL_FUNC) &_robscale_C_sn_int_fast, 1},
+    {"_robscale_C_qn_fast", (DL_FUNC) &_robscale_C_qn_fast, 1},
+    {"_robscale_C_qn_int_fast", (DL_FUNC) &_robscale_C_qn_int_fast, 1},
+    {"_robscale_get_qnsn_config", (DL_FUNC) &_robscale_get_qnsn_config, 0},
     {"_robscale_rob_loc_impl", (DL_FUNC) &_robscale_rob_loc_impl, 5},
     {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 7},
     {NULL, NULL, 0}

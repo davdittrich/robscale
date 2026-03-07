@@ -1,0 +1,180 @@
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+
+Attaching package: ‘dplyr’
+
+The following objects are masked from ‘package:stats’:
+
+    filter, lag
+
+The following objects are masked from ‘package:base’:
+
+    intersect, setdiff, setequal, union
+
+ℹ Loading robscale
+=== ENVIRONMENT ===
+Date: 2026-03-07 18:12:36 CET 
+R version: R version 4.5.2 (2025-10-31) 
+robscale version: dev (devtools::load_all)
+fastqnsn version: 1.1.0 
+─ Session info ───────────────────────────────────────────────────────────────
+ setting  value
+ version  R version 4.5.2 (2025-10-31)
+ os       Arch Linux
+ system   x86_64, linux-gnu
+ ui       X11
+ language (EN)
+ collate  en_US.UTF-8
+ ctype    en_US.UTF-8
+ tz       Europe/Berlin
+ date     2026-03-07
+ pandoc   3.5 @ /usr/bin/pandoc
+ quarto   1.8.27 @ /usr/bin/quarto
+
+─ Packages ───────────────────────────────────────────────────────────────────
+ ! package        * version  date (UTC) lib source
+   boot           * 1.3-32   2025-08-29 [1] RSPM (R 4.5.1)
+   brio             1.1.5    2024-04-24 [1] RSPM (R 4.5.0)
+   cachem           1.1.0    2024-05-16 [1] RSPM (R 4.5.0)
+   cli              3.6.5    2025-04-23 [1] RSPM (R 4.5.0)
+   desc             1.4.3    2023-12-10 [1] RSPM (R 4.5.0)
+   devtools         2.4.6    2025-10-03 [1] RSPM (R 4.5.2)
+   dichromat        2.0-0.1  2022-05-02 [1] RSPM (R 4.5.0)
+   distributional   0.6.0    2026-01-14 [1] RSPM (R 4.5.2)
+   dplyr          * 1.2.0    2026-02-03 [1] RSPM (R 4.5.2)
+   ellipsis         0.3.2    2021-04-29 [1] RSPM (R 4.5.0)
+   farver           2.1.2    2024-05-13 [1] RSPM (R 4.5.0)
+   fastmap          1.2.0    2024-05-15 [1] RSPM (R 4.5.0)
+   fastqnsn       * 1.1.0    2026-03-07 [1] local
+   fs               1.6.6    2025-04-12 [1] RSPM (R 4.5.0)
+   generics         0.1.4    2025-05-09 [1] RSPM (R 4.5.1)
+   ggdist         * 3.3.3    2025-04-23 [1] RSPM (R 4.5.0)
+   ggplot2        * 4.0.2    2026-02-03 [1] RSPM (R 4.5.2)
+   glue             1.8.0    2024-09-30 [1] RSPM (R 4.5.0)
+   gtable           0.3.6    2024-10-25 [1] RSPM (R 4.5.0)
+   lifecycle        1.0.5    2026-01-08 [1] RSPM (R 4.5.2)
+   magrittr         2.0.4    2025-09-12 [1] RSPM (R 4.5.2)
+   memoise          2.0.1    2021-11-26 [1] RSPM (R 4.5.0)
+   microbenchmark * 1.5.0    2024-09-04 [1] CRAN (R 4.5.2)
+   otel             0.2.0    2025-08-29 [1] RSPM (R 4.5.2)
+   pillar           1.11.1   2025-09-17 [1] RSPM (R 4.5.2)
+   pkgbuild         1.4.8    2025-05-26 [1] RSPM (R 4.5.1)
+   pkgconfig        2.0.3    2019-09-22 [1] RSPM (R 4.5.0)
+   pkgload          1.5.0    2026-02-03 [1] RSPM (R 4.5.2)
+   purrr            1.2.1    2026-01-09 [1] RSPM (R 4.5.2)
+   R6               2.6.1    2025-02-15 [1] RSPM (R 4.5.0)
+   RColorBrewer     1.1-3    2022-04-03 [1] RSPM (R 4.5.0)
+   Rcpp             1.1.1    2026-01-10 [1] RSPM (R 4.5.2)
+   RcppParallel     5.1.11-1 2025-08-27 [1] RSPM (R 4.5.2)
+   remotes          2.5.0    2024-03-17 [1] RSPM (R 4.5.0)
+   rlang            1.1.7    2026-01-09 [1] RSPM (R 4.5.2)
+ P robscale       * 0.1.1    2026-03-07 [?] load_all()
+   rprojroot        2.1.1    2025-08-26 [1] RSPM (R 4.5.1)
+   rstudioapi       0.18.0   2026-01-16 [1] RSPM (R 4.5.2)
+   S7               0.2.1    2025-11-14 [1] RSPM (R 4.5.2)
+   scales         * 1.4.0    2025-04-24 [1] RSPM (R 4.5.0)
+   sessioninfo    * 1.2.3    2025-02-05 [1] RSPM (R 4.5.0)
+   testthat       * 3.3.2    2026-01-11 [1] RSPM (R 4.5.2)
+   tibble           3.3.1    2026-01-11 [1] RSPM (R 4.5.2)
+   tidyr          * 1.3.2    2025-12-19 [1] RSPM (R 4.5.2)
+   tidyselect       1.2.1    2024-03-11 [1] RSPM (R 4.5.0)
+   usethis          3.2.1    2025-09-06 [1] RSPM (R 4.5.2)
+   vctrs            0.7.1    2026-01-23 [1] RSPM (R 4.5.2)
+   withr            3.0.2    2024-10-28 [1] RSPM (R 4.5.0)
+
+ [1] /home/dd/R/x86_64-pc-linux-gnu-library/4.5
+ [2] /usr/lib/R/library
+
+ * ── Packages attached to the search path.
+ P ── Loaded and on-disk path mismatch.
+
+──────────────────────────────────────────────────────────────────────────────
+CPU governor: powersave 
+
+=== NUMERICAL EQUIVALENCE CHECK ===
+Numerical equivalence: PASSED for all 22 sizes.
+
+=== BENCHMARK START ===
+[2026-03-07 18:14:27.194678] n = 8 (20000 iters)... done
+[2026-03-07 18:14:28.714012] n = 10 (20000 iters)... done
+[2026-03-07 18:14:29.729916] n = 16 (20000 iters)... done
+[2026-03-07 18:14:30.758595] n = 32 (20000 iters)... done
+[2026-03-07 18:14:31.927465] n = 64 (20000 iters)... done
+[2026-03-07 18:14:33.377154] n = 128 (20000 iters)... done
+[2026-03-07 18:14:35.602832] n = 256 (5000 iters)... done
+[2026-03-07 18:14:37.19768] n = 512 (5000 iters)... done
+[2026-03-07 18:14:39.65976] n = 1024 (5000 iters)... done
+[2026-03-07 18:14:45.079705] n = 2048 (5000 iters)... done
+[2026-03-07 18:14:55.702906] n = 4096 (500 iters)... done
+[2026-03-07 18:14:58.719552] n = 8192 (500 iters)... done
+[2026-03-07 18:15:04.01085] n = 12288 (500 iters)... done
+[2026-03-07 18:15:09.465248] n = 16384 (500 iters)... done
+[2026-03-07 18:15:16.01348] n = 32768 (50 iters)... done
+[2026-03-07 18:15:18.073461] n = 65536 (50 iters)... done
+[2026-03-07 18:15:21.359558] n = 131072 (50 iters)... done
+[2026-03-07 18:15:27.196714] n = 262144 (50 iters)... done
+[2026-03-07 18:15:36.987929] n = 524288 (50 iters)... done
+[2026-03-07 18:15:58.238732] n = 1048576 (10 iters)... done
+[2026-03-07 18:16:07.403288] n = 10000000 (10 iters)... done
+[2026-03-07 18:17:52.562952] n = 100000000 (5 iters)... done
+
+=== ANALYSIS: BOOTSTRAP CIs ===
+
+=== MONOTONICITY CHECK ===
+WARNING: Non-monotonic timing for Qn fastqnsn at n = 12288
+
+=== GENERATING PLOTS ===
+
+=== SUMMARY TABLE ===
+         n estimator    robscale    fastqnsn ratio ci_lo ci_hi regression
+         8        Sn        2.63        1.55 1.697 1.690 1.697       TRUE
+         8        Qn        2.76        1.60 1.719 1.719 1.719       TRUE
+        10        Sn        2.88        1.55 1.858 1.852 1.858       TRUE
+        10        Qn        2.94        1.61 1.820 1.820 1.826       TRUE
+        16        Sn        3.27        1.61 2.025 2.025 2.044       TRUE
+        16        Qn        3.41        1.71 1.989 1.988 1.989       TRUE
+        32        Sn        4.55        1.92 2.364 2.353 2.370       TRUE
+        32        Qn        6.33        2.34 2.701 2.697 2.712       TRUE
+        64        Sn        6.04        2.12 2.844 2.842 2.849       TRUE
+        64        Qn       15.63        3.66 4.274 4.271 4.275       TRUE
+       128        Sn        9.96        2.87 3.476 3.472 3.480       TRUE
+       128        Qn       48.39        9.06 5.343 5.342 5.343       TRUE
+       256        Sn       19.04        4.60 4.140 4.130 4.157       TRUE
+       256        Qn       83.36       24.70 3.375 3.356 3.398       TRUE
+       512        Sn       44.33        9.36 4.738 4.717 4.760       TRUE
+       512        Qn      216.97       80.38 2.699 2.692 2.708       TRUE
+      1024        Sn      108.43       28.92 3.749 3.726 3.770       TRUE
+      1024        Qn      561.24      244.55 2.295 2.291 2.298       TRUE
+      2048        Sn      221.13       61.34 3.605 3.593 3.621       TRUE
+      2048        Qn     1186.84      519.66 2.284 2.281 2.286       TRUE
+      4096        Sn      476.06      139.62 3.410 3.386 3.433       TRUE
+      4096        Qn     2844.01     1268.90 2.241 2.237 2.244       TRUE
+      8192        Sn      579.17      220.12 2.631 2.602 2.667       TRUE
+      8192        Qn     5630.53     2623.21 2.146 2.142 2.152       TRUE
+     12288        Sn      837.65      303.78 2.757 2.747 2.769       TRUE
+     12288        Qn     6128.66     2235.58 2.741 2.735 2.748       TRUE
+     16384        Sn      797.43      316.69 2.518 2.492 2.548       TRUE
+     16384        Qn     7601.35     2660.15 2.857 2.838 2.881       TRUE
+     32768        Sn     1605.36      652.89 2.459 2.358 2.592       TRUE
+     32768        Qn    16131.34     5788.26 2.787 2.706 2.833       TRUE
+     65536        Sn     3321.49     1309.42 2.537 2.430 2.626       TRUE
+     65536        Qn    32867.14    11280.02 2.914 2.887 2.939       TRUE
+    131072        Sn     6790.98     2761.78 2.459 2.370 2.560       TRUE
+    131072        Qn    68696.43    22720.53 3.024 2.995 3.057       TRUE
+    262144        Sn    10692.77     4408.14 2.426 2.363 2.485       TRUE
+    262144        Qn   120503.33    38909.63 3.097 3.066 3.139       TRUE
+    524288        Sn    24901.77    10422.19 2.389 2.248 2.584       TRUE
+    524288        Qn   287298.37    88652.65 3.241 2.951 3.420       TRUE
+   1048576        Sn    49131.57    18885.76 2.602 2.264 2.824       TRUE
+   1048576        Qn   580445.59   202813.38 2.862 2.607 3.332       TRUE
+  10000000        Sn   646898.34   272514.89 2.374 2.103 2.492       TRUE
+  10000000        Qn  7137640.84  2443072.27 2.922 2.841 3.066       TRUE
+ 100000000        Sn  6427646.67  3279013.26 1.960 1.922 1.984       TRUE
+ 100000000        Qn 72680964.50 30835415.94 2.357 2.151 2.500       TRUE
+
+=== VERDICT ===
+FAIL: 44 significant regressions detected (>10%).
+H1 (large-n parity < 5%):  INCONCLUSIVE 
+H2 (small-n overhead < 20%):  INCONCLUSIVE 
+
+Benchmark Complete.

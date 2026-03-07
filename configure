@@ -57,6 +57,28 @@ case "$(uname -m)" in
     ;;
 esac
 
+# Detect L2 cache size for cache-aware thresholds
+FASTQNSN_L2=4194304
+FASTQNSN_CL=64
+
+case "$(uname -s)" in
+  Darwin)
+    # Apple Silicon: use efficiency-core L2
+    FASTQNSN_L2=$(sysctl -n hw.perflevel1.l2cachesize 2>/dev/null \
+                  || sysctl -n hw.l2cachesize 2>/dev/null \
+                  || echo 4194304)
+    FASTQNSN_CL=$(sysctl -n hw.cachelinesize 2>/dev/null || echo 128)
+    echo "  macOS L2 Cache size: ${FASTQNSN_L2}"
+    echo "  macOS Cache Line size: ${FASTQNSN_CL}"
+    ;;
+  Linux)
+    FASTQNSN_L2=$(getconf LEVEL2_CACHE_SIZE 2>/dev/null || echo 4194304)
+    FASTQNSN_CL=$(getconf LEVEL1_DCACHE_LINESIZE 2>/dev/null || echo 64)
+    echo "  Linux L2 Cache size: ${FASTQNSN_L2}"
+    echo "  Linux Cache Line size: ${FASTQNSN_CL}"
+    ;;
+esac
+
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
 ACCELERATE_LIBS=""
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -70,6 +92,8 @@ sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
     -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
     -e "s|@SIMD_FLAGS@|${SIMD_FLAGS}|" \
+    -e "s|@FASTQNSN_L2@|${FASTQNSN_L2}|" \
+    -e "s|@FASTQNSN_CL@|${FASTQNSN_CL}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"

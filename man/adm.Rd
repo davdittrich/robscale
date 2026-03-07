@@ -56,7 +56,7 @@ estimator in \code{\link{robScale}} when the MAD collapses to zero.
 
 \strong{Performance.}
 This implementation uses a C++17 $O(n)$ selection strategy (sorting networks
-for $n \le 8$, introselect for larger $n$), typically yielding a 10x
+for $n <= 8$, introselect for larger $n$), typically yielding a 10x
 speedup over pure-R implementations like \code{revss}.
 }
 \examples{

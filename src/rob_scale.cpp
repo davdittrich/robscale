@@ -11,7 +11,7 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
   double buf_stack[STACK_BUF_SIZE * 3];
   std::unique_ptr<double[]> heap;
   double* arena;
-  if (n * 3 <= STACK_BUF_SIZE * 3) {
+  if (ROBSCALE_LIKELY(n * 3 <= STACK_BUF_SIZE * 3)) {
     arena = buf_stack;
   } else {
     heap.reset(new double[n * 3]);
@@ -39,9 +39,9 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
   }
 
   // Small-sample fallback (matches revss behavior)
-  if (n < minobs) {
+  if (ROBSCALE_UNLIKELY(n < minobs)) {
     if (s <= implbound) {
-      if (fallback == 1) return NA_REAL; // "na" fallback
+      if (ROBSCALE_UNLIKELY(fallback == 1)) return NA_REAL; // "na" fallback
       if (has_loc) {
         std::memcpy(extra, xp, n * sizeof(double));
         double med_orig = median_select(extra, n);
@@ -58,8 +58,8 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
   }
 
   // MAD collapse for n >= minobs
-  if (s <= implbound && fallback == 1) return NA_REAL;
-  if (s == 0.0) return 0.0;
+  if (ROBSCALE_UNLIKELY(s <= implbound && fallback == 1)) return NA_REAL;
+  if (ROBSCALE_UNLIKELY(s == 0.0)) return adm_core(xp, n, t, ADM_CONSISTENCY);
 
   // Multiplicative iteration with bulk_tanh
   const double* data = has_loc ? w : xp;

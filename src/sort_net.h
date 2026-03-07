@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+namespace robscale {
+
 #define SWAP_IF_GREATER(a, b) \
   do {                        \
     if ((a) > (b)) {          \
@@ -105,7 +107,7 @@ inline void sort_net_8(double* x) {
 }
 
 // Dispatcher: use sorting networks for n<=8, std::sort for n>8
-inline void small_sort(double* x, int n) {
+inline void small_sort(double* x, size_t n) {
   switch (n) {
     case 0:
     case 1:
@@ -136,5 +138,9 @@ inline void small_sort(double* x, int n) {
       return;
   }
 }
+
+#undef SWAP_IF_GREATER
+
+} // namespace robscale
 
 #endif // ROBSCALE_SORT_NET_H
