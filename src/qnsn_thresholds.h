@@ -18,8 +18,8 @@
 
 namespace robscale::qnsn {
 
-// Qn exact threshold: floor(sqrt(L2 budget / 8))
-constexpr size_t QN_EXACT_THRESHOLD = 128;
+// Brute-force threshold for Qn. Our JM implementation is very fast, so we crossover earlier.
+constexpr size_t QN_EXACT_THRESHOLD = 512;
 
 // Sn stack threshold: Max size for stack-allocated working array
 constexpr size_t SN_STACK_THRESHOLD = 2048;
@@ -27,6 +27,7 @@ constexpr size_t SN_STACK_THRESHOLD = 2048;
 // Parallel thresholds (serial -> RcppParallel/TBB)
 constexpr size_t SN_PARALLEL_THRESHOLD = 12288;
 constexpr size_t QN_PARALLEL_THRESHOLD = 8192;
+
 
 // Sort thresholds
 constexpr size_t SORT_BOOST_THRESHOLD = 256;       // std::sort -> Boost spreadsort

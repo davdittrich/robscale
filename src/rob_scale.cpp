@@ -1,3 +1,4 @@
+#pragma GCC optimize("O3")
 #include <Rcpp.h>
 #include "robust_core.h"
 

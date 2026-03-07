@@ -192,7 +192,8 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   }
   optimized_sort(sorted_x, sorted_x + n);
 
-  SnWorker<T> worker(sorted_x, n, inner_medians);
+  std::unique_ptr<T[]> inner_medians_ptr(new T[n]);
+  SnWorker<T> worker(sorted_x, n, inner_medians_ptr.get());
   if (n > config.sn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n, 2048), worker);
@@ -203,7 +204,9 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     worker(0, n);
   }
 
-  double raw = lowmedian_ptr(inner_medians, n);
+  size_t h_idx = (n - 1) / 2;
+  robscale::floyd_rivest_select(inner_medians_ptr.get(), inner_medians_ptr.get() + h_idx, inner_medians_ptr.get() + n);
+  double raw = static_cast<double>(inner_medians_ptr[h_idx]);
   return raw * CONST_SN * get_sn_factor(n);
 }
 
@@ -286,8 +289,8 @@ struct QnCountWorker : public parallel::Worker {
 
     for (; i < end; ++i) {
       double target = static_cast<double>(x[i]) - trial;
-      while (jp < i && static_cast<double>(x[jp]) <= target) jp++;
-      while (jq < jp && static_cast<double>(x[jq]) < target) jq++;
+      while (ROBSCALE_UNLIKELY(jp < i && static_cast<double>(x[jp]) <= target)) jp++;
+      while (ROBSCALE_UNLIKELY(jq < jp && static_cast<double>(x[jq]) < target)) jq++;
       sumP += (i - jp);
       sumQ += (i - jq);
     }
@@ -328,11 +331,11 @@ struct QnRefineWorker : public parallel::Worker {
     for (; i < end; ++i) {
       double target = static_cast<double>(x[i]) - trial;
       if (is_sumP) {
-        while (j < i && static_cast<double>(x[j]) <= target) j++;
+        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(x[j]) <= target)) j++;
         int32_t jj_bound = static_cast<int32_t>(i - j);
         if (jj_bound < bounds[i]) bounds[i] = jj_bound;
       } else {
-        while (j < i && static_cast<double>(x[j]) < target) j++;
+        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(x[j]) < target)) j++;
         int32_t jj_bound = static_cast<int32_t>(i - j + 1);
         if (jj_bound > bounds[i]) bounds[i] = jj_bound;
       }
@@ -350,54 +353,23 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   auto &config = RuntimeConfig::get();
   
   if (n <= config.qn_exact_threshold) {
-    constexpr size_t QN_STACK_LIMIT = 128;
-    constexpr size_t QN_STACK_PAIRS = (QN_STACK_LIMIT * (QN_STACK_LIMIT - 1)) / 2;
-    
-    if (n <= QN_STACK_LIMIT) {
-      T sorted_x[QN_STACK_LIMIT];
-      double diffs[QN_STACK_PAIRS];
-      for (size_t i = 0; i < n; ++i) {
-        if constexpr (std::is_floating_point_v<T>) {
-          if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
-        }
-        sorted_x[i] = x_ptr[i];
-      }
-      
-      if (n <= 8) {
-        if constexpr (std::is_same_v<T, double>) {
-          robscale::small_sort(sorted_x, n);
-        } else {
-          std::sort(sorted_x, sorted_x + n);
-        }
-      } else {
-        std::sort(sorted_x, sorted_x + n);
-      }
+    size_t num_pairs = n * (n - 1) / 2;
+    size_t h_qn = n / 2 + 1;
+    size_t k_target = h_qn * (h_qn - 1) / 2;
 
-      Dispatcher::qn_brute_force(sorted_x, n, diffs, config);
-
-      size_t num_pairs = n * (n - 1) / 2;
-      size_t h = n / 2 + 1;
-      size_t k_target = h * (h - 1) / 2;
-      std::nth_element(diffs, diffs + k_target - 1, diffs + num_pairs);
-      return diffs[k_target - 1] * CONST_QN * get_qn_factor(n);
-    }
-
-    std::unique_ptr<T[]> sorted_x(new T[n]);
-    for (size_t i = 0; i < n; ++i) {
+    std::unique_ptr<T[]> sorted_uninit(new T[n]);
+    for (size_t i = 0; i < n; i++) {
       if constexpr (std::is_floating_point_v<T>) {
         if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
       }
-      sorted_x[i] = x_ptr[i];
+      sorted_uninit[i] = x_ptr[i];
     }
-    std::sort(sorted_x.get(), sorted_x.get() + n);
+    std::sort(sorted_uninit.get(), sorted_uninit.get() + n);
 
-    size_t num_pairs = n * (n - 1) / 2;
     std::unique_ptr<double[]> diffs(new double[num_pairs]);
-    Dispatcher::qn_brute_force(sorted_x.get(), n, diffs.get(), config);
+    Dispatcher::qn_brute_force(sorted_uninit.get(), n, diffs.get(), config);
 
-    size_t h = n / 2 + 1;
-    size_t k_target = h * (h - 1) / 2;
-    std::nth_element(diffs.get(), diffs.get() + k_target - 1, diffs.get() + num_pairs);
+    robscale::floyd_rivest_select(diffs.get(), diffs.get() + k_target - 1, diffs.get() + num_pairs);
     double raw = diffs[k_target - 1];
     return raw * CONST_QN * get_qn_factor(n);
   }
@@ -417,7 +389,12 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   int32_t* left = reinterpret_cast<int32_t*>(ptr); ptr += n * sizeof(int32_t);
   int32_t* right = reinterpret_cast<int32_t*>(ptr);
 
-  std::copy_n(x_ptr, n, sorted_x);
+  for (size_t i = 0; i < n; i++) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
+    }
+    sorted_x[i] = x_ptr[i];
+  }
   optimized_sort(sorted_x, sorted_x + n);
 
   size_t h = n / 2 + 1;
@@ -517,6 +494,7 @@ double C_qn_fast(Rcpp::NumericVector x) {
 double C_qn_int_fast(Rcpp::IntegerVector x) { 
   return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size())); 
 }
+
 // [[Rcpp::export]]
 Rcpp::List get_qnsn_config() {
   auto &config = robscale::qnsn::RuntimeConfig::get();
