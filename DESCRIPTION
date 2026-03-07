@@ -1,15 +1,18 @@
 Package: robscale
 Type: Package
-Title: Fast Robust Estimation in Very Small Samples
+Title: Robust Estimation in Small Samples via SIMD-Accelerated Iteration
 Version: 0.1.1
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
-Description: High-performance C++ implementation (via 'Rcpp') of the robust
+Description: Provides a high-performance C++ implementation of the robust
     location and scale M-estimators described in Rousseeuw & Verboven (2002)
-    <doi:10.1016/S0167-9473(02)00078-6> for very small samples. Provides
-    numerically identical results to the 'revss' package with significantly
-    improved performance through sorting networks and compiled iteration loops.
+    <doi:10.1016/S0167-9473(02)00078-6>. This package optimizes the logistic
+    M-estimators for measurements with very small sample sizes ($n \leq 8$) using
+    platform-specific SIMD vectorization (Apple Accelerate and SLEEF),
+    Newton--Raphson iteration, and sorting networks. Across 5,400 cross-checks,
+    'robscale' maintains numerical equivalence to the 'revss' package while
+    reducing execution time by a factor of 11--39 in the target regime.
 License: MIT + file LICENSE
 URL: https://github.com/davdittrich/robscale,
     https://doi.org/10.5281/zenodo.18828607

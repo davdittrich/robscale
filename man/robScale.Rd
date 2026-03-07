@@ -17,25 +17,27 @@ robScale(
 \arguments{
 \item{x}{A numeric vector.}
 
-\item{loc}{Optional numeric scalar giving a known location.  When supplied,
+\item{loc}{Optional numeric scalar giving a known location. When supplied,
 the observations are centered at \code{loc} and the minimum sample size
 for iteration is lowered from 4 to 3 (see \sQuote{Details}).}
 
-\item{fallback}{Character string specifying the action to take when the
-MAD collapses (implodes) or when the sample size is below the minimum
-required for iteration.  Options are \code{"adm"} (the default), which
-falls back to the \code{\link{adm}} estimator, or \code{"na"}, which
-returns \code{NA} for compatibility with \code{revss}.}
+\item{fallback}{Character string specifying the fallback behavior when the MAD
+collapses to zero or the sample size is too small for iteration.
+Must be one of \code{"adm"} (default) or \code{"na"}. See \sQuote{Details}.}
 
-\item{na.rm}{Logical.  If \code{TRUE}, \code{NA} values are stripped from
-\code{x} before computation.  If \code{FALSE} (the default), the presence
+\item{implbound}{Numeric scalar specifying the threshold for MAD implosion.
+Defaults to \code{1e-4}. Passing a value of 0 disables implosion checks.}
+
+\item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
+\code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
 
-\item{maxit}{Maximum number of multiplicative iterations.  Defaults to 80.}
+\item{maxit}{Maximum number of iterations for the multiplicative algorithm.
+Defaults to 80.}
 
-\item{tol}{Convergence tolerance.  Iteration stops when the multiplicative
-update factor satisfies \eqn{|v - 1| \le \mathrm{tol}}{|v - 1| <= tol}.
-Defaults to \code{sqrt(.Machine$double.eps)}.}
+\item{tol}{Convergence tolerance. Iteration stops when the relative
+change in the scale estimate falls below \code{tol}. Defaults to
+\code{sqrt(.Machine$double.eps)}.}
 }
 \value{
 A single numeric value: the robust M-estimate of scale.
@@ -50,17 +52,15 @@ Compute the robust M-estimate of scale for very small samples using the
 \details{
 The scale estimator \eqn{S_n}{Sn} solves the M-estimating equation
 
-\deqn{\frac{1}{n}\sum_{i=1}^{n}\rho\!\left(\frac{x_i - T_n}{S_n}
-  \right) = \beta}{mean(rho((x_i - Tn) / Sn)) = beta}
+\deqn{\frac{1}{n} \sum_{i=1}^{n} \rho \left( \frac{x_i - T_n}{S_n} \right) = \beta}{mean(rho((x_i - Tn) / Sn)) = beta}
 
 where \eqn{T_n}{Tn} is fixed at the sample median, \eqn{\beta = 0.5}, and
-\eqn{\rho} is a smooth rho function defined as the square of the logistic
+\eqn{\rho}{rho} is a smooth rho function defined as the square of the logistic
 psi (Rousseeuw & Verboven, 2002, Sec.\sspace{}4.2):
 
-\deqn{\rho_{\mathrm{log}}(x) = \psi_{\mathrm{log}}^2\!\left(
-  \frac{x}{c}\right)}{rho(x) = psi(x / c)^2}
+\deqn{\rho_{\mathrm{log}}(x) = \psi_{\mathrm{log}}^2 \left( \frac{x}{c} \right)}{rho(x) = psi(x / c)^2}
 
-with the tuning constant \eqn{c = 0.37394112142347236} chosen so that
+with the tuning constant \eqn{c = 0.37394112142347236}{c = 0.37394112142347236} chosen so that
 
 \deqn{\int\rho(u)\,d\Phi(u) = 0.5}{Int rho(u) dPhi(u) = 0.5}
 
@@ -70,21 +70,18 @@ yielding a 50\% breakdown point.
 The equation is solved by multiplicative iteration (Rousseeuw & Verboven,
 2002, Eq.\sspace{}27):
 
-\deqn{S^{(k+1)} = S^{(k)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum
-  \psi_{\mathrm{log}}^2\!\left(\frac{x_i - T}{c \cdot
-  S^{(k)}}\right)}}{S(k+1) = S(k) * sqrt(2 * mean(psi((x_i - T) /
-  (c * S(k)))^2))}
+\deqn{S^{(k+1)} = S^{(k)} \cdot \sqrt{2 \cdot \frac{1}{n} \sum \psi_{\mathrm{log}}^2 \left( \frac{x_i - T}{c \cdot S^{(k)}} \right)}}{S(k+1) = S(k) * sqrt(2 * mean(psi((x_i - T) / (c * S(k)))^2))}
 
 Starting value: \eqn{S^{(0)} = \mathrm{MAD}(x)}{S(0) = MAD(x)}.
 The logistic psi values are computed via the algebraic identity
 \eqn{\psi_{\mathrm{log}}(x) = \tanh(x/2)}{psi(x) = tanh(x/2)}.
 
 \strong{Performance and SIMD.}
-This implementation is highly optimized using C++17. On supported platforms,
-transcendental evaluations (\code{tanh}) are vectorized using the \bold{SLEEF}
-SIMD library (targeting AVX2, AVX512, or NEON), Apple Accelerate, or
-OpenMP SIMD directives. This typically yields a 25--40x speedup over R
-implementations like \code{revss}.
+This package optimizes the logistic M-estimator for speed using C++17 and
+platform-specific SIMD backends. On Linux (SLEEF) and macOS (Accelerate),
+vectorized \code{tanh} evaluations reduce the computational cost of each
+iteration. Benchmarks establish a 11--39x reduction in execution time for
+small samples (\eqn{n \leq 20}) relative to the \code{revss} baseline.
 
 \strong{Decoupled estimation.}
 Scale is estimated with location held fixed at
