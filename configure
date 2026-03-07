@@ -12,6 +12,52 @@ else
 fi
 rm -f conftest.cpp conftest.o
 
+HAS_SLEEF="no"
+
+# Skip SLEEF on macOS as Accelerate is faster and preferred
+if [ "$(uname -s)" != "Darwin" ]; then
+  # Check standard paths first
+for prefix in /usr /usr/local /opt/homebrew; do
+  if [ -f "${prefix}/include/sleef.h" ]; then
+    SLEEF_CFLAGS="-I${prefix}/include -DROBSCALE_HAS_SLEEF"
+    SLEEF_LIBS="-L${prefix}/lib -lsleef"
+    HAS_SLEEF="yes"
+    break
+  fi
+done
+
+# Fallback to pkg-config if not found in standard paths
+    if pkg-config --exists sleef 2>/dev/null; then
+      SLEEF_CFLAGS="$(pkg-config --cflags sleef) -DROBSCALE_HAS_SLEEF"
+      SLEEF_LIBS=$(pkg-config --libs sleef)
+      HAS_SLEEF="yes"
+    fi
+  fi
+fi
+
+if [ "${HAS_SLEEF}" = "yes" ]; then
+  echo "  SLEEF detected"
+else
+  echo "  SLEEF not detected, falling back to Accelerate/OpenMP"
+fi
+
+# Detect CPU SIMD capabilities for optimal SLEEF/OpenMP performance
+SIMD_FLAGS=""
+case "$(uname -m)" in
+  x86_64)
+    # Check for AVX2 support in compiler
+    echo "int main(){return 0;}" > conftest_simd.cpp
+    if ${CXX:-c++} -mavx2 -mfma -c conftest_simd.cpp -o conftest_simd.o 2>/dev/null; then
+      SIMD_FLAGS="-mavx2 -mfma"
+      echo "  x86_64: AVX2/FMA supported"
+    fi
+    rm -f conftest_simd.cpp conftest_simd.o
+    ;;
+  arm64|aarch64)
+    echo "  ARM64: NEON is standard"
+    ;;
+esac
+
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
 ACCELERATE_LIBS=""
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -22,6 +68,9 @@ fi
 # Generate Makevars from template
 sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
+    -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
+    -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
+    -e "s|@SIMD_FLAGS@|${SIMD_FLAGS}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"

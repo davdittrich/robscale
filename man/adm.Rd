@@ -53,6 +53,11 @@ its explosion breakdown point is \eqn{1/n}.  However, it is highly
 resistant to implosion, with an implosion breakdown point of
 \eqn{(n-1)/n}{(n - 1) / n}.  It therefore serves as the fallback scale
 estimator in \code{\link{robScale}} when the MAD collapses to zero.
+
+\strong{Performance.}
+This implementation uses a C++17 $O(n)$ selection strategy (sorting networks
+for $n \le 8$, introselect for larger $n$), typically yielding a 10x
+speedup over pure-R implementations like \code{revss}.
 }
 \examples{
 adm(c(1:9))

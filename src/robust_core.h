@@ -14,15 +14,50 @@
   #define ROBSCALE_HAS_ACCELERATE 1
 #endif
 
+// SLEEF detection (set via PKG_CXXFLAGS from configure)
+#if defined(ROBSCALE_HAS_SLEEF)
+  #include <sleef.h>
+  #if defined(__x86_64__) || defined(_M_X64)
+    #include <immintrin.h>
+  #elif defined(__aarch64__) || defined(_M_ARM64)
+    #include <arm_neon.h>
+  #endif
+#endif
+
 #ifdef _OPENMP
   #pragma omp declare simd notinbranch
 #endif
 inline double vec_tanh(double x) { return std::tanh(x); }
 
-// Bulk tanh: vectorized on macOS (Accelerate vvtanh), SIMD-hinted elsewhere
+// Bulk tanh: vectorized via Accelerate (macOS), SLEEF (Linux), or OpenMP SIMD
 inline void bulk_tanh(double* inout, int n) {
 #if defined(ROBSCALE_HAS_ACCELERATE)
   vvtanh(inout, inout, &n);
+#elif defined(ROBSCALE_HAS_SLEEF)
+  int i = 0;
+  #if defined(__AVX2__)
+    for (; i + 4 <= n; i += 4) {
+      __m256d v = _mm256_loadu_pd(inout + i);
+      v = Sleef_tanhd4_u10avx2(v);
+      _mm256_storeu_pd(inout + i, v);
+    }
+  #elif defined(__AVX512F__)
+    for (; i + 8 <= n; i += 8) {
+      __m512d v = _mm512_loadu_pd(inout + i);
+      v = Sleef_tanhd8_u10avx512f(v);
+      _mm512_storeu_pd(inout + i, v);
+    }
+  #elif defined(__aarch64__)
+    for (; i + 2 <= n; i += 2) {
+      float64x2_t v = vld1q_f64(inout + i);
+      v = Sleef_tanhd2_u10(v);
+      vst1q_f64(inout + i, v);
+    }
+  #endif
+  // Scalar fallback for remainder
+  for (; i < n; i++) {
+    inout[i] = std::tanh(inout[i]);
+  }
 #else
   #ifdef _OPENMP
     #pragma omp simd
