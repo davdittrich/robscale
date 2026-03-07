@@ -3,7 +3,7 @@
 
 // [[Rcpp::export]]
 double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
-                      double implbound, int maxit, double tol) {
+                      double implbound, int maxit, double tol, int fallback) {
   int n = x.size();
   const double* xp = x.begin();
 
@@ -38,22 +38,27 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     minobs = 4;
   }
 
-  // Small-sample fallback
+  // Small-sample fallback (matches revss behavior)
   if (n < minobs) {
-    if (has_loc) {
-      std::memcpy(extra, xp, n * sizeof(double));
-      double med_orig = median_select(extra, n);
-      double mad_orig = mad_select(xp, n, med_orig, abs_buf);
-      return (mad_orig <= implbound)
-        ? adm_core(xp, n, med_orig, ADM_CONSISTENCY)
-        : mad_orig;
+    if (s <= implbound) {
+      if (fallback == 1) return NA_REAL; // "na" fallback
+      if (has_loc) {
+        std::memcpy(extra, xp, n * sizeof(double));
+        double med_orig = median_select(extra, n);
+        double mad_orig = mad_select(xp, n, med_orig, abs_buf);
+        return (mad_orig <= implbound)
+          ? adm_core(xp, n, med_orig, ADM_CONSISTENCY)
+          : mad_orig;
+      } else {
+        return adm_core(xp, n, t, ADM_CONSISTENCY);
+      }
     } else {
-      return (s <= implbound)
-        ? adm_core(xp, n, t, ADM_CONSISTENCY)
-        : s;
+      return s;
     }
   }
 
+  // MAD collapse for n >= minobs
+  if (s <= implbound && fallback == 1) return NA_REAL;
   if (s == 0.0) return 0.0;
 
   // Multiplicative iteration with bulk_tanh

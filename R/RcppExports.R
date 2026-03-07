@@ -13,7 +13,7 @@ rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
 
-rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol) {
-    .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol)
+rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
+    .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
 }
 

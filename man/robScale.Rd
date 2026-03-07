@@ -7,6 +7,7 @@
 robScale(
   x,
   loc = NULL,
+  fallback = c("adm", "na"),
   implbound = 0.0001,
   na.rm = FALSE,
   maxit = 80L,
@@ -20,9 +21,11 @@ robScale(
 the observations are centered at \code{loc} and the minimum sample size
 for iteration is lowered from 4 to 3 (see \sQuote{Details}).}
 
-\item{implbound}{Implosion bound: the smallest value the MAD is allowed to
-take before it is considered to have \dQuote{imploded} (collapsed to
-zero).  Defaults to \code{1e-4}.}
+\item{fallback}{Character string specifying the action to take when the
+MAD collapses (implodes) or when the sample size is below the minimum
+required for iteration.  Options are \code{"adm"} (the default), which
+falls back to the \code{\link{adm}} estimator, or \code{"na"}, which
+returns \code{NA} for compatibility with \code{revss}.}
 
 \item{na.rm}{Logical.  If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation.  If \code{FALSE} (the default), the presence
@@ -37,7 +40,8 @@ Defaults to \code{sqrt(.Machine$double.eps)}.}
 \value{
 A single numeric value: the robust M-estimate of scale.
   Returns \code{NA} if \code{x} has length zero (after removal of
-  \code{NA}s when \code{na.rm = TRUE}).
+  \code{NA}s when \code{na.rm = TRUE}) or if the MAD collapses and
+  \code{fallback = "na"}.
 }
 \description{
 Compute the robust M-estimate of scale for very small samples using the
@@ -96,12 +100,14 @@ rather than the MAD.  This lowers the minimum sample size from 4 to 3
 (Rousseeuw & Verboven, 2002, Sec.\sspace{}5).
 
 \strong{Fallback.}
-When \eqn{n} is below the minimum for iteration:
+When \eqn{n} is below the minimum for iteration or when the MAD collapses:
 \itemize{
-  \item if \eqn{\mathrm{MAD}(x) \le}{MAD(x) <=} \code{implbound}
-    (implosion), the function returns \code{\link{adm}(x)};
-  \item otherwise, it returns \eqn{\mathrm{MAD}(x)}{MAD(x)}.
+  \item if \code{fallback = "adm"} (the default), the function returns
+    \code{\link{adm}(x)};
+  \item if \code{fallback = "na"}, the function returns \code{NA} for
+    compatibility with \code{revss}.
 }
+If the MAD is non-zero and non-imploded, it is used as the starting value.
 }
 \examples{
 robScale(c(1:9))

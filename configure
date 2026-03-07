@@ -33,7 +33,6 @@ done
       HAS_SLEEF="yes"
     fi
   fi
-fi
 
 if [ "${HAS_SLEEF}" = "yes" ]; then
   echo "  SLEEF detected"
