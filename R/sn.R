@@ -20,25 +20,26 @@
 #' @export
 sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE) {
   if (na.rm) x <- x[!is.na(x)]
-  if (length(x) < 2) return(NA_real_)
+  n <- length(x)
+  if (n < 2) return(NA_real_)
   
   if (is.double(x)) {
-    res <- C_sn_fast(x)
+    if (constant == 1.1926 && finite.corr) return(.Call(`_robscale_C_sn_fast`, x))
+    res <- .Call(`_robscale_C_sn_fast`, x)
   } else if (is.integer(x)) {
-    res <- C_sn_int_fast(x)
+    if (constant == 1.1926 && finite.corr) return(.Call(`_robscale_C_sn_int_fast`, x))
+    res <- .Call(`_robscale_C_sn_int_fast`, x)
   } else {
-    res <- C_sn_fast(as.double(x))
+    x <- as.double(x)
+    if (constant == 1.1926 && finite.corr) return(.Call(`_robscale_C_sn_fast`, x))
+    res <- .Call(`_robscale_C_sn_fast`, x)
   }
   
-  # The C++ implementation already applies CONST_SN and get_sn_factor.
-  # If the user provided a custom constant, we adjust.
   if (constant != 1.1926) {
     res <- res * (constant / 1.19259855312321)
   }
   
   if (!finite.corr) {
-    # If no finite correction, we divide by the factor applied in C++
-    n <- length(x)
     res <- res / robscale:::get_sn_factor_r(n)
   }
   

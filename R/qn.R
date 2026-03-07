@@ -20,14 +20,19 @@
 #' @export
 qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE) {
   if (na.rm) x <- x[!is.na(x)]
-  if (length(x) < 2) return(NA_real_)
+  n <- length(x)
+  if (n < 2) return(NA_real_)
   
   if (is.double(x)) {
-    res <- C_qn_fast(x)
+    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
+    res <- .Call(`_robscale_C_qn_fast`, x)
   } else if (is.integer(x)) {
-    res <- C_qn_int_fast(x)
+    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_int_fast`, x))
+    res <- .Call(`_robscale_C_qn_int_fast`, x)
   } else {
-    res <- C_qn_fast(as.double(x))
+    x <- as.double(x)
+    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
+    res <- .Call(`_robscale_C_qn_fast`, x)
   }
   
   if (constant != 2.2191) {
@@ -35,7 +40,6 @@ qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE) {
   }
   
   if (!finite.corr) {
-    n <- length(x)
     res <- res / robscale:::get_qn_factor_r(n)
   }
   

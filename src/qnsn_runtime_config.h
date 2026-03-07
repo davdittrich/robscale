@@ -33,14 +33,18 @@ private:
   }
 
   void calculate_thresholds() {
-    size_t l2_budget = hw.l2_cache_size / 2;
-    qn_exact_threshold = (size_t)std::sqrt(l2_budget / 8);
+    // For Qn, brute-force O(n^2) is best at small scales. 
+    // Our JM implementation is highly optimized, so we switch over at ~512.
+    qn_exact_threshold = 512;
 
-    qn_exact_threshold = (qn_exact_threshold / 8) * 8;
-    if (qn_exact_threshold < 64)
-      qn_exact_threshold = 64;
-    if (qn_exact_threshold > 128)
-      qn_exact_threshold = 128;
+    size_t l2_budget = hw.l2_cache_size / 2;
+    // Original calculation and clamping for qn_exact_threshold are now superseded by the hardcoded value above.
+    // qn_exact_threshold = (size_t)std::sqrt(l2_budget / 8);
+    // qn_exact_threshold = (qn_exact_threshold / 8) * 8;
+    // if (qn_exact_threshold < 64)
+    //   qn_exact_threshold = 64;
+    // if (qn_exact_threshold > 1024)
+    //   qn_exact_threshold = 1024;
 
     sn_parallel_threshold = (hw.l2_cache_size / sizeof(double));
     if (sn_parallel_threshold < 8192)
