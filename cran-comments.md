@@ -1,14 +1,15 @@
-# CRAN submission comments for robscale 0.1.3
+# CRAN submission comments for robscale 0.1.4
 
-This is a resubmission for version 0.1.3. The previous submission (0.1.2) was
-withdrawn due to a discovered compilation error on macOS and several CRAN
-pre-test findings.
+This is a resubmission for version 0.1.4. Previous submissions (0.1.2, 0.1.3) 
+were withdrawn or addressed specifically for macOS compilation errors and 
+compliance notes.
 
-## Fixes in 0.1.3
-- Fixed macOS compilation failures (Accelerate header and x86 guards).
+## Fixes in 0.1.4
+- Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>`.
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
-- Removed redundant `C++17` from `SystemRequirements` (handled by `Makevars`).
-- Added `inst/WORDLIST` to address `aspell` spelling notes for technical terms.
+- Removed redundant `C++17` from `SystemRequirements`.
+- Added `inst/WORDLIST` to address technical term spelling notes.
+- Quoted 'Qn' and 'Sn' in metadata.
 
 Version 0.1.2 introduces two major new features and several refinements:
 

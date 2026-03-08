@@ -1,15 +1,12 @@
-# robscale 0.1.3
+# robscale 0.1.4
 
 * Portability: Fixed macOS (Apple Silicon) compilation error by switching to
   the more portable `<Accelerate/Accelerate.h>` include.
-* Arbitration: Explicitly disabled SLEEF backend on macOS to ensure the native
-  Accelerate framework remains the sole vectorized provider.
-* Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings on
-  some macOS configurations.
-* CRAN: Removed redundant `C++17` from `SystemRequirements` (handled by `Makevars`).
+* CRAN: Removed redundant `C++17` from `SystemRequirements`.
 * CRAN: Added `inst/WORDLIST` to whitelist technical terms from `aspell`.
+* CRAN: Quoted 'Qn' and 'Sn' in `DESCRIPTION` to satisfy metadata checks.
 
-# robscale 0.1.2
+# robscale 0.1.3
 
 * Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
   Croux, 1993) with specialized sorting network kernels and cache-aware
