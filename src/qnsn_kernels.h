@@ -35,16 +35,18 @@ void qn_brute_force_avx2(const T * __restrict__ sorted_x, size_t n, double * __r
     size_t j = 0;
     // Main AVX2 loop: 8 doubles per iteration (2 registers)
     for (; j + 8 <= i; j += 8) {
-      __m256d v_xj1 = _mm256_set_pd(static_cast<double>(sorted_x[j+3]), static_cast<double>(sorted_x[j+2]), 
-                                    static_cast<double>(sorted_x[j+1]), static_cast<double>(sorted_x[j]));
-      __m256d v_xj2 = _mm256_set_pd(static_cast<double>(sorted_x[j+7]), static_cast<double>(sorted_x[j+6]), 
-                                    static_cast<double>(sorted_x[j+5]), static_cast<double>(sorted_x[j+4]));
+      __m256d v_xj1, v_xj2;
       
       // We use set_pd which is slow, but for n <= 2048 the sorted_x array itself is small.
       // Better is to use _mm256_loadu_pd if T is double.
       if constexpr (std::is_same_v<T, double>) {
         v_xj1 = _mm256_loadu_pd(sorted_x + j);
         v_xj2 = _mm256_loadu_pd(sorted_x + j + 4);
+      } else {
+        v_xj1 = _mm256_set_pd(static_cast<double>(sorted_x[j+3]), static_cast<double>(sorted_x[j+2]), 
+                                      static_cast<double>(sorted_x[j+1]), static_cast<double>(sorted_x[j]));
+        v_xj2 = _mm256_set_pd(static_cast<double>(sorted_x[j+7]), static_cast<double>(sorted_x[j+6]), 
+                                      static_cast<double>(sorted_x[j+5]), static_cast<double>(sorted_x[j+4]));
       }
       
       _mm256_storeu_pd(diffs + k, _mm256_sub_pd(v_xi, v_xj1));
