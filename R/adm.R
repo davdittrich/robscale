@@ -29,7 +29,7 @@
 #' The default constant \eqn{C = \sqrt{\pi/2}}{C = sqrt(pi/2)} ensures that the
 #' ADM is a consistent estimator of the standard deviation \eqn{\sigma} under
 #' the Gaussian model. At the normal distribution, the ADM achieves an
-#' \bold{asymptotic relative efficiency (ARE) of 0.375} compared to the sample
+#' \bold{asymptotic relative efficiency (ARE) of 0.88} compared to the sample
 #' standard deviation.
 #'
 #' While the ADM is less efficient than the standard deviation for purely

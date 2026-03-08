@@ -47,9 +47,10 @@
 #' \strong{Numerical Computation.}
 #' The estimating equation is solved via Newton--Raphson iteration starting from
 #' the sample median. Because the derivative of the logistic psi satisfies
-#' \eqn{\psi'(x) = 1 - \psi^2(x)}{psi'(x) = 1 - psi(x)^2}, the Newton step is
-#' computationally efficient, requiring no additional transcendental calls
-#' beyond the \code{tanh} evaluations used for the psi function itself.
+#' \eqn{\psi'(x) = \frac{1}{2}(1 - \psi^2(x))}{\psi'(x) = 1/2 * (1 - \psi(x)^2)},
+#' the Newton step is computationally efficient, requiring no additional
+#' transcendental calls beyond the \code{tanh} evaluations used for the psi
+#' function itself.
 #'
 #' \strong{Performance and SIMD.}
 #' The underlying C++ core utilizes platform-specific SIMD backends (SLEEF on
