@@ -10,7 +10,7 @@ Version 0.1.2 introduces two major new features and several refinements:
 
 ## Test environments
 
-* macOS Tahoe 26.3 (aarch64), R 4.5.2, Apple clang 17.0.0
+- Arch Linux (x86_64), R 4.5.2, GCC 15.2.1
 
 ## R CMD check results
 
@@ -20,5 +20,6 @@ Version 0.1.2 introduces two major new features and several refinements:
 
 ## Notes
 
-* The package reimplements and extends the robust estimators from the CRAN package `revss` (listed in Suggests) in C++17 via Rcpp.
-* Numerical equivalence with `revss` is verified by 5,400 cross-comparisons in the test suite.
+- The package reimplements and extends the robust estimators from the CRAN package `revss` (listed in Suggests) in
+  C++17 via Rcpp.
+- Numerical equivalence with `revss` is verified by 5,400 cross-comparisons in the test suite.
