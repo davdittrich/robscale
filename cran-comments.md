@@ -1,7 +1,7 @@
-# CRAN submission comments for robscale 0.1.2
+# CRAN submission comments for robscale 0.1.3
 
-This is a new submission for version 0.1.2. The previous version (0.1.1) is
-currently on CRAN.
+This is a resubmission for version 0.1.3. The previous submission (0.1.2) was
+withdrawn due to a discovered compilation error on macOS.
 
 Version 0.1.2 introduces two major new features and several refinements:
 

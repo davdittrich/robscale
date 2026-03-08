@@ -85,7 +85,7 @@ at very small sample sizes.
 
 \strong{Performance and SIMD.}
 The C++ implementation leverages platform-specific SIMD (Single Instruction,
-Multiple Data) backends (SLEEF, Apple Accelerate) to vectorize the
+Multiple Data) backends (SLEEF on Linux, Apple Accelerate on macOS) to
 \eqn{\psi_{\mathrm{log}}} evaluations (via \code{tanh}). This specialized
 architecture typically yields an 11--39x speedup over pure-R code for
 samples of size \eqn{n \le 20}.
