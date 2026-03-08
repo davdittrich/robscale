@@ -1,11 +1,12 @@
 # CRAN submission comments for robscale 0.1.2
 
-This is a resubmission (v0.1.2). In the previous submission (v0.1.0), CRAN
-requested that 'Rcpp' be single-quoted in the DESCRIPTION. v0.1.2 addresses
-this and further expands the package with: two major new scale estimators
-(`qn()` and `sn()`), consistent NA error handling, RAII memory management
-in C++, expanded test suite, and 'opt-in' ONLY high-performance flags in
-the configure script.
+This is a new submission for version 0.1.2. The previous version (0.1.1) is
+currently on CRAN. 
+
+Version 0.1.2 introduces two major new features and several refinements:
+- **New estimators**: Added `qn()` and `sn()` (Rousseeuw & Croux, 1993) with RcppParallel and cache-aware kernels.
+- **Portability**: Fixed the `configure` script to ensure that hardware-specific flags (e.g., `-mavx2`, `-mfma`) are strictly **opt-in** via `ROBSCALE_FAST=1`, satisfying CRAN's portability requirements.
+- **Documentation**: Added missing `@examples` for all exported functions.
 
 ## Test environments
 
@@ -13,19 +14,11 @@ the configure script.
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 0 notes
 
-* NOTE: New submission
+(Note: System-specific notes for missing `aspell` or `tidy` may appear in some environments but do not reflect package defects.)
 
 ## Notes
 
-* This is the first release of the `robscale` package.
-* The package reimplements the robust estimators from the CRAN package `revss`
-  (listed in Suggests) in C++17 via Rcpp. The API is intentionally identical to
-  `revss` to serve as a drop-in replacement.
-* Numerical equivalence with `revss` is verified by 5,400 cross-comparisons in
-  the test suite (`inst/tinytest/test_cross_check.R`).
-* The package uses a `configure` script to detect `-fopenmp-simd` compiler
-  support and the macOS Accelerate framework. A `cleanup` script removes the
-  generated `src/Makevars`. On Windows, `src/Makevars.win` provides a static
-  fallback (C++17 only, no platform-specific flags).
+* The package reimplements and extends the robust estimators from the CRAN package `revss` (listed in Suggests) in C++17 via Rcpp.
+* Numerical equivalence with `revss` is verified by 5,400 cross-comparisons in the test suite.
