@@ -5,8 +5,10 @@ submission, we identified a critical compilation error specifically affecting
 macOS ARM64 (Apple Silicon) builders due to a platform-specific header 
 reference. 
 
-## Fixes in 0.1.4
+## Changes in 0.1.4
 - Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>`.
+
+## Changes in 0.1.3
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
 - Removed redundant `C++17` from `SystemRequirements`.
 - Added `inst/WORDLIST` to address technical term spelling notes.
