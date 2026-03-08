@@ -31,6 +31,12 @@ The \code{robscale} implementation utilizes a tiered strategy for optimal perfor
 sorting networks for \eqn{n \le 8}, a specialized Johnson–Mizoguchi algorithm for medium 
 samples, and cache-aware parallelization for large-scale datasets.
 }
+\examples{
+qn(c(1:9))
+x <- c(1, 2, 3, 5, 7, 8)
+qn(x)
+
+}
 \references{
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
 \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.

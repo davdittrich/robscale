@@ -1,4 +1,4 @@
-# robscale 0.1.1
+# robscale 0.1.2
 
 * Consistent NA handling: `adm()` now raises an error when `na.rm = FALSE` and
   NAs are present, matching `robLoc()` and `robScale()` behavior.
@@ -11,23 +11,25 @@
 * Added Mermaid algorithm flowcharts for `robLoc` and `robScale` to README.
 * Expanded test suite: explicit-center tests for `adm()`, `maxit` edge cases
   for `robLoc()` and `robScale()`, sorting network verification for n = 2--8.
+* Added documentation examples for `sn()` and `qn()`.
 * Added `cph` role to `Authors@R` in DESCRIPTION.
 
 # robscale 0.1.0
 
 Initial release.
 
-* Three functions: `adm()`, `robLoc()`, `robScale()` implementing the robust
-  location and scale M-estimators of Rousseeuw & Verboven (2002) for very small
-  samples.
+* Five functions: `adm()`, `robLoc()`, `robScale()`, `qn()`, and `sn()`
+  implementing the robust location and scale M-estimators of Rousseeuw &
+  Verboven (2002) for very small samples, and the high-efficiency $Q_n$ and
+  $S_n$ estimators of Rousseeuw & Croux (1993).
 * API-compatible drop-in replacement for the `revss` package.
 * C++17 implementation via Rcpp with:
-    - Newton--Raphson iteration for location (quadratic convergence).
-    - Algebraic `tanh(x/2)` identity for the logistic psi function with
-      platform-vectorized bulk evaluation (Apple Accelerate on macOS,
-      OpenMP SIMD hints on Linux).
-    - Floyd--Rivest O(n) selection for median computation.
-    - Optimal sorting networks for n <= 8.
-    - Stack-allocated arena buffers (zero heap allocation for n <= 512).
+  - Newton--Raphson iteration for location (quadratic convergence).
+  - Algebraic `tanh(x/2)` identity for the logistic psi function with
+    platform-vectorized bulk evaluation (Apple Accelerate on macOS,
+    OpenMP SIMD hints on Linux).
+  - Floyd--Rivest O(n) selection for median computation.
+  - Optimal sorting networks for n <= 8.
+  - Stack-allocated arena buffers (zero heap allocation for n <= 512).
 * Numerical equivalence with `revss` verified across 5,400 systematic
   comparisons (tolerance: sqrt(.Machine$double.eps)).
