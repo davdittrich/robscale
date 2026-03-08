@@ -5,6 +5,7 @@ withdrawn due to a discovered compilation error on macOS and several CRAN
 pre-test findings.
 
 ## Fixes in 0.1.3
+- Fixed macOS compilation failures (Accelerate header and x86 guards).
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
 - Removed redundant `C++17` from `SystemRequirements` (handled by `Makevars`).
 - Added `inst/WORDLIST` to address `aspell` spelling notes for technical terms.

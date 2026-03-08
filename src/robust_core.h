@@ -11,7 +11,7 @@
 // On macOS, include only vForce (not full Accelerate) to avoid COMPLEX
 // symbol collision between vecLib/vDSP.h and R's Rinternals.h
 #if defined(__APPLE__) && defined(__MACH__)
-  #include <vecLib/vForce.h>
+  #include <Accelerate/Accelerate.h>
   #define ROBSCALE_HAS_ACCELERATE 1
 #endif
 

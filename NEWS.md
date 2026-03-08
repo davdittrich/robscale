@@ -1,7 +1,7 @@
 # robscale 0.1.3
 
-* Portability: Fixed macOS (Apple Silicon) compilation error by properly guarding
-  x86-specific `immintrin.h` headers.
+* Portability: Fixed macOS (Apple Silicon) compilation error by switching to
+  the more portable `<Accelerate/Accelerate.h>` include.
 * Arbitration: Explicitly disabled SLEEF backend on macOS to ensure the native
   Accelerate framework remains the sole vectorized provider.
 * Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings on
