@@ -3,7 +3,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
 #include <immintrin.h>
+#endif
 
 #ifdef __ARM_NEON
 #include <arm_neon.h>
