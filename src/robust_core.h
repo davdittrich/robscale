@@ -16,7 +16,8 @@
 #endif
 
 // SLEEF detection (set via PKG_CXXFLAGS from configure)
-#if defined(ROBSCALE_HAS_SLEEF)
+// Explicitly exclude SLEEF on macOS to ensure Accelerate remains the sole backend
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE)
   #include <sleef.h>
   #if defined(__x86_64__) || defined(_M_X64)
     #include <immintrin.h>

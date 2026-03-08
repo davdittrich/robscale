@@ -252,7 +252,7 @@ this identity to reduce $\psi_{\log}$ to a single `tanh` call. The identity is n
 - **Platform vectorization.** `robscale` uses platform-specific libraries to evaluate `tanh` in bulk.
   The implementation ranks and selects the fastest available backend:
   1. **Apple Accelerate.** On macOS (Darwin), it uses `vvtanh` for array-wide SIMD processing.
-  2. **SLEEF.** On Linux (x86_64), it uses the SLEEF library to target AVX2 or AVX512 instruction sets.
+  2. **SLEEF.** On Linux (x86_64), it uses the SLEEF library to target AVX2 or AVX512 instruction sets. On macOS, this backend is explicitly disabled in favor of Apple Accelerate.
   3. **OpenMP SIMD.** A compiler-guided fallback via `#pragma omp simd`.
   4. **Scalar.** Standard `std::tanh` fallback.
 
