@@ -1,5 +1,15 @@
 # robscale 0.1.2
 
+* Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
+  Croux, 1993) with specialized sorting network kernels and cache-aware
+  parallelization.
+* Added documentation examples for all five exported functions.
+* Performance optimizations: Fixed `configure` script to ensure that
+  hardware-specific SIMD flags (e.g., `-mavx2`) are strictly opt-in
+  via `ROBSCALE_FAST=1`.
+
+# robscale 0.1.1
+
 * Consistent NA handling: `adm()` now raises an error when `na.rm = FALSE` and
   NAs are present, matching `robLoc()` and `robScale()` behavior.
 * Replaced manual `new[]`/`delete[]` with `std::unique_ptr` for RAII memory
@@ -11,10 +21,6 @@
 * Added Mermaid algorithm flowcharts for `robLoc` and `robScale` to README.
 * Expanded test suite: explicit-center tests for `adm()`, `maxit` edge cases
   for `robLoc()` and `robScale()`, sorting network verification for n = 2--8.
-* Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
-  Croux, 1993) with specialized sorting network kernels and cache-aware
-  parallelization.
-* Added documentation examples for all five exported functions.
 * Added `cph` role to `Authors@R` in DESCRIPTION.
 
 # robscale 0.1.0
