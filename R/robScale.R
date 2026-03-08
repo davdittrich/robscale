@@ -56,10 +56,11 @@
 #' at very small sample sizes.
 #'
 #' \strong{Performance and SIMD.}
-#' The C++ implementation leverages platform-specific SIMD backends (SLEEF,
-#' Apple Accelerate) to vectorize the \eqn{\psi_{\mathrm{log}}} evaluations
-#' (via \code{tanh}). This specialized architecture typically yields an
-#' 11--39x speedup over pure-R code for samples of size \eqn{n \le 20}.
+#' The C++ implementation leverages platform-specific SIMD (Single Instruction,
+#' Multiple Data) backends (SLEEF, Apple Accelerate) to vectorize the
+#' \eqn{\psi_{\mathrm{log}}} evaluations (via \code{tanh}). This specialized
+#' architecture typically yields an 11--39x speedup over pure-R code for
+#' samples of size \eqn{n \le 20}.
 #'
 #' \strong{Known location.}
 #' When \code{loc} is supplied, the observations are centered as
@@ -93,7 +94,9 @@
 #' @seealso
 #' \code{\link{adm}} for the implosion fallback;
 #' \code{\link[stats]{mad}} for the starting value and classical alternative;
-#' \code{\link{robLoc}} for the companion location estimator.
+#' \code{\link{robLoc}} for the companion location estimator;
+#' \code{\link{qn}} and \code{\link{sn}} for high-efficiency scale
+#' estimators.
 #'
 #' @examples
 #' robScale(c(1:9))

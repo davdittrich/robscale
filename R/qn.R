@@ -30,10 +30,12 @@
 #' The package utilizes a tiered execution strategy:
 #' \itemize{
 #'   \item \bold{Optimal sorting networks} for very small samples (\eqn{n \le 8}).
+#'     These networks eliminate branch misprediction in the target regimes of
+#'     extremely small samples.
 #'   \item A specialized \bold{Johnson--Mizoguchi selection} algorithm for
 #'     medium-sized datasets.
-#'   \item \bold{Cache-aware parallelization} via Intel TBB (when
-#'     \code{ROBSCALE_FAST=1}) for large-scale data.
+#'   \item \bold{Cache-aware parallelization} via Intel TBB (Threading Building
+#'     Blocks, when \code{ROBSCALE_FAST=1}) for large-scale data.
 #' }
 #'
 #' @references
