@@ -568,15 +568,15 @@ samples. *Computational Statistics & Data Analysis*, **40**(4), 741--758.
 
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
 *Journal of the American Statistical Association*, **88**, 1273--1283.
-[doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
+doi:10.1080/01621459.1993.10476408
 
 Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
 *Communications of the ACM*, **18**(3), 165--172.
-[doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
+doi:10.1145/360680.360691
 
 Nair, K.R. (1947). A Note on the Mean Deviation from the Median. *Biometrika*,
 **34**(3/4), 360--362.
-[doi:10.2307/2332448](https://doi.org/10.2307/2332448)
+doi:10.2307/2332448
 
 ## Author
 
