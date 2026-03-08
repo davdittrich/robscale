@@ -40,16 +40,6 @@ namespace robscale::qnsn {
 
 // --- UTILITIES ---
 
-template <typename T>
-inline bool validate_finite(const T* x, size_t n) {
-  if constexpr (std::is_floating_point_v<T>) {
-    for (size_t i = 0; i < n; ++i) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x[i]))) return false;
-    }
-  }
-  return true;
-}
-
 // Low-median via O(n) selection
 template <typename T>
 inline double lowmedian_ptr(T* arr, size_t n) {
@@ -373,20 +363,22 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     return raw * CONST_QN * get_qn_factor(n);
   }
 
-  size_t arena_bytes = n * sizeof(T) + n * sizeof(float) + 3 * n * sizeof(int32_t);
-  std::unique_ptr<char[]> arena;
+  // Properly-typed allocations to avoid alignment UB
+  std::unique_ptr<T[]> sorted_x_buf;
+  std::unique_ptr<float[]> work_buf;
+  std::unique_ptr<int32_t[]> bounds_buf;
   try {
-    arena.reset(new char[arena_bytes]);
+    sorted_x_buf.reset(new T[n]);
+    work_buf.reset(new float[n]);
+    bounds_buf.reset(new int32_t[3 * n]);
   } catch (const std::bad_alloc& e) {
     Rcpp::stop("robscale Out of Memory: failed to allocate Qn arena.");
   }
-  
-  char* ptr = arena.get();
-  T* sorted_x = reinterpret_cast<T*>(ptr); ptr += n * sizeof(T);
-  float* work = reinterpret_cast<float*>(ptr); ptr += n * sizeof(float);
-  int32_t* iweight = reinterpret_cast<int32_t*>(ptr); ptr += n * sizeof(int32_t);
-  int32_t* left = reinterpret_cast<int32_t*>(ptr); ptr += n * sizeof(int32_t);
-  int32_t* right = reinterpret_cast<int32_t*>(ptr);
+  T* sorted_x = sorted_x_buf.get();
+  float* work = work_buf.get();
+  int32_t* iweight = bounds_buf.get();
+  int32_t* left = bounds_buf.get() + n;
+  int32_t* right = bounds_buf.get() + 2 * n;
 
   for (size_t i = 0; i < n; i++) {
     if constexpr (std::is_floating_point_v<T>) {

@@ -1,6 +1,17 @@
 #!/bin/sh
 # Detect platform-specific compiler flags for robscale
 
+# --- Performance optimization flags ---
+# By default, use CRAN-safe flags (no -O3, no -march=native).
+# Set ROBSCALE_FAST=1 to enable aggressive optimization for local installs.
+FAST_FLAGS=""
+if [ "${ROBSCALE_FAST}" = "1" ]; then
+  FAST_FLAGS="-O3 -march=native"
+  echo "  ROBSCALE_FAST=1: enabling -O3 -march=native"
+else
+  echo "  CRAN-safe mode (set ROBSCALE_FAST=1 for -O3 -march=native)"
+fi
+
 # Detect -fopenmp-simd support
 OPENMP_SIMD_FLAG=""
 echo "int main(){return 0;}" > conftest.cpp
@@ -17,22 +28,24 @@ HAS_SLEEF="no"
 # Skip SLEEF on macOS as Accelerate is faster and preferred
 if [ "$(uname -s)" != "Darwin" ]; then
   # Check standard paths first
-for prefix in /usr /usr/local /opt/homebrew; do
-  if [ -f "${prefix}/include/sleef.h" ]; then
-    SLEEF_CFLAGS="-I${prefix}/include -DROBSCALE_HAS_SLEEF"
-    SLEEF_LIBS="-L${prefix}/lib -lsleef"
-    HAS_SLEEF="yes"
-    break
-  fi
-done
+  for prefix in /usr /usr/local /opt/homebrew; do
+    if [ -f "${prefix}/include/sleef.h" ]; then
+      SLEEF_CFLAGS="-I${prefix}/include -DROBSCALE_HAS_SLEEF"
+      SLEEF_LIBS="-L${prefix}/lib -lsleef"
+      HAS_SLEEF="yes"
+      break
+    fi
+  done
 
-# Fallback to pkg-config if not found in standard paths
+  # Fallback to pkg-config if not found in standard paths
+  if [ "${HAS_SLEEF}" = "no" ]; then
     if pkg-config --exists sleef 2>/dev/null; then
       SLEEF_CFLAGS="$(pkg-config --cflags sleef) -DROBSCALE_HAS_SLEEF"
       SLEEF_LIBS=$(pkg-config --libs sleef)
       HAS_SLEEF="yes"
     fi
   fi
+fi
 
 if [ "${HAS_SLEEF}" = "yes" ]; then
   echo "  SLEEF detected"
@@ -87,7 +100,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
 fi
 
 # Generate Makevars from template
-sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
+sed -e "s|@FAST_FLAGS@|${FAST_FLAGS}|" \
+    -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
     -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
     -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \

@@ -34,7 +34,7 @@ struct HardwareInfo {
   size_t num_logical_cores = 1;
   SIMDLevel simd_level = SIMDLevel::None;
 
-  HardwareInfo() { discover(); }
+  HardwareInfo() = default;
 
   void discover() {
     num_logical_cores = std::thread::hardware_concurrency();
