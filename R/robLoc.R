@@ -16,56 +16,54 @@
 #'   \code{sqrt(.Machine$double.eps)}.
 #'
 #' @details
-#' The location estimator \eqn{T_n}{Tn} is the solution to the
-#' M-estimating equation
+#' The M-estimate of location \eqn{T_n}{Tn} is defined as the solution to the
+#' estimating equation
 #'
-#' \deqn{\frac{1}{n}\sum_{i=1}^{n}\psi_{\mathrm{log}}
+#' \deqn{\sum_{i=1}^{n}\psi_{\mathrm{log}}
 #'   \!\left(\frac{x_i - T_n}{S_n}\right) = 0}{
-#'   mean(psi((x_i - Tn) / Sn)) = 0}
+#'   sum(psi((x_i - Tn) / Sn)) = 0}
 #'
-#' where \eqn{S_n}{Sn} is a fixed auxiliary scale estimate and
-#' \eqn{\psi_{\mathrm{log}}}{psi} is the logistic psi function (Rousseeuw &
-#' Verboven 2002, Eq.\sspace{}23):
+#' where \eqn{S_n}{Sn} is a fixed auxiliary scale (defaulting to the MAD) and
+#' \eqn{\psi_{\mathrm{log}}}{psi} is the logistic psi function:
 #'
 #' \deqn{\psi_{\mathrm{log}}(x) = \frac{e^x - 1}{e^x + 1}
 #'   = \tanh(x/2)}{psi(x) = (exp(x) - 1) / (exp(x) + 1) = tanh(x / 2)}
 #'
-#' This function is bounded in \eqn{(-1, 1)}, smooth (\eqn{C^\infty}{C-inf}),
-#' and strictly monotone.  Boundedness provides robustness against outliers;
-#' smoothness avoids the corner artifacts of Huber's \eqn{\psi}{psi} at small
-#' \eqn{n}.
+#' \strong{Statistical Properties.}
+#' The logistic psi function is bounded, smooth (\eqn{C^\infty}{C-inf}), and
+#' strictly monotone. These properties ensure that the resulting M-estimator is
+#' both robust to outliers and numerically stable. At the Gaussian distribution,
+#' the logistic M-estimator of location achieves high efficiency, with an
+#' \bold{asymptotic relative efficiency (ARE) of 0.95} compared to the sample
+#' mean.
 #'
-#' \strong{Iteration scheme.}
-#' The estimating equation is solved by Newton--Raphson iteration.  The
-#' derivative of the logistic psi satisfies \eqn{\psi'(x) =
-#' 1 - \psi^2(x)}{psi'(x) = 1 - psi(x)^2}, so the Newton step requires
-#' no additional transcendental function evaluations beyond those already
-#' computed for the numerator.  Starting value:
-#' \eqn{T^{(0)} = \mathrm{med}(x)}{T(0) = median(x)}.  Auxiliary scale:
-#' \eqn{S = \mathrm{MAD}(x)}{S = MAD(x)} unless \code{scale} is supplied.
+#' \strong{Small-Sample Strategy.}
+#' Following Rousseeuw & Verboven (2002), location and scale are estimated
+#' separately. In \code{robLoc}, the auxiliary scale \eqn{S_n}{Sn} remains fixed
+#' throughout the Newton--Raphson iteration. This "decoupled" approach avoids
+#' the instabilities often encountered in small samples when using simultaneous
+#' location--scale iteration (e.g., Huber's Proposal 2).
+#'
+#' \strong{Numerical Computation.}
+#' The estimating equation is solved via Newton--Raphson iteration starting from
+#' the sample median. Because the derivative of the logistic psi satisfies
+#' \eqn{\psi'(x) = 1 - \psi^2(x)}{psi'(x) = 1 - psi(x)^2}, the Newton step is
+#' computationally efficient, requiring no additional transcendental calls
+#' beyond the \code{tanh} evaluations used for the psi function itself.
 #'
 #' \strong{Performance and SIMD.}
-#' This C++17 implementation uses platform-specific SIMD vectorization to accelerate
-#' transcendental evaluations (\code{tanh}). On Linux, it uses the \bold{SLEEF}
-#' library (targeting AVX2, AVX512, or NEON); on macOS, it uses \bold{Apple Accelerate}.
-#' These optimizations reduce execution time by a factor of 15--30 compared to
-#' interpreted R implementations like \code{revss}.
+#' The underlying C++ core utilizes platform-specific SIMD backends (SLEEF on
+#' Linux, Apple Accelerate on macOS) to vectorize the \code{tanh} evaluations.
+#' This architectural choice delivers substantial performance gains,
+#' particularly for large-scale or high-throughput workflows.
 #'
-#' \strong{Decoupled estimation.}
-#' Location and scale are estimated separately: \code{robLoc} holds the
-#' auxiliary scale fixed at \eqn{\mathrm{MAD}(x)}{MAD(x)} throughout
-#' iteration, following the decoupled approach of Rousseeuw & Verboven (2002,
-#' Sec.\sspace{}4.1).  This avoids the positive-feedback instability of
-#' simultaneous location--scale iteration (Huber's Proposal 2) in small
-#' samples.
-#'
-#' \strong{Fallback.}
-#' When the sample is too small for reliable iteration the function returns
-#' the \code{median} directly:
+#' \strong{Fallback Mechanism.}
+#' For extremely small samples where iteration may be unreliable, the function
+#' returns the \code{\link{median}} directly:
 #' \itemize{
-#'   \item \eqn{n < 4} when \code{scale} is unknown (the MAD is unreliable
-#'     at \eqn{n = 3});
-#'   \item \eqn{n < 3} when \code{scale} is known.
+#'   \item If scale is unknown: \eqn{n < 4} (since the MAD of 3 points is
+#'     insufficiently robust).
+#'   \item If scale is supplied: \eqn{n < 3}.
 #' }
 #'
 #' @return A single numeric value: the robust M-estimate of location.

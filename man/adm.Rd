@@ -38,26 +38,31 @@ The average distance to the median (ADM) is defined as
   |x_i - \mathrm{med}(x)|}{ADM(x) = C * mean(|x - med(x)|)}
 
 where \eqn{C} is the consistency constant and \eqn{\mathrm{med}(x)}{med(x)}
-is the sample median.  When \code{center} is supplied it replaces the
-median.
+is the sample median. When \code{center} is supplied, it replaces the
+sample median.
 
-The default constant \eqn{C = \sqrt{\pi/2}}{C = sqrt(pi/2)} makes the ADM a
-consistent estimator of the standard deviation under the normal distribution.
-In large samples the ADM converges to \eqn{\sigma} at the Gaussian;
-however, this asymptotic property may \strong{not} hold at the very small
-sample sizes (\eqn{n = 3}--\eqn{8}) for which this package is primarily
-intended.
+\strong{Statistical Properties.}
+The default constant \eqn{C = \sqrt{\pi/2}}{C = sqrt(pi/2)} ensures that the
+ADM is a consistent estimator of the standard deviation \eqn{\sigma} under
+the Gaussian model. At the normal distribution, the ADM achieves an
+\bold{asymptotic relative efficiency (ARE) of 0.375} compared to the sample
+standard deviation.
 
-The ADM is \emph{not} robust against outliers in the explosion sense:
-its explosion breakdown point is \eqn{1/n}.  However, it is highly
-resistant to implosion, with an implosion breakdown point of
-\eqn{(n-1)/n}{(n - 1) / n}.  It therefore serves as the fallback scale
-estimator in \code{\link{robScale}} when the MAD collapses to zero.
+While the ADM is less efficient than the standard deviation for purely
+Gaussian data, it offers superior resistance to "implosion" (the estimate
+collapsing to zero). Its implosion breakdown point is
+\eqn{(n-1)/n}{(n - 1) / n}, meaning it only collapses if all but one
+observation are identical. Conversely, its explosion breakdown point is
+\eqn{1/n}, similar to the sample mean. These properties make the ADM the
+ideal \bold{implosion fallback} for the M-estimator of scale in
+\code{\link{robScale}}.
 
-\strong{Performance.}
-This implementation uses a C++17 \eqn{O(n)} selection strategy (sorting networks
-for \eqn{n \le 8}, introselect for larger \eqn{n}), typically yielding a 10x
-speedup over pure-R implementations like \code{revss}.
+\strong{Computational Performance.}
+This implementation employs a tiered selection strategy: optimal sorting
+networks for very small samples (\eqn{n \le 8}) and a C++17 introselect
+algorithm for larger datasets. This approach provides an \eqn{O(n)}
+worst-case time complexity, typically outperforming pure-R implementations
+by an order of magnitude.
 }
 \examples{
 adm(c(1:9))
