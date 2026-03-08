@@ -12,3 +12,4 @@
 ^install.log$
 ^benchmarks/.*$
 ^\.markdownlint\.json$
+^CRAN-SUBMISSION$
