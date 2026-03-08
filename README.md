@@ -14,8 +14,8 @@ genomics pipelines, high-frequency finance, and other time-critical workflows.
 loops with SIMD-accelerated transcendental functions, Newton–Raphson iteration,
 and parallelized $O(n \log n)$ algorithms. Against `revss`, the package achieves
 **11–39×** speedups for the small-sample M-estimators. Against `robustbase`, it
-achieves **1.6–6.9×** for $S_n$ and **1.6–10×** for $Q_n$ —with gains growing
-to near **10×** at $n = 10^7$ as TBB parallelism scales across cores.
+achieves **1.6–6.9×** for $S_n$ and **1.6–10×** for $Q_n$ —with gains peaking near
+**10×** at $n = 10^7$ as TBB parallelism reduces the computational bottleneck for massive datasets.
 
 ## Installation
 
@@ -52,13 +52,13 @@ estimators remain stable.
 
 ## API reference
 
-| Function | Purpose | Speedup vs. `revss` | Speedup vs. `robustbase` | Breakdown |
-| :--- | :--- | :--- | :--- | :--- |
-| `qn(x)` | $Q_n$ scale estimator (Rousseeuw & Croux) | — | **1.6x – 10x** | 50% |
-| `sn(x)` | $S_n$ scale estimator (Rousseeuw & Croux) | — | **1.8x – 6.9x** | 50% |
-| `robLoc(x)` | Small-sample M-estimate of location | **15x – 27x** | — | 50% |
-| `robScale(x)` | Small-sample M-estimate of scale | **32x – 39x** | — | 50% |
-| `adm(x)` | Average distance to the median | **11x – 13x** | — | $1/n$ (expl) |
+| Function | Purpose | ARE | Breakdown | Speedup vs. `revss` | Speedup vs. `robustbase` |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.6x – 10x** |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.8x – 6.9x** |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **15x – 27x** | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **32x – 39x** | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **11x – 13x** | — |
 
 All functions accept `na.rm` (default `FALSE`).
 
@@ -196,6 +196,27 @@ optimized parallelized inner-median algorithm for general samples.
 ```r
 sn(c(1, 2, 3, 5, 7, 8))
 ```
+
+### Estimator Convergence and Consistency
+
+The three scale estimators—`qn()`, `sn()`, and `robScale()`—all serve as robust
+alternatives to the standard deviation. Because `robscale` implements their
+canonical consistency constants ($c=2.2191$ for $Q_n$, $c=1.1926$ for $S_n$),
+they converge asymptotically to the same parameter $\sigma$ under a Gaussian
+distribution.
+
+While numerically similar on Gaussian data, they occupy different points on the
+robustness--efficiency frontier:
+
+1. **Precision**: $Q_n$ is the most statistically efficient, retaining **82.3%**
+   asymptotic relative efficiency (ARE) compared to the sample standard deviation.
+2. **Robustness**: All three maintain a **50% breakdown point**, though $S_n$
+   and `robScale` trade higher efficiency for lower computational complexity or
+   better behavior in specific small-sample regimes.
+
+Users should expect point estimates to align closely on clean data. On
+contaminated data, $Q_n$ provides the most stable performance across the
+widest range of outliers.
 
 ## Methodological enhancements
 
@@ -441,16 +462,28 @@ completes in 1.3 µs vs. 8.9 µs for `robustbase` — a **6.8×** edge.
 **Large samples ($n \ge 10^4$).** The advantage grows to **4×–10×** as TBB
 parallelism engages. At $n = 10^7$, `qn` runs in 2.4 s vs. 23.4 s for
 `robustbase::Qn` (**9.7×**), and `sn` runs in 0.25 s vs. 1.46 s (**5.8×**).
-The parallel workers scale linearly in thread count up to the memory-bandwidth
-limit.
+Parallel efficiency is bounded by Amdahl's Law and memory bandwidth; while the
+multi-threaded kernels provide substantial gains for massive datasets,
+speedups do not scale linearly with thread count.
 
 > [!IMPORTANT]
 > **Peak Performance Note**: To unlock maximum hardware-specific speedups
 > (including SIMD auto-discovery and microbenchmark-tuned thresholds), install
 > the package from source with the `ROBSCALE_FAST=1` environment variable set:
 >
+> **From the terminal:**
 > ```bash
-> ROBSCALE_FAST=1 R CMD INSTALL robscale_*.tar.gz
+> ROBSCALE_FAST=1 R CMD INSTALL robscale
+> ```
+>
+> **From an R session (RStudio):**
+> ```r
+> Sys.setenv(ROBSCALE_FAST = "1")
+> # Install from CRAN (compiling from source for peak performance)
+> install.packages("robscale", type = "source")
+>
+> # Or install from GitHub (requires remotes/devtools)
+> remotes::install_github("davdittrich/robscale")
 > ```
 >
 > Default CRAN binaries use conservative, portable settings to ensure
