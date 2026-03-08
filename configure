@@ -74,21 +74,24 @@ else
 fi
 
 # Detect CPU SIMD capabilities for optimal SLEEF/OpenMP performance
+# ONLY if ROBSCALE_FAST=1 is set (CRAN-safe by default)
 SIMD_FLAGS=""
-case "$(uname -m)" in
-  x86_64)
-    # Check for AVX2 support in compiler
-    echo "int main(){return 0;}" > conftest_simd.cpp
-    if ${CXX:-c++} -mavx2 -mfma -c conftest_simd.cpp -o conftest_simd.o 2>/dev/null; then
-      SIMD_FLAGS="-mavx2 -mfma"
-      echo "  x86_64: AVX2/FMA supported"
-    fi
-    rm -f conftest_simd.cpp conftest_simd.o
-    ;;
-  arm64|aarch64)
-    echo "  ARM64: NEON is standard"
-    ;;
-esac
+if [ "${ROBSCALE_FAST}" = "1" ]; then
+  case "$(uname -m)" in
+    x86_64)
+      # Check for AVX2 support in compiler
+      echo "int main(){return 0;}" > conftest_simd.cpp
+      if ${CXX:-c++} -mavx2 -mfma -c conftest_simd.cpp -o conftest_simd.o 2>/dev/null; then
+        SIMD_FLAGS="-mavx2 -mfma"
+        echo "  x86_64: AVX2/FMA supported"
+      fi
+      rm -f conftest_simd.cpp conftest_simd.o
+      ;;
+    arm64|aarch64)
+      echo "  ARM64: NEON is standard"
+      ;;
+  esac
+fi
 
 # Detect L2 cache size for cache-aware thresholds
 FASTQNSN_L2=4194304

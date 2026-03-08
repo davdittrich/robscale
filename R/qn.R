@@ -24,6 +24,11 @@
 #' \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
 #' \doi{10.1080/01621459.1993.10476408}
 #'
+#' @examples
+#' qn(c(1:9))
+#' x <- c(1, 2, 3, 5, 7, 8)
+#' qn(x)
+#'
 #' @export
 qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE) {
   if (na.rm) x <- x[!is.na(x)]

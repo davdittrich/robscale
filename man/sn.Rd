@@ -30,6 +30,12 @@ The \code{robscale} implementation optimizes the computation through optimal sor
 networks for the target regime of very small samples (\eqn{n \le 8}) and highly
 tuned \eqn{O(n \log n)} kernels for general datasets.
 }
+\examples{
+sn(c(1:9))
+x <- c(1, 2, 3, 5, 7, 8)
+sn(x)
+
+}
 \references{
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
 \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
