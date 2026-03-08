@@ -1,8 +1,9 @@
 # CRAN submission comments for robscale 0.1.4
 
-This is a resubmission for version 0.1.4. Previous submissions (0.1.2, 0.1.3) 
-were withdrawn or addressed specifically for macOS compilation errors and 
-compliance notes.
+This submission (0.1.4) supersedes version 0.1.3. Shortly after the previous 
+submission, we identified a critical compilation error specifically affecting 
+macOS ARM64 (Apple Silicon) builders due to a platform-specific header 
+reference. 
 
 ## Fixes in 0.1.4
 - Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>`.
