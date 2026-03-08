@@ -1,7 +1,14 @@
 # CRAN submission comments for robscale 0.1.3
 
 This is a resubmission for version 0.1.3. The previous submission (0.1.2) was
-withdrawn due to a discovered compilation error on macOS.
+withdrawn due to a discovered compilation error on macOS and several CRAN
+pre-test findings.
+
+## Fixes in 0.1.3
+- Fixed macOS compilation failures (proper guards for x86 intrinsics).
+- Resolved duplicate `-ltbb` linking flag warning on macOS.
+- Fixed `SystemRequirements` specification for C++17 to satisfy automated checks.
+- Added `inst/WORDLIST` to address `aspell` spelling notes for technical terms.
 
 Version 0.1.2 introduces two major new features and several refinements:
 
