@@ -24,18 +24,18 @@ qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE) {
   if (n < 2) return(NA_real_)
   
   if (is.double(x)) {
-    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
+    if (identical(constant, 2.2191) && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
     res <- .Call(`_robscale_C_qn_fast`, x)
   } else if (is.integer(x)) {
-    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_int_fast`, x))
+    if (identical(constant, 2.2191) && finite.corr) return(.Call(`_robscale_C_qn_int_fast`, x))
     res <- .Call(`_robscale_C_qn_int_fast`, x)
   } else {
     x <- as.double(x)
-    if (constant == 2.2191 && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
+    if (identical(constant, 2.2191) && finite.corr) return(.Call(`_robscale_C_qn_fast`, x))
     res <- .Call(`_robscale_C_qn_fast`, x)
   }
   
-  if (constant != 2.2191) {
+  if (!identical(constant, 2.2191)) {
     res <- res * (constant / 2.21914446598508)
   }
   
