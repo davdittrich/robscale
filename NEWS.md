@@ -1,11 +1,13 @@
 # robscale 0.1.3
-+
-+* Portability: Fixed macOS (Apple Silicon) compilation error by properly guarding
-+  x86-specific `immintrin.h` headers.
-+* Arbitration: Explicitly disabled SLEEF backend on macOS to ensure the native
-+  Accelerate framework remains the sole vectorized provider.
-+
-+# robscale 0.1.2
+
+* Portability: Fixed macOS (Apple Silicon) compilation error by properly guarding
+  x86-specific `immintrin.h` headers.
+* Arbitration: Explicitly disabled SLEEF backend on macOS to ensure the native
+  Accelerate framework remains the sole vectorized provider.
+* Build: Removed redundant `-ltbb` flag from `Makevars` which caused warnings on
+  some macOS configurations.
+
+# robscale 0.1.2
 
 * Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
   Croux, 1993) with specialized sorting network kernels and cache-aware
