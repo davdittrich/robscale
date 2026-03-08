@@ -11,17 +11,19 @@
 * Added Mermaid algorithm flowcharts for `robLoc` and `robScale` to README.
 * Expanded test suite: explicit-center tests for `adm()`, `maxit` edge cases
   for `robLoc()` and `robScale()`, sorting network verification for n = 2--8.
-* Added documentation examples for `sn()` and `qn()`.
+* Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
+  Croux, 1993) with specialized sorting network kernels and cache-aware
+  parallelization.
+* Added documentation examples for all five exported functions.
 * Added `cph` role to `Authors@R` in DESCRIPTION.
 
 # robscale 0.1.0
 
 Initial release.
 
-* Five functions: `adm()`, `robLoc()`, `robScale()`, `qn()`, and `sn()`
-  implementing the robust location and scale M-estimators of Rousseeuw &
-  Verboven (2002) for very small samples, and the high-efficiency $Q_n$ and
-  $S_n$ estimators of Rousseeuw & Croux (1993).
+* Three functions: `adm()`, `robLoc()`, and `robScale()` implementing
+  the robust location and scale M-estimators of Rousseeuw & Verboven (2002)
+  for very small samples.
 * API-compatible drop-in replacement for the `revss` package.
 * C++17 implementation via Rcpp with:
   - Newton--Raphson iteration for location (quadratic convergence).

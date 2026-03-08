@@ -2,8 +2,10 @@
 
 This is a resubmission (v0.1.2). In the previous submission (v0.1.0), CRAN
 requested that 'Rcpp' be single-quoted in the DESCRIPTION. v0.1.2 addresses
-this and further expands the package with: consistent NA error handling,
-RAII memory management in C++, expanded test suite, and 'opt-in' ONLY high-performance flags in the configure script.
+this and further expands the package with: two major new scale estimators
+(`qn()` and `sn()`), consistent NA error handling, RAII memory management
+in C++, expanded test suite, and 'opt-in' ONLY high-performance flags in
+the configure script.
 
 ## Test environments
 
