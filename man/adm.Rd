@@ -37,7 +37,7 @@ The average distance to the median (ADM) is defined as
 \deqn{\mathrm{ADM}(x) \;=\; C \cdot \frac{1}{n}\sum_{i=1}^{n}
   |x_i - \mathrm{med}(x)|}{ADM(x) = C * mean(|x - med(x)|)}
 
-where \eqn{C} is the consistency constant and \eqn{\mathrm{med}(x)}{med(x)}
+where \eqn{C} is the consistency constant and \eqn{\mathrm{med}(x)}{median(x)}
 is the sample median. When \code{center} is supplied, it replaces the
 sample median.
 
@@ -62,7 +62,8 @@ This implementation employs a tiered selection strategy: optimal sorting
 networks for very small samples (\eqn{n \le 8}) and a C++17 introselect
 algorithm for larger datasets. This approach provides an \eqn{O(n)}
 worst-case time complexity, typically outperforming pure-R implementations
-by an order of magnitude.
+by an order of magnitude. Performance is further enhanced by avoiding the
+full sort required by the standard \code{\link{median}} function.
 }
 \examples{
 adm(c(1:9))

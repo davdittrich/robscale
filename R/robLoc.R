@@ -53,10 +53,11 @@
 #' function itself.
 #'
 #' \strong{Performance and SIMD.}
-#' The underlying C++ core utilizes platform-specific SIMD backends (SLEEF on
-#' Linux, Apple Accelerate on macOS) to vectorize the \code{tanh} evaluations.
-#' This architectural choice delivers substantial performance gains,
-#' particularly for large-scale or high-throughput workflows.
+#' The underlying C++ core utilizes platform-specific SIMD (Single Instruction,
+#' Multiple Data) backends (SLEEF on Linux, Apple Accelerate on macOS) to
+#' vectorize the \code{tanh} evaluations. This architectural choice delivers
+#' substantial performance gains, particularly for large-scale or
+#' high-throughput workflows.
 #'
 #' \strong{Fallback Mechanism.}
 #' For extremely small samples where iteration may be unreliable, the function
@@ -79,7 +80,9 @@
 #' @seealso
 #' \code{\link{median}} for the starting value;
 #' \code{\link[stats]{mad}} for the auxiliary scale;
-#' \code{\link{robScale}} for the companion scale estimator.
+#' \code{\link{robScale}} for the companion scale estimator;
+#' \code{\link{qn}} and \code{\link{sn}} for high-efficiency scale
+#' estimators.
 #'
 #' @examples
 #' robLoc(c(1:9))
