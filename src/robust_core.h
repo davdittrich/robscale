@@ -85,7 +85,7 @@ constexpr double MAD_CONSISTENCY      = 1.4826;
 constexpr double ADM_CONSISTENCY      = 1.2533141373155001;  // sqrt(pi/2)
 
 // Stack buffer size (2048 doubles = 16 KB per segment; 3x arena = 48 KB)
-constexpr int STACK_BUF_SIZE = 2048;
+constexpr int STACK_BUF_SIZE = 1024;
 
 // Median of a pre-sorted array (caller must ensure n >= 1)
 inline double median_sorted(const double* x, int n) {
