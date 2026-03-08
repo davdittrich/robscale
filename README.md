@@ -4,9 +4,18 @@
 
 ## Overview
 
-Experimental data often contain outliers that destroy classical estimates. In high-throughput pipelines, small-sample measurements ($n \le 8$) are particularly vulnerable. However, existing robust implementations in interpreted languages are too slow for real-time applications in genomics or high-frequency finance.
+Outliers compromise the reliability of classical estimators even in moderate
+samples. Yet the most widely used robust implementations in R—`revss` for
+small-sample M-estimation and `robustbase` for the $Q_n$ and $S_n$ scale
+estimators—carry significant computational overhead that blocks real-time
+genomics pipelines, high-frequency finance, and other time-critical workflows.
 
-`robscale` resolves this bottleneck. By using C++17 kernels, SIMD-accelerated transcendental math, and Newton–Raphson iteration, it reduces execution time by **11–39x** compared to legacy R packages. These optimizations integrate robust statistics into modern, time-critical computational workflows without sacrificing numerical precision.
+`robscale` resolves both bottlenecks. Its C++17 kernels replace interpreted R
+loops with SIMD-accelerated transcendental functions, Newton–Raphson iteration,
+and parallelized $O(n \log n)$ algorithms. Against `revss`, the package achieves
+**11–39×** speedups for the small-sample M-estimators. Against `robustbase`, it
+achieves **1.6–6.9×** for $S_n$ and **1.6–10×** for $Q_n$ —with gains growing
+to near **10×** at $n = 10^7$ as TBB parallelism scales across cores.
 
 ## Installation
 
@@ -38,19 +47,20 @@ robLoc(x)                            # 2.9184   -- stable
 robScale(x)                          # 0.4729   -- stable
 ```
 
-Outliers pull classical estimators away from the bulk of the data. The robust estimators remain stable.
+Outliers pull classical estimators away from the bulk of the data. The robust
+estimators remain stable.
 
 ## API reference
 
-| Function | Purpose | Typical Speedup vs CRAN | Breakdown |
-| :--- | :--- | :--- | :--- |
-| `qn(x)` | Qn estimator of scale (Rousseeuw & Croux) | **1.6x – 10.9x** | 50% |
-| `sn(x)` | Sn estimator of scale (Rousseeuw & Croux) | **1.8x – 6.9x** | 50% |
-| `robLoc(x)` | Small-sample M-estimate (Location) | **15x – 27x** | 50% |
-| `robScale(x)` | Small-sample M-estimate (Scale) | **32x – 39x** | 50% |
-| `adm(x)` | Average distance to the median | **11x – 13x** | $1/n$ (expl) |
+| Function | Purpose | Speedup vs. `revss` | Speedup vs. `robustbase` | Breakdown |
+| :--- | :--- | :--- | :--- | :--- |
+| `qn(x)` | $Q_n$ scale estimator (Rousseeuw & Croux) | — | **1.6x – 10x** | 50% |
+| `sn(x)` | $S_n$ scale estimator (Rousseeuw & Croux) | — | **1.8x – 6.9x** | 50% |
+| `robLoc(x)` | Small-sample M-estimate of location | **15x – 27x** | — | 50% |
+| `robScale(x)` | Small-sample M-estimate of scale | **32x – 39x** | — | 50% |
+| `adm(x)` | Average distance to the median | **11x – 13x** | — | $1/n$ (expl) |
 
-All three functions accept `na.rm` (default `FALSE`).
+All functions accept `na.rm` (default `FALSE`).
 
 ### `adm(x, center, constant = 1.2533141373155001, na.rm = FALSE)`
 
@@ -120,9 +130,12 @@ $$S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\
 where $c = 0.37394112142347236$ and $T = \text{median}(x)$ is held fixed.
 Starting value: $S^{(0)} = \text{MAD}(x)$.
 
-**Degenerate Input Handling:** When the sample size is below the minimum for iteration (4 for unknown location, 3 for known) or the MAD collapses to zero, the function applies the logic selected by the `fallback` argument:
+**Degenerate input handling:** When the sample size falls below the minimum for
+iteration (4 for unknown location, 3 for known) or the MAD collapses to zero,
+the function applies the logic selected by the `fallback` argument:
 
-- `fallback = "adm"` (Default): returns `adm(x)` if $\text{MAD} \leq$ `implbound`, maintaining a finite robust estimate where standard scale measures fail.
+- `fallback = "adm"` (Default): returns `adm(x)` if $\text{MAD} \leq$ `implbound`, maintaining a finite
+  robust estimate where standard scale measures fail.
 - `fallback = "na"`: returns `NA`, strictly matching the behavioral profile of the `revss` package.
 
 Providing a known `loc` centers the data at that value and uses the
@@ -163,7 +176,11 @@ flowchart TD
 
 ### `qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE)`
 
-Computes the $Q_n$ estimator of scale (Rousseeuw & Croux, 1993). Unlike M-estimators, $Q_n$ does not require a location estimate and is 50% breakdown robust. `robscale` implements $Q_n$ using a specialized version of the Johnson–Mizoguchi algorithm for $n < 64$ and a cache-aware parallelized implementation for larger samples.
+Computes the $Q_n$ estimator of scale (Rousseeuw & Croux, 1993). Unlike
+M-estimators, $Q_n$ requires no location estimate and achieves a 50% breakdown
+point. `robscale` implements $Q_n$ with a tiered strategy: a brute-force exact
+algorithm for small $n$ (below `qn_exact_threshold`) and a cache-aware
+parallelized Johnson-style algorithm for larger samples.
 
 ```r
 qn(c(1, 2, 3, 5, 7, 8))
@@ -171,7 +188,10 @@ qn(c(1, 2, 3, 5, 7, 8))
 
 ### `sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE)`
 
-Computes the $S_n$ estimator of scale (Rousseeuw & Croux, 1993). $S_n$ is more efficient than the MAD and maintains a 50% breakdown point. The `robscale` implementation uses optimal sorting networks for $n \le 8$ and a highly optimized O(n log n) approach for general samples.
+Computes the $S_n$ estimator of scale (Rousseeuw & Croux, 1993). $S_n$ is more
+statistically efficient than the MAD and maintains a 50% breakdown point.
+`robscale` uses optimal sorting networks for $n \le 8$ and a highly
+optimized parallelized inner-median algorithm for general samples.
 
 ```r
 sn(c(1, 2, 3, 5, 7, 8))
@@ -179,11 +199,14 @@ sn(c(1, 2, 3, 5, 7, 8))
 
 ## Methodological enhancements
 
-The `robscale` package implements the estimators defined by Rousseeuw & Verboven (2002). While it produces identical numerical results to the `revss` package, its computational strategies significantly increase performance.
+`robscale` implements the estimators defined by Rousseeuw & Verboven (2002) and
+Rousseeuw & Croux (1993). It produces identical numerical results to `revss`
+and `robustbase`, but its computational strategies significantly cut run times
+across all sample sizes.
 
 ### 1. The tanh identity for the logistic psi function
 
-The logistic psi function central to both estimators is:
+The logistic psi function central to both M-estimators is:
 
 $$\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1}$$
 
@@ -205,7 +228,8 @@ this identity to reduce $\psi_{\log}$ to a single `tanh` call. The identity is n
   values bounded. The `tanh` function handles this internally with a single code
   path.
 
-- **Platform vectorization.** `robscale` uses platform-specific libraries to evaluate `tanh` in bulk. The implementation ranks and selects the fastest available backend:
+- **Platform vectorization.** `robscale` uses platform-specific libraries to evaluate `tanh` in bulk.
+  The implementation ranks and selects the fastest available backend:
   1. **Apple Accelerate.** On macOS (Darwin), it uses `vvtanh` for array-wide SIMD processing.
   2. **SLEEF.** On Linux (x86_64), it uses the SLEEF library to target AVX2 or AVX512 instruction sets.
   3. **OpenMP SIMD.** A compiler-guided fallback via `#pragma omp simd`.
@@ -225,7 +249,8 @@ convergence: each step reduces the error by a constant factor.
 `robscale` instead applies Newton--Raphson to the estimating equation
 $\sum \psi_{\log}((x_i - T)/S) = 0$, yielding:
 
-$$T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}{\sum \left[1 - \psi^2\!\left(\frac{x_i - T^{(k)}}{2S}\right)\right]}$$
+$$T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}
+{\sum \left[1 - \psi^2\!\left(\frac{x_i - T^{(k)}}{2S}\right)\right]}$$
 
 where $\psi(\cdot) = \tanh(\cdot)$. The efficiency follows from observing that the
 derivative of the logistic psi satisfies $\psi_{\log}'(x) = 1 - \psi_{\log}^2(x)
@@ -308,9 +333,59 @@ Values that are constant across iterations---`inv_s = 1.0 / s`,
 The `revss` implementation recomputes `(x - t) / s` as a fresh R vector each
 iteration, traversing the interpreter for every vectorised operation.
 
+### 7. $Q_n$ and $S_n$ algorithm optimizations
+
+`robustbase` implements $Q_n$ and $S_n$ in R-wrapped Fortran (Maechler et al.),
+which incurs R dispatch overhead for every inner-loop call. `robscale` replaces
+these paths entirely with a self-contained C++17 implementation.
+
+**$Q_n$ — tiered exact/approximate algorithm.** For small $n$ (below a
+compile-time threshold), `robscale` enumerates all $\binom{n}{2}$ pairwise
+absolute differences, selects the $h$th order statistic with Floyd--Rivest,
+and applies the finite-sample correction factor. For larger $n$, it uses a parallel
+Johnson-style algorithm:
+
+1. **Sort** the data in $O(n \log n)$.
+2. **Count and bound** — two parallel workers (`QnCountWorker`, `QnRefineWorker`)
+   scan the sorted array to count and bracket the number of pairs above/below a
+   trial value, using TBB `parallel_reduce` and `parallel_for`.
+3. **Weighted median of inner values** — a weighted-median step (`whimed_cpp`)
+   refines the bracket; iterations continue until the bracket width falls below
+   $n$.
+4. **Final brute-force** — the residual window is enumerated and Floyd--Rivest
+   selects the exact $k$th difference.
+
+This structure avoids materializing all $O(n^2)$ pairs and runs at $O(n \log n)$
+per iteration, with parallelism scaling across all available cores for
+$n \geq$ `qn_parallel_threshold`.
+
+**$S_n$ — parallelized inner-median sweep.** The $S_n$ statistic is the low
+median of the vector $\{\text{med}_j |x_i - x_j|\}_{i=1}^n$. `robscale`
+computes each inner median with a sliding-window binary search (exploiting
+sortedness) in O(log n) per element, then dispatches the outer $n$ iterations
+across TBB threads via `SnWorker`. For $n \leq 2048$, a
+stack-allocated arena avoids heap allocation entirely.
+
+| $n$ | `robustbase::Qn` ($\mu s$) | `robscale::qn` ($\mu s$) | Speedup |
+| ---: | ---: | ---: | ---: |
+| 8 | 8.9 | 1.3 | **6.8×** |
+| 64 | 13.6 | 5.3 | **2.6×** |
+| 1 024 | 462.7 | 276.9 | **1.7×** |
+| 65 536 | 49 324 | 12 247 | **4.0×** |
+| 10 000 000 | 23 374 593 | 2 403 552 | **9.7×** |
+
+| $n$ | `robustbase::Sn` ($\mu s$) | `robscale::sn` ($\mu s$) | Speedup |
+| ---: | ---: | ---: | ---: |
+| 8 | 4.1 | 1.3 | **3.3×** |
+| 64 | 5.3 | 1.8 | **3.0×** |
+| 1 024 | 33.0 | 17.4 | **1.9×** |
+| 65 536 | 7 265 | 1 315 | **5.5×** |
+| 10 000 000 | 1 461 045 | 250 588 | **5.8×** |
+
 ## Architecture overview
 
-`robscale` uses a tiered dispatch architecture to select the most efficient algorithm based on sample size and hardware capabilities:
+`robscale` uses a tiered dispatch architecture to select the most efficient algorithm
+based on sample size and hardware capabilities:
 
 ```mermaid
 graph TD
@@ -328,47 +403,58 @@ graph TD
 
 ## Benchmarks
 
-`robscale` is designed for elite performance across the entire range of sample sizes ($n=2$ to $n=10^8$), with specialized optimizations for the extremes. We compare our implementation against the primary CRAN alternatives: `robustbase` (standard reference for $Q_n$ and $S_n$) and `revss` (original source for the small-sample M-estimators).
+`robscale` targets two distinct performance regimes: very small samples (the
+M-estimators `robLoc`, `robScale`, and `adm`, compared against `revss`) and
+general-size samples (the scale estimators `qn` and `sn`, compared against
+`robustbase`). Figure 1 summarizes both comparisons on Linux (Ryzen 9 5900HX,
+CRAN-compatible build with no ROBSCALE_FAST optimizations).
 
-### 1. Global Performance Profile
+![Two-panel benchmark: M-estimators vs. revss (left) and scale estimators vs. robustbase (right)](benchmarks/cran_mode/full_speedup_panel.png)
+*Figure 1: Median speedup factor (×) vs. sample size $n$ on Linux (Ryzen 9 5900HX).
+Panel A compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B compares
+`qn` and `sn` against `robustbase`. Shaded bands: 95% CI. Dashed line: parity (1×).*
 
-The figure below illustrates the median speedup of `robscale` relative to its CRAN counterparts on Linux (Ryzen 9 5900HX).
+### Small-sample M-estimators vs. `revss` (Panel A)
 
-![CRAN Speedup Comparison](benchmarks/legacy_speedup_ribbon.png)
-*Figure 1: Median speedup factor vs. sample size ($n$). Highlighted consistent dominance across $10^1$ to $10^7$ observations.*
-
-#### Small-Sample Regime ($n \le 20$)
-
-In the target regime for M-estimation ($n \le 20$), `robscale` achieves its most dramatic gains, outperforming `revss` by **11x – 39x**. Drivers include:
+In the target regime ($n \le 20$), `robscale` outperforms `revss` by
+**11×–39×**. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs 6–8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $n \le 8$.
 
-#### Large-Sample Scaling ($n \ge 10^4$)
+Even at $n = 16{,}384$, the gains remain **3.5×–4.3×** because the interpreter
+overhead of `revss` scales with the number of Newton–Raphson iterations, not
+just vector length.
 
-For large datasets, the performance bottleneck shifts to memory bandwidth and transcendental math. `robscale` maintains a **2x – 10x** lead over `robustbase` through:
+### Scale estimators vs. `robustbase` (Panel B)
 
-- Parallelized kernels via TBB and `RcppParallel`.
-- Platform-optimized SIMD backends (SLEEF/Accelerate) for bulk `tanh` evaluation.
-- Cache-aware algorithm dispatch for the $Q_n$ estimator.
+For $Q_n$ and $S_n$, the performance story follows two regimes separated by
+the parallelism threshold:
+
+**Small to medium samples ($n \le 10^3$).** `robscale` leads by **1.7×–6.8×**.
+The gain comes primarily from the avoidance of R dispatch overhead and the
+use of stack memory. For $Q_n$ at $n = 8$, the brute-force exact algorithm
+completes in 1.3 µs vs. 8.9 µs for `robustbase` — a **6.8×** edge.
+
+**Large samples ($n \ge 10^4$).** The advantage grows to **4×–10×** as TBB
+parallelism engages. At $n = 10^7$, `qn` runs in 2.4 s vs. 23.4 s for
+`robustbase::Qn` (**9.7×**), and `sn` runs in 0.25 s vs. 1.46 s (**5.8×**).
+The parallel workers scale linearly in thread count up to the memory-bandwidth
+limit.
 
 > [!IMPORTANT]
-> **Peak Performance Note**: To unlock maximum hardware-specific speedups (including SIMD auto-discovery and microbenchmark tuning), the package should be installed from source with the `ROBSCALE_FAST=1` environment variable set:
+> **Peak Performance Note**: To unlock maximum hardware-specific speedups
+> (including SIMD auto-discovery and microbenchmark-tuned thresholds), install
+> the package from source with the `ROBSCALE_FAST=1` environment variable set:
 >
 > ```bash
 > ROBSCALE_FAST=1 R CMD INSTALL robscale_*.tar.gz
 > ```
 >
-> Default CRAN binaries use conservative, portable settings to ensure compatibility across all architectures.
-
-### 2. Distributional Efficiency
-
-While median speedups are significant, the stability and tail-latency of the estimators are equally critical for high-throughput applications.
-
-![Timing Distributions](benchmarks/legacy_raincloud.png)
-*Figure 2: Distribution of execution times at $n=128$ and $n=16,384$. robscale consistently exhibits both lower medians and tighter variances.*
+> Default CRAN binaries use conservative, portable settings to ensure
+> compatibility across all architectures.
 
 ## Numerical equivalence
 
@@ -386,8 +472,8 @@ differ only by rounding at the level of the convergence tolerance.
 
 ## Mathematical background
 
-The estimators follow Rousseeuw & Verboven (2002). A brief summary of the key
-definitions:
+The estimators follow Rousseeuw & Verboven (2002) and Rousseeuw & Croux (1993).
+A brief summary of the key definitions:
 
 **Logistic psi function** (Eq. 23):
 
@@ -406,7 +492,13 @@ location at $\text{median}(x)$.
 
 $$\rho_{\log}(x) = \psi_{\log}^2(x / c)$$
 
-where $c = 0.37394112142347236$ is the constant that yields 50% breakdown point.
+where $c = 0.37394112142347236$ is the constant that yields a 50% breakdown point.
+
+**$Q_n$ and $S_n$ statistics.** $Q_n = c_n \cdot d \cdot \{|x_i - x_j|; i < j\}_{(k)}$
+where $k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $d = 2.2219$
+(consistency constant for Gaussian data). $S_n = c_n' \cdot 1.1926 \cdot
+\text{lomed}_i \{\text{himed}_j |x_i - x_j|\}$, where $\text{lomed}$ and
+$\text{himed}$ denote the low and high medians respectively.
 
 **Key constants** (full double precision):
 
@@ -417,23 +509,33 @@ where $c = 0.37394112142347236$ is the constant that yields 50% breakdown point.
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
 | $C_{\text{MAD}}$ | `1.4826` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
 
-## Relation to revss
+## Relation to revss and robustbase
 
-This package reimplements the algorithms from the
-[revss](https://CRAN.R-project.org/package=revss) package by Avraham Adler.
-The API is intentionally identical: `adm()`, `robLoc()`, and `robScale()` accept
-the same arguments and return the same values. Code that uses `revss` can switch
-to `robscale` by changing only the `library()` call.
+This package re-implements the M-estimators from the
+[revss](https://CRAN.R-project.org/package=revss) package (Avraham Adler) and
+the $Q_n$ and $S_n$ estimators from
+[robustbase](https://CRAN.R-project.org/package=robustbase) (Maechler et al.).
 
-Users who do not need compiled performance---or who prefer a dependency-free
-pure-R package---should use `revss` directly. It is mature, well-tested, and
-available on CRAN.
+The API for the M-estimators is intentionally identical to `revss`: `adm()`,
+`robLoc()`, and `robScale()` accept the same arguments and return the same values.
+Code that uses `revss` can switch to `robscale` by changing only the `library()` call.
+
+For `qn()` and `sn()`, the function signatures match `robustbase::Qn()` and
+`robustbase::Sn()` (with lowercase names for consistency).
+
+Users who do not need compiled performance—or who prefer a dependency-free
+pure-R package—should use `revss` or `robustbase` directly. Both are mature,
+well-tested, and widely available.
 
 ## References
 
 Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
 samples. *Computational Statistics & Data Analysis*, **40**(4), 741--758.
 [doi:10.1016/S0167-9473(02)00078-6](https://doi.org/10.1016/S0167-9473(02)00078-6)
+
+Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
+*Journal of the American Statistical Association*, **88**, 1273--1283.
+[doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
 
 Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
 *Communications of the ACM*, **18**(3), 165--172.
@@ -442,10 +544,6 @@ Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
 Nair, K.R. (1947). A Note on the Mean Deviation from the Median. *Biometrika*,
 **34**(3/4), 360--362.
 [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
-
-Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
-*Journal of the American Statistical Association*, **88**, 1273--1283.
-[doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
 
 ## Author
 
