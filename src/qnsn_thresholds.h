@@ -30,7 +30,7 @@ constexpr size_t QN_PARALLEL_THRESHOLD = 8192;
 
 
 // Sort thresholds
-constexpr size_t SORT_BOOST_THRESHOLD = 256;       // std::sort -> Boost spreadsort
+constexpr size_t SORT_BOOST_THRESHOLD = 1280;      // std::sort -> Boost spreadsort
 constexpr size_t SORT_TBB_FLOAT_THRESHOLD = 6144; // spreadsort -> TBB (float)
 constexpr size_t SORT_TBB_INT_THRESHOLD = 8192;   // spreadsort -> TBB (integer)
 
