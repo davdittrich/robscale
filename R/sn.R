@@ -2,20 +2,26 @@
 #'
 #' Computes the robust estimator of scale \eqn{S_n} proposed by Rousseeuw and Croux (1993).
 #'
-#' @param x a numeric vector of observations.
-#' @param constant consistency constant. Default is \eqn{1.1926}.
-#' @param finite.corr logical; if \code{TRUE}, a finite-sample correction factor is applied.
-#' @param na.rm logical; if \code{TRUE}, \code{NA} values are removed before computation.
+#' @param x A numeric vector of observations.
+#' @param constant Consistency constant. Default is \eqn{1.1926}.
+#' @param finite.corr Logical; if \code{TRUE}, a finite-sample correction factor is applied.
+#' @param na.rm Logical; if \code{TRUE}, \code{NA} values are removed before computation.
 #'
 #' @return The \eqn{S_n} estimator of scale.
 #'
 #' @details
 #' \eqn{S_n} is defined as \eqn{1.1926 \cdot \text{med}_i \{ \text{med}_j |x_i - x_j| \}}.
-#' It has a breakdown point of 50% and is more efficient than the MAD.
+#' It achieves a 50\% breakdown point and provides superior efficiency compared to the
+#' Median Absolute Deviation (MAD).
+#'
+#' The \code{robscale} implementation optimizes the computation through optimal sorting
+#' networks for the target regime of very small samples (\eqn{n \le 8}) and highly
+#' tuned \eqn{O(n \log n)} kernels for general datasets.
 #'
 #' @references
 #' Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
-#' \emph{Journal of the American Statistical Association}, \bold{88}, 1273--1283.
+#' \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
+#' \doi{10.1080/01621459.1993.10476408}
 #'
 #' @export
 sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE) {

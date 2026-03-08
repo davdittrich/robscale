@@ -28,7 +28,7 @@ A single numeric value: the scaled mean absolute deviation from the
   \code{NA}s.
 }
 \description{
-Compute the mean absolute deviation from the median, scaled by a consistency
+Computes the mean absolute deviation from the median, scaled by a consistency
 constant for asymptotic normality under the Gaussian model.
 }
 \details{
@@ -55,8 +55,8 @@ resistant to implosion, with an implosion breakdown point of
 estimator in \code{\link{robScale}} when the MAD collapses to zero.
 
 \strong{Performance.}
-This implementation uses a C++17 $O(n)$ selection strategy (sorting networks
-for $n <= 8$, introselect for larger $n$), typically yielding a 10x
+This implementation uses a C++17 \eqn{O(n)} selection strategy (sorting networks
+for \eqn{n \le 8}, introselect for larger \eqn{n}), typically yielding a 10x
 speedup over pure-R implementations like \code{revss}.
 }
 \examples{

@@ -1,6 +1,6 @@
 #' Robust M-Estimate of Location
 #'
-#' Compute the robust M-estimate of location for very small samples using the
+#' Computes the robust M-estimate of location for very small samples using the
 #' logistic \eqn{\psi}{psi} function of Rousseeuw & Verboven (2002).
 #'
 #' @param x A numeric vector.

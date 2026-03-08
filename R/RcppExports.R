@@ -9,14 +9,6 @@ adm_impl_auto <- function(x, constant) {
     .Call(`_robscale_adm_impl_auto`, x, constant)
 }
 
-C_sn_fast <- function(x) {
-    .Call(`_robscale_C_sn_fast`, x)
-}
-
-C_sn_int_fast <- function(x) {
-    .Call(`_robscale_C_sn_int_fast`, x)
-}
-
 C_qn_fast <- function(x) {
     .Call(`_robscale_C_qn_fast`, x)
 }
@@ -29,10 +21,6 @@ get_qnsn_config <- function() {
     .Call(`_robscale_get_qnsn_config`)
 }
 
-C_get_sn_factor <- function(n) {
-    .Call(`_robscale_C_get_sn_factor`, n)
-}
-
 C_get_qn_factor <- function(n) {
     .Call(`_robscale_C_get_qn_factor`, n)
 }
@@ -43,5 +31,17 @@ rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
 
 rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
     .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
+}
+
+C_sn_fast <- function(x) {
+    .Call(`_robscale_C_sn_fast`, x)
+}
+
+C_sn_int_fast <- function(x) {
+    .Call(`_robscale_C_sn_int_fast`, x)
+}
+
+C_get_sn_factor <- function(n) {
+    .Call(`_robscale_C_get_sn_factor`, n)
 }
 

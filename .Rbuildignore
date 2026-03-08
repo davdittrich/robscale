@@ -8,3 +8,6 @@
 ^src/\.dll$
 ^src/Makevars$
 ^src/symbols\.rds$
+^benchmarks$
+^install.log$
+^benchmarks/.*$

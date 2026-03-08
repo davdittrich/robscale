@@ -1,0 +1,50 @@
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+* installing to library ‘/home/dd/R/x86_64-pc-linux-gnu-library/4.5’
+* installing *source* package ‘robscale’ ...
+** this is package ‘robscale’ version ‘0.1.1’
+** using staged installation
+  ROBSCALE_FAST=1: enabling -O3 -march=native
+  Running threshold auto-tuning (this may take a few seconds)...
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+  Saved auto-tuned thresholds to src/qnsn_tuned_thresholds.h
+  -fopenmp-simd supported
+  SLEEF detected
+  x86_64: AVX2/FMA supported
+  Linux L2 Cache size: 524288
+  Linux Cache Line size: 64
+  Generated src/Makevars
+** libs
+using C++ compiler: ‘g++ (GCC) 15.2.1 20260209’
+using C++17
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -O3 -march=native -DROBSCALE_HAS_TUNED_THRESHOLDS -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -mavx2 -mfma -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -O3 -march=native -DROBSCALE_HAS_TUNED_THRESHOLDS -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -mavx2 -mfma -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c adm.cpp -o adm.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -O3 -march=native -DROBSCALE_HAS_TUNED_THRESHOLDS -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -mavx2 -mfma -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c qnsn_estimators.cpp -o qnsn_estimators.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -O3 -march=native -DROBSCALE_HAS_TUNED_THRESHOLDS -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -mavx2 -mfma -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c rob_loc.cpp -o rob_loc.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -O3 -march=native -DROBSCALE_HAS_TUNED_THRESHOLDS -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -mavx2 -mfma -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c rob_scale.cpp -o rob_scale.o
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp/src
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp/src
+g++ -std=gnu++17 -shared -L/usr/lib64/R/lib -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now -Wl,-z,pack-relative-relocs -flto=auto -o robscale.so RcppExports.o adm.o qnsn_estimators.o rob_loc.o rob_scale.o -L/usr/lib -lsleef -ltbb -L/usr/lib64/R/lib -lR
+installing to /home/dd/R/x86_64-pc-linux-gnu-library/4.5/00LOCK-revss_temp/00new/robscale/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+** help
+*** installing help indices
+** building package indices
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+** testing if installed package can be loaded from temporary location
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp
+** testing if installed package keeps a record of temporary installation path
+* DONE (robscale)
