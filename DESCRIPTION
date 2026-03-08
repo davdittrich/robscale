@@ -25,7 +25,7 @@ Encoding: UTF-8
 Imports: Rcpp (>= 1.0.0), RcppParallel (>= 5.0.0)
 LinkingTo: Rcpp, RcppParallel, BH
 Suggests: testthat (>= 3.0.0), revss, microbenchmark, robustbase
-SystemRequirements: GNU make, TBB (Intel Threading Building Blocks), C++17
+SystemRequirements: C++17, TBB, GNU make
 Config/testthat/edition: 3
 NeedsCompilation: yes
 RoxygenNote: 7.3.3

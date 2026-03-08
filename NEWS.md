@@ -4,8 +4,10 @@
   x86-specific `immintrin.h` headers.
 * Arbitration: Explicitly disabled SLEEF backend on macOS to ensure the native
   Accelerate framework remains the sole vectorized provider.
-* Build: Removed redundant `-ltbb` flag from `Makevars` which caused warnings on
+* Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings on
   some macOS configurations.
+* CRAN: Fixed `SystemRequirements` specification for C++17 compliance.
+* CRAN: Added `inst/WORDLIST` to whitelist technical terms from `aspell`.
 
 # robscale 0.1.2
 
