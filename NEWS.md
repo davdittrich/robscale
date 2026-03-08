@@ -3,6 +3,7 @@
 * Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
   Croux, 1993) with specialized sorting network kernels and cache-aware
   parallelization.
+* Added `robustbase` to `Suggests` for reference and benchmarking.
 * Added documentation examples for all five exported functions.
 * Performance optimizations: Fixed `configure` script to ensure that
   hardware-specific SIMD flags (e.g., `-mavx2`) are strictly opt-in
