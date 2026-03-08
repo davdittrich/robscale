@@ -4,14 +4,18 @@
 \name{robscale-package}
 \alias{robscale}
 \alias{robscale-package}
-\title{Fast Robust Estimation of Location and Scale}
+\title{Faster Robustness: SIMD-Accelerated Estimation of Location and Scale}
 \description{
-Fast C++17 implementation of the robust location and scale estimators
-of Rousseeuw & Verboven (2002) for very small samples, and the Qn and Sn
-estimators of Rousseeuw and Croux (1993) for general samples.
-Exploits the tanh identity for the logistic psi function and provides
-platform-vectorized transcendental evaluation (SLEEF, Accelerate, OpenMP SIMD).
-Parallized via RcppParallel/TBB for large samples.
+Robust estimation ensures statistical reliability in data 
+contaminated by outliers. Yet, computational bottlenecks in existing R 
+implementations frequently obstruct both very small sample analysis and 
+large-scale processing. 'robscale' resolves these inefficiencies by 
+providing high-performance C++17 implementations of logistic M-estimators 
+and the Qn and Sn scale estimators. By leveraging platform-specific SIMD 
+vectorization and TBB parallelism, the package delivers speedups of 
+11–39x for small samples and up to 10x for massive datasets. These 
+performance gains enable the integration of robust statistics into modern, 
+time-critical computational workflows.
 }
 \references{
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.

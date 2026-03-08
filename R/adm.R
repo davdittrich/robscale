@@ -1,6 +1,6 @@
 #' Average Distance to the Median
 #'
-#' Compute the mean absolute deviation from the median, scaled by a consistency
+#' Computes the mean absolute deviation from the median, scaled by a consistency
 #' constant for asymptotic normality under the Gaussian model.
 #'
 #' @param x A numeric vector.
@@ -39,8 +39,8 @@
 #' estimator in \code{\link{robScale}} when the MAD collapses to zero.
 #'
 #' \strong{Performance.}
-#' This implementation uses a C++17 $O(n)$ selection strategy (sorting networks
-#' for $n \le 8$, introselect for larger $n$), typically yielding a 10x
+#' This implementation uses a C++17 \eqn{O(n)} selection strategy (sorting networks
+#' for \eqn{n \le 8}, introselect for larger \eqn{n}), typically yielding a 10x
 #' speedup over pure-R implementations like \code{revss}.
 #'
 #' @return A single numeric value: the scaled mean absolute deviation from the

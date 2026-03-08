@@ -35,7 +35,7 @@ A single numeric value: the robust M-estimate of location.
   \code{NA}s when \code{na.rm = TRUE}).
 }
 \description{
-Compute the robust M-estimate of location for very small samples using the
+Computes the robust M-estimate of location for very small samples using the
 logistic \eqn{\psi}{psi} function of Rousseeuw & Verboven (2002).
 }
 \details{

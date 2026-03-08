@@ -5,7 +5,6 @@
 #include "robust_core.h"
 #include "qnsn_constants.h"
 #include "qnsn_sort_utils.h"
-#include "qnsn_thresholds.h"
 #include "qnsn_dispatcher.h"
 #include "qnsn_runtime_config.h"
 
@@ -16,7 +15,6 @@
 #include <tbb/blocked_range.h>
 #endif
 #include <algorithm>
-#include <cmath>
 #include <memory>
 #include <new>
 #include <type_traits>

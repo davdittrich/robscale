@@ -7,13 +7,13 @@
 qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE)
 }
 \arguments{
-\item{x}{a numeric vector of observations.}
+\item{x}{A numeric vector of observations.}
 
-\item{constant}{consistency constant. Default is \eqn{2.2191}.}
+\item{constant}{Consistency constant. Default is \eqn{2.2191}.}
 
-\item{finite.corr}{logical; if \code{TRUE}, a finite-sample correction factor is applied.}
+\item{finite.corr}{Logical; if \code{TRUE}, a finite-sample correction factor is applied.}
 
-\item{na.rm}{logical; if \code{TRUE}, \code{NA} values are removed before computation.}
+\item{na.rm}{Logical; if \code{TRUE}, \code{NA} values are removed before computation.}
 }
 \value{
 The \eqn{Q_n} estimator of scale.
@@ -22,10 +22,17 @@ The \eqn{Q_n} estimator of scale.
 Computes the robust estimator of scale \eqn{Q_n} proposed by Rousseeuw and Croux (1993).
 }
 \details{
-\eqn{Q_n} is defined as \eqn{2.2191 \cdot \{ |x_i - x_j|; i < j \}_{(k)}} where \eqn{k \approx \binom{n}{2} / 4}.
-It has a breakdown point of 50%, is more efficient than the MAD, and does not require a location estimate.
+\eqn{Q_n} is defined as the \eqn{k}-th order statistic of the \eqn{\binom{n}{2}} absolute
+differences \eqn{|x_i - x_j|} for \eqn{i < j}, where \eqn{k \approx \binom{n}{2} / 4}.
+The estimator achieves a 50\% breakdown point and higher statistical efficiency than the
+Median Absolute Deviation (MAD), without requiring a prior location estimate.
+
+The \code{robscale} implementation utilizes a tiered strategy for optimal performance:
+sorting networks for \eqn{n \le 8}, a specialized Johnson–Mizoguchi algorithm for medium 
+samples, and cache-aware parallelization for large-scale datasets.
 }
 \references{
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
-\emph{Journal of the American Statistical Association}, \bold{88}, 1273--1283.
+\emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
+\doi{10.1080/01621459.1993.10476408}
 }

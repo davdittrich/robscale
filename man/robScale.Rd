@@ -46,7 +46,7 @@ A single numeric value: the robust M-estimate of scale.
   \code{fallback = "na"}.
 }
 \description{
-Compute the robust M-estimate of scale for very small samples using the
+Computes the robust M-estimate of scale for very small samples using the
 \eqn{\rho}{rho} function of Rousseeuw & Verboven (2002).
 }
 \details{

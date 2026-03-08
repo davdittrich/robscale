@@ -1,6 +1,6 @@
 #' Robust M-Estimate of Scale
 #'
-#' Compute the robust M-estimate of scale for very small samples using the
+#' Computes the robust M-estimate of scale for very small samples using the
 #' \eqn{\rho}{rho} function of Rousseeuw & Verboven (2002).
 #'
 #' @param x A numeric vector.
