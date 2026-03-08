@@ -28,12 +28,11 @@
 #endif
 
 #ifdef USE_DIRECT_TBB
-namespace parallel {
-  struct Worker {};
-  using Split = tbb::split;
-}
+struct WorkerBase {};
+using SplitType = tbb::split;
 #else
-namespace parallel = RcppParallel;
+using WorkerBase = RcppParallel::Worker;
+using SplitType = RcppParallel::Split;
 #endif
 
 namespace robscale::qnsn {
@@ -52,7 +51,7 @@ inline double lowmedian_ptr(T* arr, size_t n) {
 // --- SN ESTIMATOR WORKER ---
 
 template <typename T>
-struct SnWorker : public parallel::Worker {
+struct SnWorker : public WorkerBase {
   const T* sorted_x;
   size_t n;
   mutable T* results; // mutable to allow updating results in const operator()
@@ -249,7 +248,7 @@ inline T whimed_cpp(T* a, int32_t* iw, size_t n, int64_t target) {
 }
 
 template <typename T>
-struct QnCountWorker : public parallel::Worker {
+struct QnCountWorker : public WorkerBase {
   const T* x;
   size_t n;
   double trial;
@@ -258,7 +257,7 @@ struct QnCountWorker : public parallel::Worker {
 
   QnCountWorker(const T* x, size_t n, double trial)
       : x(x), n(n), trial(trial) {}
-  QnCountWorker(const QnCountWorker& other, parallel::Split)
+  QnCountWorker(const QnCountWorker& other, SplitType)
       : x(other.x), n(other.n), trial(other.trial) {}
 
 #ifdef USE_DIRECT_TBB
@@ -292,7 +291,7 @@ struct QnCountWorker : public parallel::Worker {
 };
 
 template <typename T>
-struct QnRefineWorker : public parallel::Worker {
+struct QnRefineWorker : public WorkerBase {
   const T* x;
   size_t n;
   double trial;
@@ -498,4 +497,14 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("l2_cache_size") = (int)config.hw.l2_cache_size,
     Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores
   );
+}
+
+// [[Rcpp::export]]
+double C_get_sn_factor(int n) {
+  return robscale::qnsn::get_sn_factor(static_cast<size_t>(n));
+}
+
+// [[Rcpp::export]]
+double C_get_qn_factor(int n) {
+  return robscale::qnsn::get_qn_factor(static_cast<size_t>(n));
 }

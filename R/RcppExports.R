@@ -29,6 +29,14 @@ get_qnsn_config <- function() {
     .Call(`_robscale_get_qnsn_config`)
 }
 
+C_get_sn_factor <- function(n) {
+    .Call(`_robscale_C_get_sn_factor`, n)
+}
+
+C_get_qn_factor <- function(n) {
+    .Call(`_robscale_C_get_qn_factor`, n)
+}
+
 rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
