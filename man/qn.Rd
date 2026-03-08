@@ -22,14 +22,31 @@ The \eqn{Q_n} estimator of scale.
 Computes the robust estimator of scale \eqn{Q_n} proposed by Rousseeuw and Croux (1993).
 }
 \details{
-\eqn{Q_n} is defined as the \eqn{k}-th order statistic of the \eqn{\binom{n}{2}} absolute
-differences \eqn{|x_i - x_j|} for \eqn{i < j}, where \eqn{k \approx \binom{n}{2} / 4}.
-The estimator achieves a 50\% breakdown point and higher statistical efficiency than the
-Median Absolute Deviation (MAD), without requiring a prior location estimate.
+The \eqn{Q_n} estimator is defined as the \eqn{k}-th order statistic of the
+\eqn{\binom{n}{2}} absolute pairwise differences \eqn{|x_i - x_j|} for
+\eqn{i < j}. Specifically, \eqn{Q_n = C \cdot d_{(k)}} where \eqn{d} is the
+set of absolute differences and \eqn{k = \binom{h}{2}} with
+\eqn{h = \lfloor n/2 \rfloor + 1}.
 
-The \code{robscale} implementation utilizes a tiered strategy for optimal performance:
-sorting networks for \eqn{n \le 8}, a specialized Johnson–Mizoguchi algorithm for medium 
-samples, and cache-aware parallelization for large-scale datasets.
+\strong{Statistical Properties.}
+\eqn{Q_n} is a highly robust estimator with a \bold{50\% breakdown point}.
+Unlike the Median Absolute Deviation (MAD), \eqn{Q_n} does not require a
+prior location estimate, making it more robust in asymmetric distributions.
+At the Gaussian distribution, it achieves an \bold{asymptotic relative
+efficiency (ARE) of 0.82}, significantly higher than the 0.37 achieved by the
+MAD.
+
+\strong{Computational Performance.}
+While the naive calculation of \eqn{Q_n} requires \eqn{O(n^2)} space and
+time, this implementation employs a specialized \eqn{O(n \log n)} algorithm.
+The package utilizes a tiered execution strategy:
+\itemize{
+  \item \bold{Optimal sorting networks} for very small samples (\eqn{n \le 8}).
+  \item A specialized \bold{Johnson--Mizoguchi selection} algorithm for
+    medium-sized datasets.
+  \item \bold{Cache-aware parallelization} via Intel TBB (when
+    \code{ROBSCALE_FAST=1}) for large-scale data.
+}
 }
 \examples{
 qn(c(1:9))

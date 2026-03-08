@@ -10,13 +10,29 @@
 #' @return The \eqn{S_n} estimator of scale.
 #'
 #' @details
-#' \eqn{S_n} is defined as \eqn{1.1926 \cdot \text{med}_i \{ \text{med}_j |x_i - x_j| \}}.
-#' It achieves a 50\% breakdown point and provides superior efficiency compared to the
-#' Median Absolute Deviation (MAD).
+#' The \eqn{S_n} estimator is defined as the median of medians:
 #'
-#' The \code{robscale} implementation optimizes the computation through optimal sorting
-#' networks for the target regime of very small samples (\eqn{n \le 8}) and highly
-#' tuned \eqn{O(n \log n)} kernels for general datasets.
+#' \deqn{S_n = C \cdot \text{med}_i \left\{ \text{med}_j |x_i - x_j| \right\}}{Sn = C * med_i(med_j(|x_i - x_j|))}
+#'
+#' \strong{Statistical Properties.}
+#' \eqn{S_n} achieves a \bold{50\% breakdown point} and provides superior
+#' statistical efficiency compared to the Median Absolute Deviation (MAD). At
+#' the Gaussian distribution, it has an \bold{asymptotic relative efficiency
+#' (ARE) of 0.58}, which is significantly higher than the 0.37 of the MAD.
+#' Unlike M-estimators of scale, \eqn{S_n} is an explicit function of the
+#' data and does not require an iterative solution or a prior location
+#' estimate.
+#'
+#' \strong{Computational Performance.}
+#' This implementation provides a highly optimized \bold{\eqn{O(n \log n)}}
+#' algorithm, avoiding the \eqn{O(n^2)} complexity of the naive definition.
+#' The execution strategy is tiered for maximum efficiency:
+#' \itemize{
+#'   \item \bold{Optimal sorting networks} are used for the target regime of
+#'     very small samples (\eqn{n \le 8}).
+#'   \item \bold{Highly tuned kernels} are employed for general datasets,
+#'     leveraging C++17 features for cache-aware computation.
+#' }
 #'
 #' @references
 #' Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
