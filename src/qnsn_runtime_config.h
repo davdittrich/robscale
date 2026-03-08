@@ -34,26 +34,17 @@ private:
   }
 
   void calculate_thresholds() {
-    // Use the threshold defined in the thresholds header.
     qn_exact_threshold = QN_EXACT_THRESHOLD;
+    sn_stack_threshold = SN_STACK_THRESHOLD;
 
-    size_t l2_budget = hw.l2_cache_size / 2;
-    // Original calculation and clamping for qn_exact_threshold are now superseded by the hardcoded value above.
-    // qn_exact_threshold = (size_t)std::sqrt(l2_budget / 8);
-    // qn_exact_threshold = (qn_exact_threshold / 8) * 8;
-    // if (qn_exact_threshold < 64)
-    //   qn_exact_threshold = 64;
-    // if (qn_exact_threshold > 1024)
-    //   qn_exact_threshold = 1024;
+    size_t parallel_thresh = hw.l2_cache_size / sizeof(double);
+    if (parallel_thresh < 8192)
+      parallel_thresh = 8192;
+    if (parallel_thresh > 32768)
+      parallel_thresh = 32768;
 
-    sn_parallel_threshold = (hw.l2_cache_size / sizeof(double));
-    if (sn_parallel_threshold < 8192)
-      sn_parallel_threshold = 8192;
-    if (sn_parallel_threshold > 32768)
-      sn_parallel_threshold = 12288;
-
-    qn_parallel_threshold = 8192;
-    sn_stack_threshold = 2048;
+    sn_parallel_threshold = parallel_thresh;
+    qn_parallel_threshold = parallel_thresh;
   }
 };
 
