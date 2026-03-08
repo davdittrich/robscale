@@ -6,7 +6,7 @@
   Accelerate framework remains the sole vectorized provider.
 * Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings on
   some macOS configurations.
-* CRAN: Fixed `SystemRequirements` specification for C++17 compliance.
+* CRAN: Removed redundant `C++17` from `SystemRequirements` (handled by `Makevars`).
 * CRAN: Added `inst/WORDLIST` to whitelist technical terms from `aspell`.
 
 # robscale 0.1.2
