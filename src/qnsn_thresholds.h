@@ -19,7 +19,7 @@
 namespace robscale::qnsn {
 
 // Brute-force threshold for Qn. Our JM implementation is very fast, so we crossover earlier.
-constexpr size_t QN_EXACT_THRESHOLD = 512;
+constexpr size_t QN_EXACT_THRESHOLD = 64;
 
 // Sn stack threshold: Max size for stack-allocated working array
 constexpr size_t SN_STACK_THRESHOLD = 2048;
