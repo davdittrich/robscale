@@ -7,8 +7,6 @@
 
 namespace robscale {
 
-// --- Floyd-Rivest selection (O(n) average) ---
-// Based on Floyd & Rivest (1975) with portability improvements.
 template <typename Iter>
 void floyd_rivest_select(Iter left_in, Iter k, Iter right_in) {
   using T = typename std::iterator_traits<Iter>::value_type;
@@ -35,13 +33,13 @@ void floyd_rivest_select(Iter left_in, Iter k, Iter right_in) {
       Iter new_left =
           (std::max)(left,
                      k - static_cast<ptrdiff_t>(static_cast<double>(i) * s /
-                                                     static_cast<double>(nn) +
-                                                 sd));
+                                                      static_cast<double>(nn) +
+                                                  sd));
       Iter new_right =
           (std::min)(right,
                      k + static_cast<ptrdiff_t>(static_cast<double>(nn - i) * s /
-                                                     static_cast<double>(nn) +
-                                                 sd));
+                                                      static_cast<double>(nn) +
+                                                  sd));
       floyd_rivest_select(new_left, k, new_right + 1);
     }
 
