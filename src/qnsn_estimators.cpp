@@ -192,8 +192,7 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   }
   optimized_sort(sorted_x, sorted_x + n);
 
-  std::unique_ptr<T[]> inner_medians_ptr(new T[n]);
-  SnWorker<T> worker(sorted_x, n, inner_medians_ptr.get());
+  SnWorker<T> worker(sorted_x, n, inner_medians);
   if (n > config.sn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n, 2048), worker);
@@ -205,8 +204,8 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   }
 
   size_t h_idx = (n - 1) / 2;
-  robscale::floyd_rivest_select(inner_medians_ptr.get(), inner_medians_ptr.get() + h_idx, inner_medians_ptr.get() + n);
-  double raw = static_cast<double>(inner_medians_ptr[h_idx]);
+  robscale::floyd_rivest_select(inner_medians, inner_medians + h_idx, inner_medians + n);
+  double raw = static_cast<double>(inner_medians[h_idx]);
   return raw * CONST_SN * get_sn_factor(n);
 }
 
@@ -374,7 +373,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     return raw * CONST_QN * get_qn_factor(n);
   }
 
-  size_t arena_bytes = n * sizeof(T) + n * sizeof(double) + 3 * n * sizeof(int32_t);
+  size_t arena_bytes = n * sizeof(T) + n * sizeof(float) + 3 * n * sizeof(int32_t);
   std::unique_ptr<char[]> arena;
   try {
     arena.reset(new char[arena_bytes]);
@@ -384,7 +383,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   
   char* ptr = arena.get();
   T* sorted_x = reinterpret_cast<T*>(ptr); ptr += n * sizeof(T);
-  double* work = reinterpret_cast<double*>(ptr); ptr += n * sizeof(double);
+  float* work = reinterpret_cast<float*>(ptr); ptr += n * sizeof(float);
   int32_t* iweight = reinterpret_cast<int32_t*>(ptr); ptr += n * sizeof(int32_t);
   int32_t* left = reinterpret_cast<int32_t*>(ptr); ptr += n * sizeof(int32_t);
   int32_t* right = reinterpret_cast<int32_t*>(ptr);
@@ -412,7 +411,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
       if (left[i] <= right[i]) {
         int32_t w = right[i] - left[i] + 1;
         int32_t jj = left[i] + w / 2;
-        work[m] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]);
+        work[m] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
         iweight[m] = w;
         m += 1;
       }

@@ -2,6 +2,7 @@
 #define ROBSCALE_QNSN_RUNTIME_CONFIG_H
 
 #include "qnsn_hardware_info.h"
+#include "qnsn_thresholds.h"
 #include <cmath>
 #include <mutex>
 
@@ -33,9 +34,8 @@ private:
   }
 
   void calculate_thresholds() {
-    // For Qn, brute-force O(n^2) is best at small scales. 
-    // Our JM implementation is highly optimized, so we switch over at ~512.
-    qn_exact_threshold = 512;
+    // Use the threshold defined in the thresholds header.
+    qn_exact_threshold = QN_EXACT_THRESHOLD;
 
     size_t l2_budget = hw.l2_cache_size / 2;
     // Original calculation and clamping for qn_exact_threshold are now superseded by the hardcoded value above.
