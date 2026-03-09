@@ -1,16 +1,14 @@
 # CRAN submission comments for robscale 0.1.4
 
-This submission (0.1.4) supersedes version 0.1.3. Shortly after the previous 
-submission, we identified a critical compilation error specifically affecting 
-macOS ARM64 (Apple Silicon) builders due to a platform-specific header 
-reference. 
+This submission (0.1.4) addresses all points raised in pre-test logs for version 
+0.1.2/0.1.3 across Windows, Linux (Debian/Clang), and macOS platforms.
 
 ## Changes in 0.1.4
 - Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>`.
-
-## Changes in 0.1.3
+- Resolved Windows toolchain collision by removing explicit `CXX_STD`.
+- Removed non-portable GCC-specific pragmas that caused warnings on Clang.
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
-- Removed redundant `C++17` from `SystemRequirements`.
+- Removed redundant `GNU make` from `SystemRequirements`.
 - Added `inst/WORDLIST` to address technical term spelling notes.
 - Quoted 'Qn' and 'Sn' in metadata.
 

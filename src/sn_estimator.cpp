@@ -1,4 +1,3 @@
-#pragma GCC optimize("O3")
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(BH)]]
