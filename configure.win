@@ -1,0 +1,2 @@
+#!/bin/sh
+# No configuration needed on Windows; Makevars.win provides all settings
