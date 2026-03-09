@@ -4,7 +4,7 @@ This submission (0.1.4) addresses all points raised in pre-test logs for version
 0.1.2/0.1.3 across Windows, Linux (Debian/Clang), and macOS platforms.
 
 ## Changes in 0.1.4
-- Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>`.
+- Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>` and resolving a `COMPLEX` symbol conflict with R's internal types.
 - Resolved Windows toolchain collision by removing explicit `CXX_STD`.
 - Removed non-portable GCC-specific pragmas that caused warnings on Clang.
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
