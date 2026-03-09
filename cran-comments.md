@@ -2,6 +2,9 @@
 
 ## Changes in 0.1.5
 
+- Resolved the "pragmas suppressing diagnostics" NOTE by removing 
+  `#pragma GCC diagnostic ignored "-Wdeprecated-volatile"` from 
+  `src/qn_estimator.cpp`, `src/sn_estimator.cpp`, and `src/qnsn_sort_utils.h`.
 - Added `configure.win` and `cleanup.win` to suppress win-builder's
   "this package has a configure script / It probably needs manual configuration"
   warning.
@@ -43,10 +46,8 @@ https://github.com/davdittrich/robscale/actions
 0 errors | 0 warnings | 2 notes
 
 - **CRAN incoming feasibility**: New submission; maintainer address confirmed.
-- **Pragmas suppressing diagnostics**: `src/qn_estimator.cpp`,
-  `src/qnsn_sort_utils.h`, `src/sn_estimator.cpp` — these targeted pragmas
-  silence TBB deprecation warnings from upstream headers on specific compilers
-  and are documented in CRAN-NOTE form.
+- **Compilation flags used**: NOTE regarding non-portable flags (`-march=x86-64`,
+  etc.) provided by the R core build environment for performance and security.
 
 ## URL Checks
 
