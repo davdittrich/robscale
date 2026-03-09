@@ -1,0 +1,136 @@
+#!/bin/sh
+# Detect platform-specific compiler flags for robscale
+
+# --- Performance optimization flags ---
+# By default, use CRAN-safe flags (no -O3, no -march=native).
+# Set ROBSCALE_FAST=1 to enable aggressive optimization for local installs.
+FAST_FLAGS=""
+if [ "${ROBSCALE_FAST}" = "1" ]; then
+  FAST_FLAGS="-O3 -march=native"
+  echo "  ROBSCALE_FAST=1: enabling -O3 -march=native"
+else
+  echo "  CRAN-safe mode (set ROBSCALE_FAST=1 for -O3 -march=native)"
+fi
+
+# Generate tuned thresholds if ROBSCALE_FAST is used
+rm -f src/qnsn_tuned_thresholds.h
+if [ "${ROBSCALE_FAST}" = "1" ]; then
+  echo "  Running threshold auto-tuning (this may take a few seconds)..."
+  BH_INC=$("${R_HOME}/bin/Rscript" -e 'cat(system.file("include", package="BH"))')
+  if [ -n "${BH_INC}" ] && [ -d "${BH_INC}" ]; then
+    ${CXX:-c++} -O3 -march=native -std=c++17 -I"${BH_INC}" tools/tune_thresholds.cpp -o tools/tune_thresholds 2>/dev/null
+    if [ -x tools/tune_thresholds ]; then
+      ./tools/tune_thresholds > src/qnsn_tuned_thresholds.h
+      echo "  Saved auto-tuned thresholds to src/qnsn_tuned_thresholds.h"
+      FAST_FLAGS="${FAST_FLAGS} -DROBSCALE_HAS_TUNED_THRESHOLDS"
+    else
+      echo "  Failed to compile tuner, using defaults."
+    fi
+    rm -f tools/tune_thresholds
+  else
+    echo "  BH package not found, skipping tuning."
+  fi
+fi
+
+# Detect -fopenmp-simd support
+OPENMP_SIMD_FLAG=""
+echo "int main(){return 0;}" > conftest.cpp
+if ${CXX:-c++} -fopenmp-simd -c conftest.cpp -o conftest.o 2>/dev/null; then
+  OPENMP_SIMD_FLAG="-fopenmp-simd"
+  echo "  -fopenmp-simd supported"
+else
+  echo "  -fopenmp-simd not supported, skipping"
+fi
+rm -f conftest.cpp conftest.o
+
+HAS_SLEEF="no"
+
+# Skip SLEEF on macOS as Accelerate is faster and preferred
+if [ "$(uname -s)" != "Darwin" ]; then
+  # Check standard paths first
+  for prefix in /usr /usr/local /opt/homebrew; do
+    if [ -f "${prefix}/include/sleef.h" ]; then
+      SLEEF_CFLAGS="-I${prefix}/include -DROBSCALE_HAS_SLEEF"
+      SLEEF_LIBS="-L${prefix}/lib -lsleef"
+      HAS_SLEEF="yes"
+      break
+    fi
+  done
+
+  # Fallback to pkg-config if not found in standard paths
+  if [ "${HAS_SLEEF}" = "no" ]; then
+    if pkg-config --exists sleef 2>/dev/null; then
+      SLEEF_CFLAGS="$(pkg-config --cflags sleef) -DROBSCALE_HAS_SLEEF"
+      SLEEF_LIBS=$(pkg-config --libs sleef)
+      HAS_SLEEF="yes"
+    fi
+  fi
+fi
+
+if [ "${HAS_SLEEF}" = "yes" ]; then
+  echo "  SLEEF detected"
+else
+  echo "  SLEEF not detected, falling back to Accelerate/OpenMP"
+fi
+
+# Detect CPU SIMD capabilities for optimal SLEEF/OpenMP performance
+# ONLY if ROBSCALE_FAST=1 is set (CRAN-safe by default)
+SIMD_FLAGS=""
+if [ "${ROBSCALE_FAST}" = "1" ]; then
+  case "$(uname -m)" in
+    x86_64)
+      # Check for AVX2 support in compiler
+      echo "int main(){return 0;}" > conftest_simd.cpp
+      if ${CXX:-c++} -mavx2 -mfma -c conftest_simd.cpp -o conftest_simd.o 2>/dev/null; then
+        SIMD_FLAGS="-mavx2 -mfma"
+        echo "  x86_64: AVX2/FMA supported"
+      fi
+      rm -f conftest_simd.cpp conftest_simd.o
+      ;;
+    arm64|aarch64)
+      echo "  ARM64: NEON is standard"
+      ;;
+  esac
+fi
+
+# Detect L2 cache size for cache-aware thresholds
+FASTQNSN_L2=4194304
+FASTQNSN_CL=64
+
+case "$(uname -s)" in
+  Darwin)
+    # Apple Silicon: use efficiency-core L2
+    FASTQNSN_L2=$(sysctl -n hw.perflevel1.l2cachesize 2>/dev/null \
+                  || sysctl -n hw.l2cachesize 2>/dev/null \
+                  || echo 4194304)
+    FASTQNSN_CL=$(sysctl -n hw.cachelinesize 2>/dev/null || echo 128)
+    echo "  macOS L2 Cache size: ${FASTQNSN_L2}"
+    echo "  macOS Cache Line size: ${FASTQNSN_CL}"
+    ;;
+  Linux)
+    FASTQNSN_L2=$(getconf LEVEL2_CACHE_SIZE 2>/dev/null || echo 4194304)
+    FASTQNSN_CL=$(getconf LEVEL1_DCACHE_LINESIZE 2>/dev/null || echo 64)
+    echo "  Linux L2 Cache size: ${FASTQNSN_L2}"
+    echo "  Linux Cache Line size: ${FASTQNSN_CL}"
+    ;;
+esac
+
+# Detect macOS Accelerate framework (vForce for vectorized tanh)
+ACCELERATE_LIBS=""
+if [ "$(uname -s)" = "Darwin" ]; then
+  ACCELERATE_LIBS="-framework Accelerate"
+  echo "  macOS detected, linking Accelerate framework"
+fi
+
+# Generate Makevars from template
+sed -e "s|@FAST_FLAGS@|${FAST_FLAGS}|" \
+    -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
+    -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
+    -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
+    -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
+    -e "s|@SIMD_FLAGS@|${SIMD_FLAGS}|" \
+    -e "s|@FASTQNSN_L2@|${FASTQNSN_L2}|" \
+    -e "s|@FASTQNSN_CL@|${FASTQNSN_CL}|" \
+    src/Makevars.in > src/Makevars
+
+echo "  Generated src/Makevars"

@@ -1,0 +1,5 @@
+adm                     Average Distance to the Median
+qn                      Robust Estimator of Scale Qn
+robLoc                  Robust M-Estimate of Location
+robScale                Robust M-Estimate of Scale
+sn                      Robust Estimator of Scale Sn
