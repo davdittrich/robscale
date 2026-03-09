@@ -1,3 +1,12 @@
+# robscale 0.1.5
+
+* Windows: Added `configure.win` and `cleanup.win` to suppress spurious
+  win-builder warnings about missing Windows configuration.
+* CI: Added GitHub Actions R-CMD-check workflow with multi-platform matrix
+  (Windows, macOS, Ubuntu) as independent evidence of Windows compilation.
+* Build: Switched `RcppParallel::LdFlags()` to the canonical
+  `RcppParallel::RcppParallelLibs()` in `Makevars.win` and `Makevars.in`.
+
 # robscale 0.1.4
 
 * Portability: Fixed macOS (Apple Silicon) compilation error by switching to

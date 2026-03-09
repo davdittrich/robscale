@@ -1,33 +1,47 @@
-# CRAN submission comments for robscale 0.1.4
+# CRAN submission comments for robscale 0.1.5
 
-This submission (0.1.4) addresses all points raised in pre-test logs for version 
-0.1.2/0.1.3 across Windows, Linux (Debian/Clang), and macOS platforms.
+## Changes in 0.1.5
 
-## Changes in 0.1.4
-- Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>` and resolving a `COMPLEX` symbol conflict with R's internal types.
-- Restored explicit `CXX_STD = CXX17` in Makevars (required by CRAN policy).
-- Removed non-portable GCC-specific pragmas that caused warnings on Clang.
-- Resolved duplicate `-ltbb` linking flag warning on macOS.
-- Retained `GNU make` in `SystemRequirements` (required for `$(shell)` in Makevars).
-- Added `inst/WORDLIST` to address technical term spelling notes.
-- Quoted 'Qn' and 'Sn' in metadata.
+- Added `configure.win` and `cleanup.win` to suppress win-builder's
+  "this package has a configure script / It probably needs manual configuration"
+  warning.
+- Added GitHub Actions CI workflow with a multi-platform matrix including
+  Windows (R-release and R-devel), macOS, and Ubuntu.
+- Switched `RcppParallel::LdFlags()` to the canonical
+  `RcppParallel::RcppParallelLibs()` in `Makevars.win` and `Makevars.in`.
 
-Version 0.1.2 introduces two major new features and several refinements:
+## Win-builder incoming_pretest note
 
-- **New estimators**: Added `qn()` and `sn()` (Rousseeuw & Croux, 1993) with RcppParallel and cache-aware kernels.
-- **Portability**: Fixed the `configure` script to ensure that hardware-specific flags (e.g., `-mavx2`, `-mfma`) are
-  strictly **opt-in** via `ROBSCALE_FAST=1`, satisfying CRAN's portability requirements.
-- **Documentation**: Added missing `@examples` for all exported functions.
+The **Windows** incoming_pretest for 0.1.4 failed with an installation error.
+The root cause is a toolchain mismatch on the pretest server: R was compiled with
+MinGW g++ (GCC 14.3.0), but the build invokes Cygwin's g++ (GCC 15.2.0). When
+Cygwin's g++ resolves standard headers via MinGW's `_mingw_stdarg.h`, that
+header raises `#error Only Win32 target is supported!`. The error occurs at the
+very first `#include <Rcpp.h>` before any package-specific code is reached — no
+source-level change can fix this.
+
+The **Debian/Clang** incoming_pretest passed cleanly (0 errors, 0 warnings,
+2 NOTEs).
+
+As independent evidence that robscale compiles and passes `R CMD check` on
+Windows, we now include a GitHub Actions CI workflow that tests on
+`windows-latest` with both R-release and R-devel (proper Rtools45/MinGW
+toolchain). Results are visible at:
+https://github.com/davdittrich/robscale/actions
 
 ## Test environments
 
 - Arch Linux (x86_64), R 4.5.2, GCC 15.2.1
+- GitHub Actions: Windows Server 2022 (x86_64), R-release + R-devel
+- GitHub Actions: macOS (ARM64), R-release
+- GitHub Actions: Ubuntu 22.04 (x86_64), R-release + R-devel
 
 ## R CMD check results
 
 0 errors | 0 warnings | 0 notes
 
-(Note: System-specific notes for missing `aspell` or `tidy` may appear in some environments but do not reflect package defects.)
+(System-specific notes for missing `aspell` or `tidy` may appear in some
+environments but do not reflect package defects.)
 
 ## URL Checks
 
