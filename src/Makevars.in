@@ -1,4 +1,6 @@
+CXX_STD = CXX17
 PKG_CXXFLAGS = @FAST_FLAGS@ @OPENMP_SIMD_FLAG@ @SLEEF_CFLAGS@ @SIMD_FLAGS@ \
                -DFASTQNSN_L2_CACHE_BYTES=@FASTQNSN_L2@ \
-               -DFASTQNSN_CACHE_LINE_BYTES=@FASTQNSN_CL@ -DUSE_DIRECT_TBB
-PKG_LIBS = @ACCELERATE_LIBS@ @SLEEF_LIBS@ $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::LdFlags()")
+               -DFASTQNSN_CACHE_LINE_BYTES=@FASTQNSN_CL@ -DUSE_DIRECT_TBB \
+               -Wno-deprecated-volatile
+PKG_LIBS = @ACCELERATE_LIBS@ @SLEEF_LIBS@ $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::LdFlags()") -ltbb
