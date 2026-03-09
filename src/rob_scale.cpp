@@ -1,5 +1,5 @@
-#include <Rcpp.h>
 #include "robust_core.h"
+#include <Rcpp.h>
 
 // [[Rcpp::export]]
 double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,

@@ -1,5 +1,5 @@
-#include <Rcpp.h>
 #include "robust_core.h"
+#include <Rcpp.h>
 
 // Called when center is explicitly provided by user
 // [[Rcpp::export]]
