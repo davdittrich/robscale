@@ -2,14 +2,17 @@
 
 * Portability: Fixed macOS (Apple Silicon) compilation error by switching to
   the more portable `<Accelerate/Accelerate.h>` include.
-
-# robscale 0.1.3
-
-* Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings on
-  some macOS configurations.
-* CRAN: Removed redundant `C++17` from `SystemRequirements`.
+* Portability: Resolved critical Windows toolchain collision by removing
+  redundant `CXX_STD = CXX17` from `Makevars`.
+* Portability: Removed non-portable GCC pragmas to silence warnings on Clang
+  (win-builder Debian).
+* CRAN: Removed redundant `GNU make` from `SystemRequirements`.
 * CRAN: Added `inst/WORDLIST` to whitelist technical terms from `aspell`.
 * CRAN: Quoted 'Qn' and 'Sn' in `DESCRIPTION` to satisfy metadata checks.
+* Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings
+  on some macOS configurations.
+
+# robscale 0.1.3
 
 * Added high-efficiency scale estimators: `qn()` and `sn()` (Rousseeuw &
   Croux, 1993) with specialized sorting network kernels and cache-aware
