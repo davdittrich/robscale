@@ -7,6 +7,8 @@
   warning.
 - Added GitHub Actions CI workflow with a multi-platform matrix including
   Windows (R-release and R-devel), macOS, and Ubuntu.
+- Fixed uninitialized NEON vector register in `qnsn_kernels.h` that
+  Clang 17 promoted to a compilation WARNING (blocking `R CMD check`).
 - Switched `RcppParallel::LdFlags()` to the canonical
   `RcppParallel::RcppParallelLibs()` in `Makevars.win` and `Makevars.in`.
 
@@ -34,14 +36,17 @@ https://github.com/davdittrich/robscale/actions
 - Arch Linux (x86_64), R 4.5.2, GCC 15.2.1
 - GitHub Actions: Windows Server 2022 (x86_64), R-release + R-devel
 - GitHub Actions: macOS (ARM64), R-release
-- GitHub Actions: Ubuntu 22.04 (x86_64), R-release + R-devel
+- GitHub Actions: Ubuntu 24.04 (x86_64), R-release + R-devel
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes
+0 errors | 0 warnings | 2 notes
 
-(System-specific notes for missing `aspell` or `tidy` may appear in some
-environments but do not reflect package defects.)
+- **CRAN incoming feasibility**: New submission; maintainer address confirmed.
+- **Pragmas suppressing diagnostics**: `src/qn_estimator.cpp`,
+  `src/qnsn_sort_utils.h`, `src/sn_estimator.cpp` — these targeted pragmas
+  silence TBB deprecation warnings from upstream headers on specific compilers
+  and are documented in CRAN-NOTE form.
 
 ## URL Checks
 

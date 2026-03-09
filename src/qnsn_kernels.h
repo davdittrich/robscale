@@ -37,7 +37,7 @@ void qn_brute_force_avx2(const T * __restrict__ sorted_x, size_t n, double * __r
     size_t j = 0;
     // Main AVX2 loop: 8 doubles per iteration (2 registers)
     for (; j + 8 <= i; j += 8) {
-      __m256d v_xj1, v_xj2;
+      __m256d v_xj1 = {}, v_xj2 = {};
       
       // We use set_pd which is slow, but for n <= 2048 the sorted_x array itself is small.
       // Better is to use _mm256_loadu_pd if T is double.
