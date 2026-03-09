@@ -77,8 +77,9 @@ void qn_brute_force_neon(const T * __restrict__ sorted_x, size_t n, double * __r
       if constexpr (std::is_same_v<T, double>) {
         v_xj = vld1q_f64(sorted_x + j);
       } else {
-        v_xj = vsetq_lane_f64(static_cast<double>(sorted_x[j]), v_xj, 0);
-        v_xj = vsetq_lane_f64(static_cast<double>(sorted_x[j+1]), v_xj, 1);
+        double tmp[2] = { static_cast<double>(sorted_x[j]),
+                          static_cast<double>(sorted_x[j+1]) };
+        v_xj = vld1q_f64(tmp);
       }
       vst1q_f64(diffs + k, vsubq_f64(v_xi, v_xj));
       k += 2;
