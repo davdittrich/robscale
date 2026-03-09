@@ -1,5 +1,9 @@
 # robscale 0.1.5
 
+* CRAN: Removed `#pragma GCC diagnostic ignored "-Wdeprecated-volatile"` from
+  `src/qn_estimator.cpp`, `src/sn_estimator.cpp`, and `src/qnsn_sort_utils.h`
+  to resolve the "pragmas suppressing diagnostics" NOTE requested by CRAN
+  maintainers.
 * Windows: Added `configure.win` and `cleanup.win` to suppress spurious
   win-builder warnings about missing Windows configuration.
 * CI: Added GitHub Actions R-CMD-check workflow with multi-platform matrix
@@ -60,12 +64,12 @@ Initial release.
   for very small samples.
 * API-compatible drop-in replacement for the `revss` package.
 * C++17 implementation via Rcpp with:
-  - Newton--Raphson iteration for location (quadratic convergence).
-  - Algebraic `tanh(x/2)` identity for the logistic psi function with
+  * Newton--Raphson iteration for location (quadratic convergence).
+  * Algebraic `tanh(x/2)` identity for the logistic psi function with
     platform-vectorized bulk evaluation (Apple Accelerate on macOS,
     OpenMP SIMD hints on Linux).
-  - Floyd--Rivest O(n) selection for median computation.
-  - Optimal sorting networks for n <= 8.
-  - Stack-allocated arena buffers (zero heap allocation for n <= 512).
+  * Floyd--Rivest O(n) selection for median computation.
+  * Optimal sorting networks for n <= 8.
+  * Stack-allocated arena buffers (zero heap allocation for n <= 512).
 * Numerical equivalence with `revss` verified across 5,400 systematic
   comparisons (tolerance: sqrt(.Machine$double.eps)).

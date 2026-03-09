@@ -4,15 +4,9 @@
 #include "qnsn_thresholds.h"
 #include <algorithm>
 #include <boost/sort/spreadsort/spreadsort.hpp>
-// Suppress TBB deprecation warnings in C++20
-#if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wdeprecated-volatile"
-#endif
+#include <boost/sort/spreadsort/spreadsort.hpp>
+// Include TBB parallel_sort
 #include <tbb/parallel_sort.h>
-#if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic pop
-#endif
 #include <type_traits>
 
 namespace robscale::qnsn {

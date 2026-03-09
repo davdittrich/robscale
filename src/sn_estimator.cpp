@@ -8,17 +8,10 @@
 
 #include <RcppParallel.h>
 #ifdef USE_DIRECT_TBB
-// Suppress TBB deprecation warnings in C++20
-#if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic push
-  #pragma GCC diagnostic ignored "-Wdeprecated-volatile"
-#endif
+// Include TBB headers
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
-#if defined(__GNUC__) || defined(__clang__)
-  #pragma GCC diagnostic pop
-#endif
 #endif
 #include <algorithm>
 #include <memory>
