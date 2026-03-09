@@ -1,7 +1,7 @@
+#include "robust_core.h"
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(BH)]]
-#include "robust_core.h"
 #include "qnsn_constants.h"
 #include "qnsn_sort_utils.h"
 #include "qnsn_dispatcher.h"
