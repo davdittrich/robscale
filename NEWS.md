@@ -4,6 +4,8 @@
   win-builder warnings about missing Windows configuration.
 * CI: Added GitHub Actions R-CMD-check workflow with multi-platform matrix
   (Windows, macOS, Ubuntu) as independent evidence of Windows compilation.
+* Portability: Fixed uninitialized NEON register in `qnsn_kernels.h` that
+  Clang 17 on macOS promoted to a compilation WARNING.
 * Build: Switched `RcppParallel::LdFlags()` to the canonical
   `RcppParallel::RcppParallelLibs()` in `Makevars.win` and `Makevars.in`.
 
