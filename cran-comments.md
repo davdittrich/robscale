@@ -5,10 +5,10 @@ This submission (0.1.4) addresses all points raised in pre-test logs for version
 
 ## Changes in 0.1.4
 - Fixed macOS ARM64 compilation failure by switching to `<Accelerate/Accelerate.h>` and resolving a `COMPLEX` symbol conflict with R's internal types.
-- Resolved Windows toolchain collision by removing explicit `CXX_STD`.
+- Restored explicit `CXX_STD = CXX17` in Makevars (required by CRAN policy).
 - Removed non-portable GCC-specific pragmas that caused warnings on Clang.
 - Resolved duplicate `-ltbb` linking flag warning on macOS.
-- Removed redundant `GNU make` from `SystemRequirements`.
+- Retained `GNU make` in `SystemRequirements` (required for `$(shell)` in Makevars).
 - Added `inst/WORDLIST` to address technical term spelling notes.
 - Quoted 'Qn' and 'Sn' in metadata.
 
@@ -28,17 +28,17 @@ Version 0.1.2 introduces two major new features and several refinements:
 0 errors | 0 warnings | 0 notes
 
 (Note: System-specific notes for missing `aspell` or `tidy` may appear in some environments but do not reflect package defects.)
-+
-+## URL Checks
-+
-+`urlchecker` flags three DOI URLs as `403 Forbidden`. These have been manually
-+verified to work correctly in a browser. The access denials are likely due to
-+bot-protection on the part of the publishers (Taylor & Francis, ACM, and JSTOR).
-+
-+Affected DOI links:
-+- [doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
-+- [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
-+- [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
+
+## URL Checks
+
+`urlchecker` flags three DOI URLs as `403 Forbidden`. These have been manually
+verified to work correctly in a browser. The access denials are likely due to
+bot-protection on the part of the publishers (Taylor & Francis, ACM, and JSTOR).
+
+Affected DOI links:
+- [doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
+- [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
+- [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
 
 ## Notes
 

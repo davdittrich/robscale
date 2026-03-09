@@ -3,11 +3,12 @@
 * Portability: Fixed macOS (Apple Silicon) compilation error by switching to
   the more portable `<Accelerate/Accelerate.h>` include and resolving a
   symbol conflict with R's `COMPLEX` type.
-* Portability: Resolved critical Windows toolchain collision by removing
-  redundant `CXX_STD = CXX17` from `Makevars`.
+* Portability: Restored explicit `CXX_STD = CXX17` in Makevars (required by
+  CRAN policy for packages using C++17 features).
 * Portability: Removed non-portable GCC pragmas to silence warnings on Clang
   (win-builder Debian).
-* CRAN: Removed redundant `GNU make` from `SystemRequirements`.
+* CRAN: Retained `GNU make` in `SystemRequirements` (`$(shell)` is a GNU
+  extension used for RcppParallel linking).
 * CRAN: Added `inst/WORDLIST` to whitelist technical terms from `aspell`.
 * CRAN: Quoted 'Qn' and 'Sn' in `DESCRIPTION` to satisfy metadata checks.
 * Build: Resolved duplicate `-ltbb` flag from `Makevars` which caused warnings
