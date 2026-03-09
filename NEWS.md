@@ -1,7 +1,8 @@
 # robscale 0.1.4
 
 * Portability: Fixed macOS (Apple Silicon) compilation error by switching to
-  the more portable `<Accelerate/Accelerate.h>` include.
+  the more portable `<Accelerate/Accelerate.h>` include and resolving a
+  symbol conflict with R's `COMPLEX` type.
 * Portability: Resolved critical Windows toolchain collision by removing
   redundant `CXX_STD = CXX17` from `Makevars`.
 * Portability: Removed non-portable GCC pragmas to silence warnings on Clang
