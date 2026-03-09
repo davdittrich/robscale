@@ -1,4 +1,0 @@
-PKG_CXXFLAGS =  -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF  \
-               -DFASTQNSN_L2_CACHE_BYTES=524288 \
-               -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB
-PKG_LIBS =  -L/usr/lib -lsleef $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::LdFlags()")
