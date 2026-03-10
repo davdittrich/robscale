@@ -1,3 +1,5 @@
+^renv$
+^renv\.lock$
 ^\.claude$
 ^\.gitignore$
 ^\.github$
@@ -13,3 +15,10 @@
 ^benchmarks/.*$
 ^\.markdownlint\.json$
 ^CRAN-SUBMISSION$
+^README\.qmd$
+^_targets$
+^_targets\.R$
+^scripts$
+^data$
+^R/run_benchmarks\.R$
+^R/make_plots\.R$
