@@ -25,7 +25,31 @@ format_speedup <- function(x) {
 # Load benchmark results
 tar_load(benchmark_report)
 
-# 1. Processing M-estimators (Panel A)
+# 0. Capture System Metadata
+sys_info <- sessioninfo::platform_info()
+
+# Dynamic Hardware Info
+get_cpu_name <- function() {
+  if (file.exists("/proc/cpuinfo")) {
+    cpu_info <- system("grep 'model name' /proc/cpuinfo | head -n1 | cut -d':' -f2", intern = TRUE)
+    if (length(cpu_info) > 0) return(trimws(cpu_info))
+  } else {
+    # Try macOS fallback
+    cpu_brand <- try(system("sysctl -n machdep.cpu.brand_string", intern = TRUE), silent = TRUE)
+    if (!inherits(cpu_brand, "try-error") && length(cpu_brand) > 0) return(trimws(cpu_brand))
+  }
+  return("Unknown CPU")
+}
+
+hw_cpu <- get_cpu_name()
+sys_os <- sys_info$os
+sys_r <- sys_info$version
+sys_date <- as.character(Sys.Date())
+
+# Version from DESCRIPTION
+pkg_version <- read.dcf("DESCRIPTION")[, "Version"]
+
+# 1. Processing M-estimators (Panel A: robscale (fast) vs revss)
 m_fast <- benchmark_report$fast$m_estimators
 m_legacy <- benchmark_report$legacy$revss
 
@@ -41,7 +65,7 @@ m_combined <- bind_rows(
 m_speedup_min <- format_speedup(min(m_combined$speedup))
 m_speedup_max <- format_speedup(max(m_combined$speedup))
 
-# 2. Processing Scale-estimators (Panel B)
+# 2. Processing Scale-estimators (Panel B: robscale (fast) vs robustbase)
 s_fast <- benchmark_report$fast$scale_estimators
 s_legacy <- benchmark_report$legacy$robustbase
 
@@ -62,6 +86,20 @@ qn_speedup_max <- format_speedup(max(qn_combined$speedup))
 
 sn_speedup_min <- format_speedup(min(sn_combined$speedup))
 sn_speedup_max <- format_speedup(max(sn_combined$speedup))
+
+# 3. Processing Optimized vs Unoptimized (Variation: fast vs slow)
+# We aggregate all fast vs all slow
+v_fast <- bind_rows(m_fast, s_fast)
+v_slow <- bind_rows(benchmark_report$slow$m_estimators, benchmark_report$slow$scale_estimators)
+
+v_combined <- bind_rows(
+  v_fast %>% mutate(label = "fast"),
+  v_slow %>% mutate(label = "slow")
+) %>%
+  mutate(expr = as.character(expression)) %>%
+  select(n, expr, median, label) %>%
+  pivot_wider(names_from = label, values_from = median) %>%
+  mutate(speedup = as.numeric(slow) / as.numeric(fast))
 ```
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -522,6 +560,13 @@ CRAN-compatible build with no ROBSCALE_FAST optimizations).
 tar_read(speedup_figure)
 ```
 
+**Benchmark environment:**
+- **Machine:** `r hw_cpu`
+- **OS:** `r sys_os`
+- **R version:** `r sys_r`
+- **Package version:** `r pkg_version`
+- **Date:** `r sys_date`
+
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($n \le 20$), `robscale` outperforms `revss` by
@@ -575,6 +620,27 @@ speedups do not scale linearly with thread count.
 >
 > Default CRAN binaries use conservative, portable settings to ensure
 > compatibility across all architectures.
+
+### Comparison: Optimized vs. Unoptimized builds
+
+The following table explicitly compares the performance of `robscale` when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the unoptimized (portable) version of the package.
+
+```{r}
+#| label: tbl-comp-fast
+#| results: asis
+
+comp_data <- v_combined %>%
+  group_by(expr) %>%
+  summarize(
+    `Min Speedup` = format_speedup(min(speedup)),
+    `Max Speedup` = format_speedup(max(speedup))
+  ) %>%
+  rename(Estimator = expr)
+
+knitr::kable(comp_data)
+```
+
+The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion. On large samples, the optimized version also benefits from tuned threading thresholds that more effectively leverage TBB.
 
 ## Numerical equivalence
 
