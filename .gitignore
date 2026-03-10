@@ -7,3 +7,15 @@ src/qnsn_tuned_thresholds.h
 .claude/
 *.Rcheck/
 *.tar.gz
+
+# Targets pipeline
+_targets/
+README_files/
+
+# Renv
+.RData
+.Rhistory
+renv/library/
+renv/python/
+renv/staging/
+renv/cache/
