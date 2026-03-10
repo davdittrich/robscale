@@ -31,8 +31,17 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
     library(bench)
     
     # Define sizes
-    n_small <- c(5, 10, 20)
-    n_large <- c(100, 1000, 10000, 100000)
+    n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
+    n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+                 12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
+    
+    get_iters <- function(n) {
+      if (n <= 128) 100L
+      else if (n <= 2048) 50L
+      else if (n <= 16384) 20L
+      else if (n <= 1048576) 10L
+      else 5L
+    }
     
     # Small sample benchmarks (vs revss if installed, or just internal)
     results_m <- bench::press(
@@ -44,7 +53,7 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
           robScale = robscale::robScale(x),
           adm = robscale::adm(x),
           check = FALSE,
-          min_iterations = 100
+          iterations = get_iters(n)
         )
       }
     )
@@ -58,7 +67,7 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
           qn = robscale::qn(x),
           sn = robscale::sn(x),
           check = FALSE,
-          min_iterations = 20
+          iterations = get_iters(n)
         )
       }
     )
@@ -77,8 +86,17 @@ benchmark_legacy <- function() {
   library(robustbase)
   library(revss)
   
-  n_small <- c(5, 10, 20)
-  n_large <- c(100, 1000, 10000, 100000)
+  n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
+  n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+               12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
+  
+  get_iters <- function(n) {
+    if (n <= 128) 100L
+    else if (n <= 2048) 50L
+    else if (n <= 16384) 20L
+    else if (n <= 1048576) 10L
+    else 5L
+  }
   
   results_revss <- bench::press(
     n = n_small,
@@ -89,7 +107,7 @@ benchmark_legacy <- function() {
         robScale = revss::robScale(x),
         adm = revss::adm(x),
         check = FALSE,
-        min_iterations = 100
+        iterations = get_iters(n)
       )
     }
   )
@@ -102,7 +120,7 @@ benchmark_legacy <- function() {
         qn = robustbase::Qn(x),
         sn = robustbase::Sn(x),
         check = FALSE,
-        min_iterations = 20
+        iterations = get_iters(n)
       )
     }
   )
