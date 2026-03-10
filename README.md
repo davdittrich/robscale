@@ -15,10 +15,10 @@ time-critical workflows.
 `robscale` resolves both bottlenecks. Its C++17 kernels replace
 interpreted R loops with SIMD-accelerated transcendental functions,
 Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **3.1–37.2×** speedups for the
+Against `revss`, the package achieves **3.3–27.4×** speedups for the
 small-sample M-estimators. Against `robustbase`, it achieves
-**1.3–5.2×** for $S_n$ and **1.3–5.2×** for $Q_n$ —with gains peaking
-near **10×** at $n = 10^7$ as TBB parallelism reduces the computational
+**1.6–6.8×** for $S_n$ and **1.5–5.5×** for $Q_n$ —with gains peaking
+near **6.8×** at $n = 10^7$ as TBB parallelism reduces the computational
 bottleneck for massive datasets.
 
 ## Installation
@@ -62,11 +62,11 @@ Table 1
 
 | Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
 |:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.3x** \[1.2x, 5.3x\] |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.4x** \[1.4x, 6.5x\] |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **4.0x** \[4.0x, 37.4x\] | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.1x** \[3.1x, 26.2x\] | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **3.9x** \[3.9x, 13.2x\] | — |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.5x** \[1.5x, 1.5x\] to **5.5x** \[5.4x, 5.5x\] |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.6x** \[1.6x, 1.7x\] to **6.8x** \[6.7x, 6.9x\] |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x** \[3.8x, 3.8x\] to **27.4x** \[27.0x, 27.8x\] | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.3x** \[3.2x, 3.3x\] to **25.9x** \[25.8x, 26.0x\] | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.5x** \[5.4x, 5.5x\] to **11.3x** \[11.2x, 11.5x\] | — |
 
 </div>
 

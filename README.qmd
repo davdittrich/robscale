@@ -87,6 +87,8 @@ sn_speedup_max <- format_speedup(max(sn_analyzed$median_speedup))
 
 # 3. Processing Optimized vs Unoptimized (Variation: fast vs slow)
 v_analyzed <- benchmark_report$analyzed$fast_slow
+
+max_large_speedup <- format_speedup(max(s_analyzed$median_speedup))
 ```
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -103,8 +105,8 @@ genomics pipelines, high-frequency finance, and other time-critical workflows.
 loops with SIMD-accelerated transcendental functions, Newton–Raphson iteration,
 and parallelized $O(n \log n)$ algorithms. Against `revss`, the package achieves
 **`r m_speedup_min`–`r m_speedup_max`×** speedups for the small-sample M-estimators. Against `robustbase`, it
-achieves **`r qn_speedup_min`–`r qn_speedup_max`×** for $S_n$ and **`r qn_speedup_min`–`r qn_speedup_max`×** for $Q_n$ —with gains peaking near
-**10×** at $n = 10^7$ as TBB parallelism reduces the computational bottleneck for massive datasets.
+achieves **`r sn_speedup_min`–`r sn_speedup_max`×** for $S_n$ and **`r qn_speedup_min`–`r qn_speedup_max`×** for $Q_n$ —with gains peaking near
+**`r max_large_speedup`×** at $n = 10^7$ as TBB parallelism reduces the computational bottleneck for massive datasets.
 
 ## Installation
 
@@ -146,13 +148,23 @@ estimators remain stable.
 #| results: asis
 
 # Extract speedup ranges for the table
-# M-estimators
-loc_data <- m_analyzed %>% filter(expr == "robLoc") %>% 
-  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
-scale_data <- m_analyzed %>% filter(expr == "robScale") %>% 
-  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
-adm_data <- m_analyzed %>% filter(expr == "adm") %>% 
-  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
+format_speedup_range <- function(df, estimator_name) {
+  sub_df <- df %>% filter(expr == estimator_name)
+  if(nrow(sub_df) == 0) return("—")
+  
+  min_row <- sub_df[which.min(sub_df$median_speedup), ]
+  max_row <- sub_df[which.max(sub_df$median_speedup), ]
+  
+  fmt <- function(r) {
+    if (is.na(r$ci_low) || is.na(r$ci_high)) return(sprintf("**%.1fx**", r$median_speedup))
+    sprintf("**%.1fx** [%.1fx, %.1fx]", r$median_speedup, r$ci_low, r$ci_high)
+  }
+  
+  if (min_row$median_speedup == max_row$median_speedup) {
+      return(fmt(min_row))
+  }
+  sprintf("%s to %s", fmt(min_row), fmt(max_row))
+}
 
 api_data <- data.frame(
   Function = c("`qn(x)`", "`sn(x)`", "`robLoc(x)`", "`robScale(x)`", "`adm(x)`"),
@@ -160,12 +172,12 @@ api_data <- data.frame(
   ARE = c("**82.3%**", "**58.2%**", "**41.3%**", "**60.5%**", "**88.3%**"),
   Breakdown = c("50%", "50%", "50%", "50%", "$1/n$"),
   `Speedup vs revss` = c("—", "—", 
-                         format_speedup_ci(loc_data$med, loc_data$lo, loc_data$hi),
-                         format_speedup_ci(scale_data$med, scale_data$lo, scale_data$hi),
-                         format_speedup_ci(adm_data$med, adm_data$lo, adm_data$hi)),
+                         format_speedup_range(m_analyzed, "robLoc"),
+                         format_speedup_range(m_analyzed, "robScale"),
+                         format_speedup_range(m_analyzed, "adm")),
   `Speedup vs robustbase` = c(
-    format_speedup_ci(min(qn_analyzed$median_speedup), min(qn_analyzed$ci_low), max(qn_analyzed$ci_high)),
-    format_speedup_ci(min(sn_analyzed$median_speedup), min(sn_analyzed$ci_low), max(sn_analyzed$ci_high)),
+    format_speedup_range(s_analyzed, "qn"),
+    format_speedup_range(s_analyzed, "sn"),
     "—", "—", "—"),
   check.names = FALSE
 )
