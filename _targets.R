@@ -8,9 +8,9 @@ tar_option_set(
 )
 
 # Source the functions
-source("R/run_benchmarks.R")
-source("R/make_plots.R")
-source("R/analyze_results.R")
+source("benchmarks/run_benchmarks.R")
+source("benchmarks/make_plots.R")
+source("benchmarks/analyze_results.R")
 
 # Pipeline
 list(
