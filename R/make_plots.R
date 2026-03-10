@@ -5,71 +5,50 @@ library(patchwork)
 library(scales)
 
 #' Create the speedup plot
-#' @param rob_fast Optimized robscale results
-#' @param rob_slow Unoptimized robscale results
-#' @param legacy Legacy package results
-plot_benchmarks <- function(rob_fast, rob_slow, legacy) {
-  # Helper to process mark results
-  process_mark <- function(bm, label) {
-    if (is.null(bm)) return(NULL)
-    bm %>%
-      mutate(
-        expr = as.character(expression),
-        median_ms = as.numeric(median) * 1000,
-        label = label
-      ) %>%
-      select(n, expr, median_ms, label)
-  }
-
-  # Process all components
-  df_fast_m <- process_mark(rob_fast$m_estimators, "robscale (FAST=1)")
-  df_fast_scale <- process_mark(rob_fast$scale_estimators, "robscale (FAST=1)")
+#' @param analyzed The analyzed results from analyze_benchmarks()
+plot_benchmarks <- function(analyzed) {
+  # Panel A: M-estimators vs revss (analyzed$leg_small)
+  df_a <- analyzed$leg_small
   
-  df_legacy_revss <- process_mark(legacy$revss, "revss")
-  df_legacy_robustbase <- process_mark(legacy$robustbase, "robustbase")
-  
-  # Panel A: M-estimators vs revss
-  df_a <- bind_rows(df_fast_m, df_legacy_revss) %>%
-    pivot_wider(names_from = label, values_from = median_ms) %>%
-    filter(!is.na(revss), !is.na(`robscale (FAST=1)`)) %>%
-    mutate(speedup = revss / `robscale (FAST=1)`)
-  
-  p1 <- ggplot(df_a, aes(x = n, y = speedup, color = expr)) +
-    geom_line(size = 0.8) + geom_point(size = 1.5) +
+  p1 <- ggplot(df_a, aes(x = n, y = median_speedup, color = expr, fill = expr)) +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.2, color = NA) +
+    geom_line(linewidth = 0.8) + geom_point(size = 1.5) +
     scale_x_log10(
       breaks = 10^(0:7),
       labels = trans_format("log10", math_format(10^.x))
     ) +
     scale_y_continuous(labels = label_number(suffix = "x")) +
+    expand_limits(y = 0) +
     labs(
       title = "Panel A: Small-sample M-estimators",
-      subtitle = "robscale vs revss",
+      subtitle = "robscale vs revss (with 95% BCa confidence bands)",
       x = "Sample Size (n)",
-      y = "Speedup Factor",
-      color = "Estimator"
+      y = "Median Speedup Factor",
+      color = "Estimator",
+      fill = "Estimator"
     ) +
     theme_minimal() +
     theme(legend.position = "bottom")
     
-  # Panel B: Scale estimators vs robustbase
-  df_b <- bind_rows(df_fast_scale, df_legacy_robustbase) %>%
-    pivot_wider(names_from = label, values_from = median_ms) %>%
-    filter(!is.na(robustbase), !is.na(`robscale (FAST=1)`)) %>%
-    mutate(speedup = robustbase / `robscale (FAST=1)`)
+  # Panel B: Scale estimators vs robustbase (analyzed$leg_large)
+  df_b <- analyzed$leg_large
     
-  p2 <- ggplot(df_b, aes(x = n, y = speedup, color = expr)) +
-    geom_line(size = 0.8) + geom_point(size = 1.5) +
+  p2 <- ggplot(df_b, aes(x = n, y = median_speedup, color = expr, fill = expr)) +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.2, color = NA) +
+    geom_line(linewidth = 0.8) + geom_point(size = 1.5) +
     scale_x_log10(
       breaks = 10^(0:7),
       labels = trans_format("log10", math_format(10^.x))
     ) +
     scale_y_continuous(labels = label_number(suffix = "x")) +
+    expand_limits(y = 0) +
     labs(
       title = "Panel B: Scale Estimators",
-      subtitle = "robscale vs robustbase",
+      subtitle = "robscale vs robustbase (with 95% BCa confidence bands)",
       x = "Sample Size (n)",
-      y = "Speedup Factor",
-      color = "Estimator"
+      y = "Median Speedup Factor",
+      color = "Estimator",
+      fill = "Estimator"
     ) +
     theme_minimal() +
     theme(legend.position = "bottom")

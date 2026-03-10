@@ -10,7 +10,6 @@ src/qnsn_tuned_thresholds.h
 
 # Targets pipeline
 _targets/
-README_files/
 
 # Renv
 .RData
