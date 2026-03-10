@@ -17,7 +17,7 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
   res <- system2(R.home("bin/R"), 
                 args = c("CMD", "INSTALL", ".", 
                         paste0("--library=", lib_path),
-                        "--no-multiarch", "--no-test-load", "--quiet"),
+                        "--no-multiarch", "--no-test-load"),
                 env = paste0(names(envs), "=", envs),
                 stdout = TRUE, stderr = TRUE)
   if (!is.null(attr(res, "status"))) {
@@ -36,11 +36,11 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
     
     get_iters <- function(n) {
-      if (n <= 128) 1000L
-      else if (n <= 2048) 500L
-      else if (n <= 16384) 100L
-      else if (n <= 1048576) 20L
-      else 10L
+      if (n <= 128) 2000L
+      else if (n <= 2048) 1000L
+      else if (n <= 16384) 200L
+      else if (n <= 1048576) 50L
+      else 20L
     }
     
     # Small sample benchmarks (vs revss if installed, or just internal)
@@ -71,11 +71,14 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
         )
       }
     )
+    # Determine if SLEEF was used from the installation log
+    has_sleef <- any(grepl("SLEEF detected|-DROBSCALE_HAS_SLEEF|-lsleef", res, ignore.case = TRUE))
     
     list(
       m_estimators = results_m,
       scale_estimators = results_scale,
-      sys_info = sessioninfo::session_info()
+      sys_info = sessioninfo::session_info(),
+      has_sleef = has_sleef
     )
   })
 }
@@ -91,11 +94,11 @@ benchmark_legacy <- function() {
                12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
   
   get_iters <- function(n) {
-    if (n <= 128) 1000L
-    else if (n <= 2048) 500L
-    else if (n <= 16384) 100L
-    else if (n <= 1048576) 20L
-    else 10L
+    if (n <= 128) 2000L
+    else if (n <= 2048) 1000L
+    else if (n <= 16384) 200L
+    else if (n <= 1048576) 50L
+    else 20L
   }
   
   results_revss <- bench::press(
