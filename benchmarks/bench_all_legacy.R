@@ -4,10 +4,10 @@
 #' against legacy counterparts in robustbase, fastqnsn, and revss.
 #' 
 #' Output: 
-#' - benchmarks/legacy_benchmark_raw.csv
-#' - benchmarks/legacy_benchmark_summary.csv
-#' - benchmarks/legacy_speedup_ribbon.png
-#' - benchmarks/legacy_raincloud.png
+#' - benchmarks/optimized_mode/legacy_benchmark_raw.csv
+#' - benchmarks/optimized_mode/legacy_benchmark_summary.csv
+#' - benchmarks/optimized_mode/legacy_speedup_ribbon.png
+#' - benchmarks/optimized_mode/legacy_raincloud.png
 
 # ── 0. Dependencies ──────────────────────────────────────────────────────────
 suppressPackageStartupMessages({
@@ -73,7 +73,7 @@ comparisons <- list(
          list(name = "robustbase::Sn", fn = robustbase::Sn),
          list(name = "fastqnsn::sn",   fn = fastqnsn::sn)
        ),
-       sizes = c(8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+       sizes = c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)),
   
   list(name = "Qn", new = robscale::qn,
@@ -81,20 +81,20 @@ comparisons <- list(
          list(name = "robustbase::Qn", fn = robustbase::Qn),
          list(name = "fastqnsn::qn",   fn = fastqnsn::qn)
        ),
-       sizes = c(8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+       sizes = c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)),
   
   list(name = "robScale", new = robscale::robScale,
        legacy = list(list(name = "revss::robScale", fn = revss::robScale)),
-       sizes = c(8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)),
+       sizes = c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)),
   
   list(name = "robLoc", new = robscale::robLoc,
        legacy = list(list(name = "revss::robLoc", fn = revss::robLoc)),
-       sizes = c(8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)),
+       sizes = c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)),
   
   list(name = "adm", new = robscale::adm,
        legacy = list(list(name = "revss::adm", fn = revss::adm)),
-       sizes = c(8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384))
+       sizes = c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384))
 )
 
 get_iters <- function(n) {
@@ -139,8 +139,8 @@ for (comp in comparisons) {
 }
 
 raw_df <- bind_rows(all_raw)
-write.csv(raw_df, "benchmarks/legacy_benchmark_raw.csv", row.names = FALSE)
-cat("\nRaw timings saved to benchmarks/legacy_benchmark_raw.csv\n\n")
+write.csv(raw_df, "benchmarks/optimized_mode/legacy_benchmark_raw.csv", row.names = FALSE)
+cat("\nRaw timings saved to benchmarks/optimized_mode/legacy_benchmark_raw.csv\n\n")
 
 # ── 5. Bootstrap Analysis ─────────────────────────────────────────────────────
 cat("=== PERFORMING BOOTSTRAP ANALYSIS ===\n")
@@ -195,8 +195,8 @@ for (i in 1:nrow(combos)) {
 }
 
 summary_df <- bind_rows(summary_list)
-write.csv(summary_df, "benchmarks/legacy_benchmark_summary.csv", row.names = FALSE)
-cat("\nSummary table saved to benchmarks/legacy_benchmark_summary.csv\n\n")
+write.csv(summary_df, "benchmarks/optimized_mode/legacy_benchmark_summary.csv", row.names = FALSE)
+cat("\nSummary table saved to benchmarks/optimized_mode/legacy_benchmark_summary.csv\n\n")
 
 # ── 6. Visualizations ────────────────────────────────────────────────────────
 cat("=== GENERATING PLOTS ===\n")
@@ -218,7 +218,7 @@ p1 <- ggplot(summary_df, aes(x = n, y = speedup, color = legacy_name, fill = leg
   theme_minimal() +
   theme(legend.position = "bottom")
 
-ggsave("benchmarks/legacy_speedup_ribbon.png", p1, width = 10, height = 7, dpi = 300)
+ggsave("benchmarks/optimized_mode/legacy_speedup_ribbon.png", p1, width = 10, height = 7, dpi = 300)
 
 # Plot 2: Raincloud at selected n
 # Selected sizes: 128 (exact/serial transition), 16384 (parallel region)
@@ -237,8 +237,8 @@ if (requireNamespace("ggdist", quietly = TRUE)) {
     theme_minimal() +
     theme(legend.position = "none")
   
-  ggsave("benchmarks/legacy_raincloud.png", p2, width = 12, height = 10, dpi = 300)
+  ggsave("benchmarks/optimized_mode/legacy_raincloud.png", p2, width = 12, height = 10, dpi = 300)
 }
 
-cat("Plots saved to benchmarks/legacy_speedup_ribbon.png and benchmarks/legacy_raincloud.png\n")
+cat("Plots saved to benchmarks/optimized_mode/legacy_speedup_ribbon.png and benchmarks/optimized_mode/legacy_raincloud.png\n")
 cat("\n=== BENCHMARK COMPLETE ===\n")

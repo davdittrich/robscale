@@ -47,6 +47,7 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
     results_m <- bench::press(
       n = n_small,
       {
+        set.seed(42 + n)
         x <- rnorm(n)
         bench::mark(
           robLoc = robscale::robLoc(x),
@@ -62,6 +63,7 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
     results_scale <- bench::press(
       n = n_large,
       {
+        set.seed(42 + n)
         x <- rnorm(n)
         bench::mark(
           qn = robscale::qn(x),
@@ -104,6 +106,7 @@ benchmark_legacy <- function() {
   results_revss <- bench::press(
     n = n_small,
     {
+      set.seed(42 + n)
       x <- rnorm(n)
       bench::mark(
         robLoc = revss::robLoc(x),
@@ -118,6 +121,7 @@ benchmark_legacy <- function() {
   results_robustbase <- bench::press(
     n = n_large,
     {
+      set.seed(42 + n)
       x <- rnorm(n)
       bench::mark(
         qn = robustbase::Qn(x),
