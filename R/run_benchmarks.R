@@ -36,11 +36,11 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
     
     get_iters <- function(n) {
-      if (n <= 128) 100L
-      else if (n <= 2048) 50L
-      else if (n <= 16384) 20L
-      else if (n <= 1048576) 10L
-      else 5L
+      if (n <= 128) 1000L
+      else if (n <= 2048) 500L
+      else if (n <= 16384) 100L
+      else if (n <= 1048576) 20L
+      else 10L
     }
     
     # Small sample benchmarks (vs revss if installed, or just internal)
@@ -91,11 +91,11 @@ benchmark_legacy <- function() {
                12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
   
   get_iters <- function(n) {
-    if (n <= 128) 100L
-    else if (n <= 2048) 50L
-    else if (n <= 16384) 20L
-    else if (n <= 1048576) 10L
-    else 5L
+    if (n <= 128) 1000L
+    else if (n <= 2048) 500L
+    else if (n <= 16384) 100L
+    else if (n <= 1048576) 20L
+    else 10L
   }
   
   results_revss <- bench::press(

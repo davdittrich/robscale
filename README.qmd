@@ -17,9 +17,10 @@ library(dplyr)
 library(tidyr)
 library(knitr)
 
-# Helper to format speedups
+# Helper to format speedups (without x)
 format_speedup <- function(x) {
-  sprintf("%.1fx", x)
+  if (is.null(x) || is.na(x)) return("—")
+  sprintf("%.1f", x)
 }
 
 # Load benchmark results
@@ -41,7 +42,18 @@ get_cpu_name <- function() {
   return("Unknown CPU")
 }
 
+# CPU Scaling Governor (Linux only)
+get_cpu_governor <- function() {
+  gov_path <- "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+  if (file.exists(gov_path)) {
+    trimws(readLines(gov_path, n = 1))
+  } else {
+    "unknown"
+  }
+}
+
 hw_cpu <- get_cpu_name()
+sys_gov <- get_cpu_governor()
 sys_os <- sys_info$os
 sys_r <- sys_info$version
 sys_date <- as.character(Sys.Date())
@@ -49,57 +61,32 @@ sys_date <- as.character(Sys.Date())
 # Version from DESCRIPTION
 pkg_version <- read.dcf("DESCRIPTION")[, "Version"]
 
+# Helper to format speedup with CI
+format_speedup_ci <- function(med, lo, hi) {
+  if (is.na(med)) return("—")
+  if (is.na(lo) || is.na(hi)) return(sprintf("**%sx**", format_speedup(med)))
+  sprintf("**%sx** [%sx, %sx]", format_speedup(med), format_speedup(lo), format_speedup(hi))
+}
+
 # 1. Processing M-estimators (Panel A: robscale (fast) vs revss)
-m_fast <- benchmark_report$fast$m_estimators
-m_legacy <- benchmark_report$legacy$revss
+m_analyzed <- benchmark_report$analyzed$leg_small
 
-m_combined <- bind_rows(
-  m_fast %>% mutate(label = "fast"),
-  m_legacy %>% mutate(label = "legacy")
-) %>%
-  mutate(expr = as.character(expression)) %>%
-  select(n, expr, median, label) %>%
-  pivot_wider(names_from = label, values_from = median) %>%
-  mutate(speedup = as.numeric(legacy) / as.numeric(fast))
-
-m_speedup_min <- format_speedup(min(m_combined$speedup))
-m_speedup_max <- format_speedup(max(m_combined$speedup))
+m_speedup_min <- format_speedup(min(m_analyzed$median_speedup))
+m_speedup_max <- format_speedup(max(m_analyzed$median_speedup))
 
 # 2. Processing Scale-estimators (Panel B: robscale (fast) vs robustbase)
-s_fast <- benchmark_report$fast$scale_estimators
-s_legacy <- benchmark_report$legacy$robustbase
+s_analyzed <- benchmark_report$analyzed$leg_large
+qn_analyzed <- s_analyzed %>% filter(expr == "qn")
+sn_analyzed <- s_analyzed %>% filter(expr == "sn")
 
-s_combined <- bind_rows(
-  s_fast %>% mutate(label = "fast"),
-  s_legacy %>% mutate(label = "legacy")
-) %>%
-  mutate(expr = as.character(expression)) %>%
-  select(n, expr, median, label) %>%
-  pivot_wider(names_from = label, values_from = median) %>%
-  mutate(speedup = as.numeric(legacy) / as.numeric(fast))
+qn_speedup_min <- format_speedup(min(qn_analyzed$median_speedup))
+qn_speedup_max <- format_speedup(max(qn_analyzed$median_speedup))
 
-qn_combined <- s_combined %>% filter(expr == "qn")
-sn_combined <- s_combined %>% filter(expr == "sn")
-
-qn_speedup_min <- format_speedup(min(qn_combined$speedup))
-qn_speedup_max <- format_speedup(max(qn_combined$speedup))
-
-sn_speedup_min <- format_speedup(min(sn_combined$speedup))
-sn_speedup_max <- format_speedup(max(sn_combined$speedup))
+sn_speedup_min <- format_speedup(min(sn_analyzed$median_speedup))
+sn_speedup_max <- format_speedup(max(sn_analyzed$median_speedup))
 
 # 3. Processing Optimized vs Unoptimized (Variation: fast vs slow)
-# We aggregate all fast vs all slow
-v_fast <- bind_rows(m_fast, s_fast)
-v_slow <- bind_rows(benchmark_report$slow$m_estimators, benchmark_report$slow$scale_estimators)
-
-v_combined <- bind_rows(
-  v_fast %>% mutate(label = "fast"),
-  v_slow %>% mutate(label = "slow")
-) %>%
-  mutate(expr = as.character(expression)) %>%
-  select(n, expr, median, label) %>%
-  pivot_wider(names_from = label, values_from = median) %>%
-  mutate(speedup = as.numeric(slow) / as.numeric(fast))
+v_analyzed <- benchmark_report$analyzed$fast_slow
 ```
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -160,12 +147,12 @@ estimators remain stable.
 
 # Extract speedup ranges for the table
 # M-estimators
-loc_speedup <- m_combined %>% filter(expr == "robLoc") %>% 
-  summarize(min = min(speedup), max = max(speedup))
-scale_speedup <- m_combined %>% filter(expr == "robScale") %>% 
-  summarize(min = min(speedup), max = max(speedup))
-adm_speedup <- m_combined %>% filter(expr == "adm") %>% 
-  summarize(min = min(speedup), max = max(speedup))
+loc_data <- m_analyzed %>% filter(expr == "robLoc") %>% 
+  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
+scale_data <- m_analyzed %>% filter(expr == "robScale") %>% 
+  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
+adm_data <- m_analyzed %>% filter(expr == "adm") %>% 
+  summarize(med = min(median_speedup), lo = min(ci_low), hi = max(ci_high))
 
 api_data <- data.frame(
   Function = c("`qn(x)`", "`sn(x)`", "`robLoc(x)`", "`robScale(x)`", "`adm(x)`"),
@@ -173,12 +160,13 @@ api_data <- data.frame(
   ARE = c("**82.3%**", "**58.2%**", "**41.3%**", "**60.5%**", "**88.3%**"),
   Breakdown = c("50%", "50%", "50%", "50%", "$1/n$"),
   `Speedup vs revss` = c("—", "—", 
-                         sprintf("**%s – %s**", format_speedup(loc_speedup$min), format_speedup(loc_speedup$max)),
-                         sprintf("**%s – %s**", format_speedup(scale_speedup$min), format_speedup(scale_speedup$max)),
-                         sprintf("**%s – %s**", format_speedup(adm_speedup$min), format_speedup(adm_speedup$max))),
-  `Speedup vs robustbase` = c(sprintf("**%s – %s**", qn_speedup_min, qn_speedup_max),
-                            sprintf("**%s – %s**", sn_speedup_min, sn_speedup_max),
-                            "—", "—", "—"),
+                         format_speedup_ci(loc_data$med, loc_data$lo, loc_data$hi),
+                         format_speedup_ci(scale_data$med, scale_data$lo, scale_data$hi),
+                         format_speedup_ci(adm_data$med, adm_data$lo, adm_data$hi)),
+  `Speedup vs robustbase` = c(
+    format_speedup_ci(min(qn_analyzed$median_speedup), min(qn_analyzed$ci_low), max(qn_analyzed$ci_high)),
+    format_speedup_ci(min(sn_analyzed$median_speedup), min(sn_analyzed$ci_low), max(sn_analyzed$ci_high)),
+    "—", "—", "—"),
   check.names = FALSE
 )
 knitr::kable(api_data)
@@ -562,6 +550,7 @@ tar_read(speedup_figure)
 
 **Benchmark environment:**
 - **Machine:** `r hw_cpu`
+- **CPU Governor:** `r sys_gov`
 - **OS:** `r sys_os`
 - **R version:** `r sys_r`
 - **Package version:** `r pkg_version`
@@ -629,11 +618,11 @@ The following table explicitly compares the performance of `robscale` when compi
 #| label: tbl-comp-fast
 #| results: asis
 
-comp_data <- v_combined %>%
+comp_data <- v_analyzed %>%
   group_by(expr) %>%
   summarize(
-    `Min Speedup` = format_speedup(min(speedup)),
-    `Max Speedup` = format_speedup(max(speedup))
+    `Median Speedup` = format_speedup(median(median_speedup)),
+    `BCa 95% CI` = sprintf("[%sx, %sx]", format_speedup(min(ci_low)), format_speedup(max(ci_high)))
   ) %>%
   rename(Estimator = expr)
 

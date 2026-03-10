@@ -15,11 +15,11 @@ time-critical workflows.
 `robscale` resolves both bottlenecks. Its C++17 kernels replace
 interpreted R loops with SIMD-accelerated transcendental functions,
 Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **2.6x–36.3x×** speedups for the
+Against `revss`, the package achieves **3.1–36.4×** speedups for the
 small-sample M-estimators. Against `robustbase`, it achieves
-**1.7x–5.9x×** for $S_n$ and **1.7x–5.9x×** for $Q_n$ —with gains
-peaking near **10×** at $n = 10^7$ as TBB parallelism reduces the
-computational bottleneck for massive datasets.
+**1.8–5.7×** for $S_n$ and **1.8–5.7×** for $Q_n$ —with gains peaking
+near **10×** at $n = 10^7$ as TBB parallelism reduces the computational
+bottleneck for massive datasets.
 
 ## Installation
 
@@ -62,11 +62,11 @@ Table 1
 
 | Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
 |:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.7x – 5.9x** |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.6x – 7.4x** |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x – 36.3x** | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.1x – 21.1x** | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **2.6x – 17.0x** | — |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.8x** \[1.8x, 5.8x\] |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.7x** \[1.7x, 7.4x\] |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **4.0x** \[4.0x, 36.7x\] | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.1x** \[3.1x, 25.8x\] | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **4.0x** \[3.9x, 13.0x\] | — |
 
 </div>
 
@@ -479,8 +479,9 @@ compares `qn` and `sn` against `robustbase`.
 </div>
 
 **Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
-Graphics - **OS:** Arch Linux - **R version:** R version 4.5.2
-(2025-10-31) - **Package version:** 0.1.5 - **Date:** 2026-03-10
+Graphics - **CPU Governor:** powersave - **OS:** Arch Linux - **R
+version:** R version 4.5.2 (2025-10-31) - **Package version:** 0.1.5 -
+**Date:** 2026-03-10
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
@@ -550,13 +551,13 @@ unoptimized (portable) version of the package.
 
 Table 2
 
-| Estimator | Min Speedup | Max Speedup |
-|:----------|:------------|:------------|
-| adm       | 0.6x        | 1.7x        |
-| qn        | 0.8x        | 1.4x        |
-| robLoc    | 0.8x        | 1.6x        |
-| robScale  | 0.8x        | 1.3x        |
-| sn        | 0.8x        | 1.4x        |
+| Estimator | Median Speedup | BCa 95% CI     |
+|:----------|:---------------|:---------------|
+| adm       | 1.0            | \[0.7x, 1.3x\] |
+| qn        | 1.1            | \[0.8x, 1.6x\] |
+| robLoc    | 1.0            | \[0.7x, 1.5x\] |
+| robScale  | 1.0            | \[0.8x, 1.3x\] |
+| sn        | 1.1            | \[0.9x, 1.5x\] |
 
 </div>
 
