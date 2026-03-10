@@ -554,6 +554,7 @@ tar_read(speedup_figure)
 - **OS:** `r sys_os`
 - **R version:** `r sys_r`
 - **Package version:** `r pkg_version`
+- **SLEEF (Optimized Build):** `r ifelse(isTRUE(benchmark_report$fast$has_sleef), "Detected", "Not Detected")`
 - **Date:** `r sys_date`
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
@@ -612,24 +613,17 @@ speedups do not scale linearly with thread count.
 
 ### Comparison: Optimized vs. Unoptimized builds
 
-The following table explicitly compares the performance of `robscale` when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the unoptimized (portable) version of the package.
+The following figure explicitly compares the performance of `robscale` when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the unoptimized (portable) version of the package across all sample sizes.
 
 ```{r}
-#| label: tbl-comp-fast
-#| results: asis
-
-comp_data <- v_analyzed %>%
-  group_by(expr) %>%
-  summarize(
-    `Median Speedup` = format_speedup(median(median_speedup)),
-    `BCa 95% CI` = sprintf("[%sx, %sx]", format_speedup(min(ci_low)), format_speedup(max(ci_high)))
-  ) %>%
-  rename(Estimator = expr)
-
-knitr::kable(comp_data)
+#| label: fig-fast-slow
+#| fig-cap: "Median speedup factor (×) of optimized vs. unoptimized builds with 95% BCa confidence bands. Note logarithmic scales."
+#| fig-width: 8
+#| fig-height: 5
+tar_read(fast_slow_figure)
 ```
 
-The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion. On large samples, the optimized version also benefits from tuned threading thresholds that more effectively leverage TBB.
+The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion `r if(isTRUE(benchmark_report$fast$has_sleef)) "(using the SLEEF library for vectorized math)" else ""`. On large samples, the optimized version also benefits from tuned threading thresholds that more effectively leverage TBB.
 
 ## Numerical equivalence
 

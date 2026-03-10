@@ -55,3 +55,29 @@ plot_benchmarks <- function(analyzed) {
     
   p1 + p2 + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 }
+
+#' Create the Optimized vs Unoptimized speedup plot
+#' @param analyzed The analyzed results from analyze_benchmarks()
+plot_fast_slow <- function(analyzed) {
+  df <- analyzed$fast_slow
+  
+  ggplot(df, aes(x = n, y = median_speedup, color = expr, fill = expr)) +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.2, color = NA) +
+    geom_line(linewidth = 0.8) + geom_point(size = 1.5) +
+    scale_x_log10(
+      breaks = 10^(0:7),
+      labels = trans_format("log10", math_format(10^.x))
+    ) +
+    scale_y_continuous(labels = label_number(suffix = "x")) +
+    expand_limits(y = 0) +
+    labs(
+      title = "Optimized vs. Unoptimized builds",
+      subtitle = "robscale (FAST=1) vs robscale (FAST=0) with 95% BCa confidence bands",
+      x = "Sample Size (n)",
+      y = "Median Speedup Factor",
+      color = "Estimator",
+      fill = "Estimator"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "right")
+}

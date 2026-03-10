@@ -38,6 +38,9 @@ list(
   # Create the speedup plot
   tar_target(speedup_figure, plot_benchmarks(analyzed_results)),
   
+  # Create the fast vs slow comparison plot
+  tar_target(fast_slow_figure, plot_fast_slow(analyzed_results)),
+  
   # Render README.qmd
   tar_quarto(readme, "README.qmd")
 )
