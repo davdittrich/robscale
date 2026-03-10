@@ -15,9 +15,9 @@ time-critical workflows.
 `robscale` resolves both bottlenecks. Its C++17 kernels replace
 interpreted R loops with SIMD-accelerated transcendental functions,
 Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **10.0x–29.8x×** speedups for the
+Against `revss`, the package achieves **2.6x–36.3x×** speedups for the
 small-sample M-estimators. Against `robustbase`, it achieves
-**2.0x–5.4x×** for $S_n$ and **2.0x–5.4x×** for $Q_n$ —with gains
+**1.7x–5.9x×** for $S_n$ and **1.7x–5.9x×** for $Q_n$ —with gains
 peaking near **10×** at $n = 10^7$ as TBB parallelism reduces the
 computational bottleneck for massive datasets.
 
@@ -62,11 +62,11 @@ Table 1
 
 | Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
 |:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **2.0x – 5.4x** |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **2.1x – 7.0x** |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **26.0x – 28.3x** | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **18.0x – 29.8x** | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **10.0x – 11.9x** | — |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.7x – 5.9x** |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.6x – 7.4x** |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x – 36.3x** | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.1x – 21.1x** | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **2.6x – 17.0x** | — |
 
 </div>
 
@@ -552,11 +552,11 @@ Table 2
 
 | Estimator | Min Speedup | Max Speedup |
 |:----------|:------------|:------------|
-| adm       | 1.0x        | 1.1x        |
-| qn        | 1.0x        | 1.2x        |
-| robLoc    | 0.9x        | 1.2x        |
-| robScale  | 1.0x        | 1.1x        |
-| sn        | 0.9x        | 1.2x        |
+| adm       | 0.6x        | 1.7x        |
+| qn        | 0.8x        | 1.4x        |
+| robLoc    | 0.8x        | 1.6x        |
+| robScale  | 0.8x        | 1.3x        |
+| sn        | 0.8x        | 1.4x        |
 
 </div>
 
