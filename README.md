@@ -478,6 +478,10 @@ compares `qn` and `sn` against `robustbase`.
 
 </div>
 
+**Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
+Graphics - **OS:** Arch Linux - **R version:** R version 4.5.2
+(2025-10-31) - **Package version:** 0.1.5 - **Date:** 2026-03-10
+
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($n \le 20$), `robscale` outperforms `revss` by
@@ -535,6 +539,31 @@ for massive datasets, speedups do not scale linearly with thread count.
 >
 > Default CRAN binaries use conservative, portable settings to ensure
 > compatibility across all architectures.
+
+### Comparison: Optimized vs. Unoptimized builds
+
+The following table explicitly compares the performance of `robscale`
+when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the
+unoptimized (portable) version of the package.
+
+<div id="tbl-comp-fast">
+
+Table 2
+
+| Estimator | Min Speedup | Max Speedup |
+|:----------|:------------|:------------|
+| adm       | 1.0x        | 1.1x        |
+| qn        | 1.0x        | 1.2x        |
+| robLoc    | 0.9x        | 1.2x        |
+| robScale  | 1.0x        | 1.1x        |
+| sn        | 0.9x        | 1.2x        |
+
+</div>
+
+The gains in the optimized build come primarily from SIMD vectorization
+(AVX2/AVX512/Accelerate) and aggressive transcendental function
+expansion. On large samples, the optimized version also benefits from
+tuned threading thresholds that more effectively leverage TBB.
 
 ## Numerical equivalence
 
