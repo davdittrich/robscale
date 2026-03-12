@@ -1,26 +1,36 @@
 #include "robust_core.h"
 #include <Rcpp.h>
+#ifndef STACK_BUF_SIZE
+#define STACK_BUF_SIZE 1024
+#endif
 
-// Called when center is explicitly provided by user
 // [[Rcpp::export]]
 double adm_impl(Rcpp::NumericVector x, double center, double constant) {
-  return adm_core(x.begin(), x.size(), center, constant);
+  return robscale::adm_core(x.begin(), (int)x.size(), center, constant);
 }
 
-// Called when center is not provided — compute median via O(n) selection
 // [[Rcpp::export]]
 double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
-  double buf_stack[STACK_BUF_SIZE];
-  std::unique_ptr<double[]> heap;
-  double* buf;
-  if (n <= STACK_BUF_SIZE) {
-    buf = buf_stack;
+  if (n == 0) return 0.0;
+  
+  double med;
+  if (n <= 64) {
+    double buf_micro[64];
+    std::memcpy(buf_micro, x.begin(), n * sizeof(double));
+    med = robscale::median_select(buf_micro, n);
   } else {
-    heap.reset(new double[n]);
-    buf = heap.get();
+    double buf_stack[STACK_BUF_SIZE];
+    std::unique_ptr<double[]> heap;
+    double* buf;
+    if (n <= STACK_BUF_SIZE) {
+      buf = buf_stack;
+    } else {
+      heap.reset(new double[n]);
+      buf = heap.get();
+    }
+    std::memcpy(buf, x.begin(), n * sizeof(double));
+    med = robscale::median_select(buf, n);
   }
-  std::memcpy(buf, x.begin(), n * sizeof(double));
-  double med = median_select(buf, n);
-  return adm_core(x.begin(), n, med, constant);
+  return robscale::adm_core(x.begin(), n, med, constant);
 }

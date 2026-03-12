@@ -1,58 +1,37 @@
-# README Conversion and Automation Plan
+# Task Plan: Resolve Subtle Performance Regressions
 
 ## Goal
-Convert the static `README.md` into a reproducible Quarto notebook (`README.qmd`) that dynamically computes all benchmarks, figures, and tables, comparing optimized vs unoptimized `robscale` against legacy alternatives, ensuring 100% honesty in performance claims.
+Identify, quantify, and resolve all performance regressions where `robscale` v0.2.0 is slower than the v0.1.5 Gold Standard. Every regression must be justified by algorithmic/architectural necessity or resolved to achieve parity/improvement.
 
-## Current Phase
-Phase 1: Planning
+## Phase 1: Quantify Regressions (BCa CI Audit) [x]
+- [x] Extract all $(n, \text{estimator})$ pairs where `median_speedup < 1.0` vs v0.1.5.
+- [x] Determine if the 95% CI overlaps with 1.0. If not, it's a confirmed regression.
+- [x] Map these regions to:
+    - Tiny ($n < 16$): Sorting network / Constant overhead regime.
+    - Small ($16 \le n \le 128$): Exact algorithm crossover regime.
+    - Medium ($128 < n \le 51,200$): Serial cache-friendly regime.
+    - Large ($n > 51,200$): Parallel overhead regime.
 
-## Phases
+## Phase 2: Root Cause Analysis
+### Qn / Sn @ n=100
+- **Variable**: `QN_EXACT_THRESHOLD` is 64. 0.1.5 might have been using a different threshold or a faster approximate kernel.
+- **Action**: Profile $n=100$ and compare `qn_brute_force_exact` vs the approximate path.
 
-### Phase 1: Planning & Structure
-- [x] Analyze current README structure and hardcoded claims
-- [x] Define pipeline architecture (targets + Quarto)
-- [x] Document the comprehensive plan
-- **Status:** complete
+### Qn / Sn @ n=1000
+- **Variable**: Proximity to `SN_STACK_THRESHOLD` (2048) and `SORT_BOOST_THRESHOLD` (2048).
+- **Action**: Check if Boost Spreadsort overhead is higher than `std::sort` for this specific range.
 
-### Phase 2: Pipeline & Benchmarking Infrastructure
-- [ ] Initialize `renv` to lock down dependencies (quarto, targets, bench, etc.)
-- [ ] Create `R/benchmarks.R` with robust timing functions
-- [ ] Setup a target that compiles `robscale` with `ROBSCALE_FAST=0` and benchmarks it
-- [ ] Setup a target that compiles `robscale` with `ROBSCALE_FAST=1` and benchmarks it
-- [ ] Save benchmark results and session info (CPU, BLAS, etc.) to target store
-- **Status:** pending
+### Sn @ n > 10^5
+- **Variable**: TBB grain size and false sharing in `SnWorker`. 
+- **Action**: Profile the parallel worker for cache misses.
 
-### Phase 3: Quarto Conversion
-- [ ] Rename `README.md` to `README.qmd`
-- [ ] Configure YAML for `format: gfm`
-- [ ] Replace hardcoded metric statements (e.g., "11-39x speedups") with inline R code (`tar_read()`)
-- [ ] Replace markdown tables with dynamic generation (e.g., `knitr::kable()`)
-- [ ] Generate Figure 1 dynamically from benchmark data
-- **Status:** pending
+## Phase 3: Targeted Remediation [x]
+- [x] Align `ROBSCALE_SORT_THRESHOLD` to 512 in `robscale_config.h`.
+- [x] Align `ROBSCALE_TBB_GRAIN_SIZE` to 1024/2048 in `sn_estimator.cpp` and `qn_estimator.cpp`.
+- [x] Implement dynamic grain size scaling for $n > 10^6$ in `RuntimeConfig`.
+- [x] Decouple parallel sorting threshold (6144) from algorithm threshold.
+- [x] Streamline `qn_brute_force_exact` by removing redundant checks.
 
-### Phase 4: Release Automation & Verification
-- [ ] Create `scripts/update-readme.sh` to run the pipeline and render
-- [ ] Update `.Rbuildignore` to exclude pipeline files
-- [ ] Validate final `README.md` output against expected layout
-- **Status:** pending
-
-## Key Questions
-1. How exactly will we cleanly install the package twice with different `Sys.setenv` parameters in the `targets` pipeline without polluting the user's main R library?
-   *Decision: We will use a temporary library path (`.libPaths(temp_lib)`) during the benchmarking targets for the active installations.*
-
-## Decisions Made
-| Decision | Rationale |
-|----------|-----------|
-| Use `targets` for benchmarks | Benchmarking takes time. We must separate computation from rendering so tweaking README prose doesn't trigger a 20-minute benchmark run. |
-| Use Quarto + inline R | Guarantees "honesty". Text claims like "10x faster" will be programmatically linked to the actual data, eliminating drift. |
-| Two-pass compilation | Running both `ROBSCALE_FAST=0` and `1` requires compiling the package from source twice during the benchmark phase to ensure apples-to-apples comparison on the same machine. |
-
-## Errors Encountered
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-|       | 1       |            |
-
-## Notes
-- Update phase status as you progress: pending → in_progress → complete
-- Re-read this plan before major decisions (attention manipulation)
-- Log ALL errors - they help avoid repetition
+## Phase 4: Final Gold Verification [x]
+- [x] Re-run full `targets` pipeline.
+- [x] Verify `detailed_gold_figure.png` shows NO regressions (all medians $\ge 1.0$).

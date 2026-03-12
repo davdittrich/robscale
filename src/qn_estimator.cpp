@@ -1,9 +1,12 @@
+#include "robscale_config.h"
 #include "robust_core.h"
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(BH)]]
 #include "qnsn_constants.h"
 #include "qnsn_sort_utils.h"
+#include "qnsn_kernels.h"
+
 #include "qnsn_dispatcher.h"
 #include "qnsn_runtime_config.h"
 
@@ -20,9 +23,10 @@
 #include <type_traits>
 #include <cassert>
 #include <cstdlib>
+#include <vector>
 
-#ifndef NA_REAL
-#define NA_REAL R_NaReal
+#ifndef R_NaReal
+#define R_NaReal R_NaReal
 #endif
 
 #ifdef USE_DIRECT_TBB
@@ -40,10 +44,7 @@ namespace robscale::qnsn {
 // Low-median via O(n) selection
 template <typename T>
 inline double lowmedian_ptr(T* arr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  size_t h = (n - 1) / 2;
-  robscale::floyd_rivest_select(arr, arr + h, arr + n);
-  return static_cast<double>(arr[h]);
+  return lowmedian_select(arr, n);
 }
 
 // --- QN ESTIMATOR HELPERS ---
@@ -95,46 +96,97 @@ inline T whimed_cpp(T* a, int32_t* iw, size_t n, int64_t target) {
   return a[l];
 }
 
+// whimed_cpp and other performance helpers
+
 template <typename T>
 struct QnCountWorker : public WorkerBase {
   const T* x;
   size_t n;
   double trial;
-  uint64_t sumP = 0;
-  uint64_t sumQ = 0;
+  uint64_t sumP;
+  uint64_t sumQ;
 
   QnCountWorker(const T* x, size_t n, double trial)
-      : x(x), n(n), trial(trial) {}
+      : x(x), n(n), trial(trial), sumP(0), sumQ(0) {}
+
   QnCountWorker(const QnCountWorker& other, SplitType)
-      : x(other.x), n(other.n), trial(other.trial) {}
+      : x(other.x), n(other.n), trial(other.trial), sumP(0), sumQ(0) {}
 
 #ifdef USE_DIRECT_TBB
   void operator()(const tbb::blocked_range<size_t>& r) {
-    this->operator()(r.begin(), r.end());
+    operator()(r.begin(), r.end());
   }
 #endif
 
   void operator()(size_t begin, size_t end) {
-    if (ROBSCALE_UNLIKELY(begin >= end)) return;
+    if (begin >= end) return;
     size_t i = begin;
     if (i == 0) i = 1;
-    if (ROBSCALE_UNLIKELY(i >= end)) return;
+    if (i >= end) return;
 
-    size_t jp = static_cast<size_t>(std::upper_bound(x, x + i, static_cast<double>(x[i]) - trial) - x);
-    size_t jq = static_cast<size_t>(std::lower_bound(x, x + i, static_cast<double>(x[i]) - trial) - x);
+    size_t jP = std::upper_bound(x, x + i, static_cast<double>(x[i]) - trial) - x;
+    size_t jQ = std::lower_bound(x, x + i, static_cast<double>(x[i]) - trial) - x;
 
     for (; i < end; ++i) {
       double target = static_cast<double>(x[i]) - trial;
-      while (ROBSCALE_UNLIKELY(jp < i && static_cast<double>(x[jp]) <= target)) jp++;
-      while (ROBSCALE_UNLIKELY(jq < jp && static_cast<double>(x[jq]) < target)) jq++;
-      sumP += (i - jp);
-      sumQ += (i - jq);
+      while (jP < i && static_cast<double>(x[jP]) <= target) jP++;
+      while (jQ < i && static_cast<double>(x[jQ]) < target) jQ++;
+      sumP += (i - jP);
+      sumQ += (i - jQ);
     }
   }
 
   void join(const QnCountWorker& other) {
     sumP += other.sumP;
     sumQ += other.sumQ;
+  }
+};
+
+template <typename T>
+struct QnCandidateWorker {
+  const T* sorted_x;
+  const size_t n;
+  const int32_t* left;
+  const int32_t* right;
+  size_t* offsets; // Pointer to shared offsets array
+
+  QnCandidateWorker(const T* x, size_t n, const int32_t* l, const int32_t* r, size_t* off)
+      : sorted_x(x), n(n), left(l), right(r), offsets(off) {}
+
+  void operator()(const tbb::blocked_range<size_t>& range) const {
+    size_t block_idx = range.begin() / ROBSCALE_TBB_GRAIN_SIZE;
+    size_t count = 0;
+    for (size_t i = range.begin(); i < range.end(); ++i) {
+      if (i > 0 && left[i] <= right[i]) count++;
+    }
+    offsets[block_idx] = count;
+  }
+};
+
+template <typename T>
+struct QnCandidateFulfiller {
+  const T* sorted_x;
+  const int32_t* left;
+  const int32_t* right;
+  const size_t* prefix_offsets;
+  float* work;
+  int32_t* iweight;
+
+  QnCandidateFulfiller(const T* x, const int32_t* l, const int32_t* r, const size_t* off, float* w, int32_t* iw)
+      : sorted_x(x), left(l), right(r), prefix_offsets(off), work(w), iweight(iw) {}
+
+  void operator()(const tbb::blocked_range<size_t>& range) const {
+    size_t block_idx = range.begin() / ROBSCALE_TBB_GRAIN_SIZE;
+    size_t out_idx = prefix_offsets[block_idx];
+    for (size_t i = range.begin(); i < range.end(); ++i) {
+      if (i > 0 && left[i] <= right[i]) {
+        int32_t w_val = right[i] - left[i] + 1;
+        int32_t jj = left[i] + w_val / 2;
+        work[out_idx] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
+        iweight[out_idx] = w_val;
+        out_idx++;
+      }
+    }
   }
 };
 
@@ -179,9 +231,47 @@ struct QnRefineWorker : public WorkerBase {
   }
 };
 
+// End of performance critical section
+
+// qn_brute_force_exact: Specialized for tiny n
+template <typename T>
+double qn_brute_force_exact(const T* x_ptr, size_t n) {
+  size_t num_pairs = n * (n - 1) / 2;
+  size_t h_qn = n / 2 + 1;
+  size_t k_target = h_qn * (h_qn - 1) / 2;
+
+  // Tiny stack-only path for n <= 64
+  T sorted_buf[64];
+  double diffs_buf[2048]; // 64*63/2 = 2016
+
+  for (size_t i = 0; i < n; i++) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_buf[i] = x_ptr[i];
+  }
+
+  if (n <= 8) {
+    robscale::small_sort(sorted_buf, n);
+  } else {
+    std::sort(sorted_buf, sorted_buf + n);
+  }
+
+  // Use SIMD dispatcher for anything where n > 8
+  const auto& config = RuntimeConfig::get();
+  if (n > 8) {
+    Dispatcher::qn_brute_force(sorted_buf, n, diffs_buf, config);
+  } else {
+    qn_brute_force_scalar(sorted_buf, n, diffs_buf);
+  }
+
+  robscale::floyd_rivest_select(diffs_buf, diffs_buf + k_target - 1, diffs_buf + num_pairs);
+  return diffs_buf[k_target - 1] * CONST_QN * get_qn_factor(n);
+}
+
 template <typename T>
 double C_qn_impl(const T* x_ptr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n < 2)) return NA_REAL;
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
   }
@@ -189,25 +279,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   auto &config = RuntimeConfig::get();
   
   if (n <= config.qn_exact_threshold) {
-    size_t num_pairs = n * (n - 1) / 2;
-    size_t h_qn = n / 2 + 1;
-    size_t k_target = h_qn * (h_qn - 1) / 2;
-
-    std::unique_ptr<T[]> sorted_uninit(new T[n]);
-    for (size_t i = 0; i < n; i++) {
-      if constexpr (std::is_floating_point_v<T>) {
-        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
-      }
-      sorted_uninit[i] = x_ptr[i];
-    }
-    std::sort(sorted_uninit.get(), sorted_uninit.get() + n);
-
-    std::unique_ptr<double[]> diffs(new double[num_pairs]);
-    Dispatcher::qn_brute_force(sorted_uninit.get(), n, diffs.get(), config);
-
-    robscale::floyd_rivest_select(diffs.get(), diffs.get() + k_target - 1, diffs.get() + num_pairs);
-    double raw = diffs[k_target - 1];
-    return raw * CONST_QN * get_qn_factor(n);
+    return qn_brute_force_exact(x_ptr, n);
   }
 
   // Properly-typed allocations to avoid alignment UB
@@ -229,7 +301,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
 
   for (size_t i = 0; i < n; i++) {
     if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
     }
     sorted_x[i] = x_ptr[i];
   }
@@ -246,13 +318,46 @@ double C_qn_impl(const T* x_ptr, size_t n) {
 
   while (nR - nL > n) {
     size_t m = 0;
-    for (size_t i = 1; i < n; ++i) {
-      if (left[i] <= right[i]) {
-        int32_t w = right[i] - left[i] + 1;
-        int32_t jj = left[i] + w / 2;
-        work[m] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
-        iweight[m] = w;
-        m += 1;
+    if (n > config.qn_parallel_threshold) {
+#ifdef USE_DIRECT_TBB
+      size_t num_blocks = (n + ROBSCALE_TBB_GRAIN_SIZE - 1) / ROBSCALE_TBB_GRAIN_SIZE + 1;
+      std::vector<size_t> block_offsets(num_blocks, 0);
+      
+      QnCandidateWorker<T> worker(sorted_x, n, left, right, block_offsets.data());
+      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, ROBSCALE_TBB_GRAIN_SIZE), worker);
+      
+      // Sequential prefix sum of offsets
+      size_t current = 0;
+      for (size_t i = 0; i < num_blocks; ++i) {
+        size_t block_count = block_offsets[i];
+        block_offsets[i] = current;
+        current += block_count;
+      }
+      m = current;
+      
+      QnCandidateFulfiller<T> fulfiller(sorted_x, left, right, block_offsets.data(), work, iweight);
+      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, ROBSCALE_TBB_GRAIN_SIZE), fulfiller);
+#else
+      // Fallback for non-TBB builds
+      for (size_t i = 1; i < n; ++i) {
+        if (left[i] <= right[i]) {
+          int32_t w_val = right[i] - left[i] + 1;
+          int32_t jj = left[i] + w_val / 2;
+          work[m] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
+          iweight[m] = w_val;
+          m += 1;
+        }
+      }
+#endif
+    } else {
+      for (size_t i = 1; i < n; ++i) {
+        if (left[i] <= right[i]) {
+          int32_t w_val = right[i] - left[i] + 1;
+          int32_t jj = left[i] + w_val / 2;
+          work[m] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
+          iweight[m] = w_val;
+          m += 1;
+        }
       }
     }
 
@@ -261,9 +366,9 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     QnCountWorker<T> countWorker(sorted_x, n, trial);
     if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
-      tbb::parallel_reduce(tbb::blocked_range<size_t>(1, n, 1024), countWorker);
+      tbb::parallel_reduce(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)), countWorker);
 #else
-      RcppParallel::parallelReduce(1, n, countWorker, 1024);
+      RcppParallel::parallelReduce(1, n, countWorker, config.get_dynamic_grain_size(n));
 #endif
     } else {
       countWorker(1, n);
@@ -272,10 +377,11 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     if (k_target <= countWorker.sumP) {
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, true, right);
       if (n > config.qn_parallel_threshold) {
+        size_t g = config.get_dynamic_grain_size(n);
 #ifdef USE_DIRECT_TBB
-        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, 1024), refineWorker);
+        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), refineWorker);
 #else
-        RcppParallel::parallelFor(1, n, refineWorker, 1024);
+        RcppParallel::parallelFor(1, n, refineWorker, g);
 #endif
       } else refineWorker(1, n);
       nR = countWorker.sumP;
@@ -283,9 +389,9 @@ double C_qn_impl(const T* x_ptr, size_t n) {
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, false, left);
       if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
-        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, 1024), refineWorker);
+        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)), refineWorker);
 #else
-        RcppParallel::parallelFor(1, n, refineWorker, 1024);
+        RcppParallel::parallelFor(1, n, refineWorker, config.get_dynamic_grain_size(n));
 #endif
       } else refineWorker(1, n);
       nL = countWorker.sumQ;
@@ -294,20 +400,66 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     }
   }
 
-  size_t num_final = static_cast<size_t>(nR - nL);
-  std::unique_ptr<double[]> final_diffs(new double[num_final]);
-  size_t fd_idx = 0;
-  for (size_t i = 1; i < n; ++i) {
-    for (int32_t jj = left[i]; jj <= right[i]; ++jj) {
-      final_diffs[fd_idx++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]);
+  std::unique_ptr<double[]> diffs(new double[nR - nL]);
+  
+  if (n > config.qn_parallel_threshold) {
+#ifdef USE_DIRECT_TBB
+    size_t g = config.get_dynamic_grain_size(n);
+    size_t num_blocks = (n + g - 1) / g + 1;
+    std::vector<size_t> block_offsets(num_blocks, 0);
+    
+    // Pass 1: Count candidates per block
+    tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
+      size_t b_idx = r.begin() / g;
+      size_t count = 0;
+      for (size_t i = r.begin(); i < r.end(); ++i) {
+        if (i > 0 && left[i] <= right[i]) count += (right[i] - left[i] + 1);
+      }
+      block_offsets[b_idx] = count;
+    });
+
+    size_t current = 0;
+    for (size_t i = 0; i < num_blocks; ++i) {
+      size_t b_c = block_offsets[i];
+      block_offsets[i] = current;
+      current += b_c;
+    }
+
+    // Pass 2: Fulfill candidates
+    tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
+      size_t b_idx = r.begin() / g;
+      size_t o = block_offsets[b_idx];
+      for (size_t i = r.begin(); i < r.end(); ++i) {
+        if (i > 0 && left[i] <= right[i]) {
+          for (int32_t j = left[i]; j <= right[i]; ++j) {
+            diffs[o++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
+          }
+        }
+      }
+    });
+#else
+    size_t id_x = 0;
+    for (size_t i = 1; i < n; ++i) {
+      for (int32_t j = left[i]; j <= right[i]; ++j) {
+        diffs[id_x++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
+      }
+    }
+#endif
+  } else {
+    size_t id_x = 0;
+    for (size_t i = 1; i < n; ++i) {
+      for (int32_t j = left[i]; j <= right[i]; ++j) {
+        diffs[id_x++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
+      }
     }
   }
-  
-  double* k_ptr = final_diffs.get() + (k_target - nL - 1);
-  robscale::floyd_rivest_select(final_diffs.get(), k_ptr, final_diffs.get() + num_final);
-  double raw = *k_ptr;
-  return raw * CONST_QN * get_qn_factor(n);
+
+  robscale::floyd_rivest_select(diffs.get(), diffs.get() + k_target - nL - 1, diffs.get() + nR - nL);
+  double final_raw = diffs[k_target - nL - 1];
+  return final_raw * CONST_QN * get_qn_factor(n);
 }
+#if defined(__GNUC__) || defined(__clang__)
+#endif
 
 } // namespace robscale::qnsn
 

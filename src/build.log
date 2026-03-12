@@ -1,0 +1,141 @@
+Welcome back dd!
+Working directory is: /home/dd/Gemini/revss_temp/src
+ℹ Loading robscale
+Exports from /home/dd/Gemini/revss_temp/src/adm.cpp:
+   double adm_impl(Rcpp::NumericVector x, double center, double constant)
+   double adm_impl_auto(Rcpp::NumericVector x, double constant)
+
+Exports from /home/dd/Gemini/revss_temp/src/qn_estimator.cpp:
+   double C_qn_fast(Rcpp::NumericVector x)
+   double C_qn_int_fast(Rcpp::IntegerVector x)
+   Rcpp::List get_qnsn_config()
+   double C_get_qn_factor(int n)
+
+Exports from /home/dd/Gemini/revss_temp/src/rob_loc.cpp:
+   double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val, int maxit, double tol)
+
+Exports from /home/dd/Gemini/revss_temp/src/rob_scale.cpp:
+   double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val, double implbound, int maxit, double tol, int fallback)
+
+Exports from /home/dd/Gemini/revss_temp/src/sn_estimator.cpp:
+   double C_sn_fast(Rcpp::NumericVector x)
+   double C_sn_int_fast(Rcpp::IntegerVector x)
+   double C_get_sn_factor(int n)
+
+/home/dd/Gemini/revss_temp/src/RcppExports.cpp updated.
+/home/dd/Gemini/revss_temp/R/RcppExports.R updated.
+ℹ Re-compiling robscale (debug build)
+── R CMD INSTALL ───────────────────────────────────────────────────────────────
+* installing *source* package ‘robscale’ ...
+** this is package ‘robscale’ version ‘0.1.5’
+** using staged installation
+  CRAN-safe mode (set ROBSCALE_FAST=1 for -O3 -march=native)
+  -fopenmp-simd supported
+  SLEEF detected
+  Linux L2 Cache size: 524288
+  Linux Cache Line size: 64
+  Generated src/Makevars
+** libs
+using C++ compiler: ‘g++ (GCC) 15.2.1 20260209’
+using C++17
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c RcppExports.cpp -o RcppExports.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c adm.cpp -o adm.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c qn_estimator.cpp -o qn_estimator.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c rob_loc.cpp -o rob_loc.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c rob_scale.cpp -o rob_scale.o
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/RcppParallel/include' -I'/home/dd/R/x86_64-pc-linux-gnu-library/4.5/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects  -UNDEBUG -Wall -pedantic -g -O0  -c sn_estimator.cpp -o sn_estimator.o
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/cstddef:51,
+                 from robscale_config.h:4,
+                 from sn_estimator.cpp:1:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/bits/requires_hosted.h:31,
+                 from /usr/include/c++/15.2.1/cmath:46,
+                 from /home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include/Rcpp/platform/compiler.h:37,
+                 from /home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include/Rcpp/r/headers.h:67,
+                 from /home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include/RcppCommon.h:30,
+                 from /home/dd/R/x86_64-pc-linux-gnu-library/4.5/Rcpp/include/Rcpp.h:27,
+                 from RcppExports.cpp:4:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/cstddef:51,
+                 from robscale_config.h:4,
+                 from rob_loc.cpp:1:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/cstddef:51,
+                 from robscale_config.h:4,
+                 from qn_estimator.cpp:1:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/cstddef:51,
+                 from robscale_config.h:4,
+                 from adm.cpp:1:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+In file included from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/os_defines.h:39,
+                 from /usr/include/c++/15.2.1/x86_64-pc-linux-gnu/bits/c++config.h:727,
+                 from /usr/include/c++/15.2.1/cstddef:51,
+                 from robscale_config.h:4,
+                 from rob_scale.cpp:1:
+/usr/include/features.h:451:4: warning: #warning _FORTIFY_SOURCE requires compiling with optimization (-O) [-Wcpp]
+  451 | #  warning _FORTIFY_SOURCE requires compiling with optimization (-O)
+      |    ^~~~~~~
+adm.cpp: In function ‘double adm_impl_auto(Rcpp::NumericVector, double)’:
+adm.cpp:20:12: error: ‘adm_tiny_kernel’ was not declared in this scope
+   20 |     return adm_tiny_kernel(x.begin(), n, constant);
+      |            ^~~~~~~~~~~~~~~
+make: *** [/usr/lib64/R/etc/Makeconf:211: adm.o] Error 1
+make: *** Waiting for unfinished jobs....
+ERROR: compilation failed for package ‘robscale’
+* removing ‘/tmp/Rtmp61mm29/devtools_install_593f41fd1782d/robscale’
+Error in `(function (command = NULL, args = character(), error_on_status = TRUE, …`:
+! System command 'R' failed
+---
+Exit status: 1
+stdout & stderr: <printed>
+---
+Backtrace:
+ 1. pkgload::load_all(".")
+ 2. pkgbuild::compile_dll(path, quiet = quiet, debug = debug)
+ 3. pkgbuild:::withr_with_makevars(compiler_flags(debug), { …
+ 4. pkgbuild:::withr_with_envvar(c(R_MAKEVARS_USER = makevars_file), { …
+ 5. base::force(code)
+ 6. base::force(code)
+ 7. pkgbuild:::withr_with_envvar(c(DEBUG = "true"), build())
+ 8. base::force(code)
+ 9. pkgbuild::build()
+10. pkgbuild:::install_min(path, dest = install_dir, components = "libs", args = if (need…
+11. pkgbuild::rcmd_build_tools("INSTALL", c(path, paste("--library=", dest, …
+12. pkgbuild::with_build_tools({ …
+13. base::withCallingHandlers(callr::rcmd_safe(..., env = env, spinner = FALSE, …
+14. callr::rcmd_safe(..., env = env, spinner = FALSE, show = FALSE, …
+15. callr:::run_r(options)
+16. base::with(options, with_envvar(env, do.call(processx::run, c(list(bin, …
+17. base::with.default(options, with_envvar(env, do.call(processx::run, …
+18. base::eval(substitute(expr), data, enclos = parent.frame())
+19. base::eval(substitute(expr), data, enclos = parent.frame())
+20. callr:::with_envvar(env, do.call(processx::run, c(list(bin, args = real_cmdargs, …
+21. base::force(code)
+22. base::do.call(processx::run, c(list(bin, args = real_cmdargs, stdout_line_callba…
+23. (function (command = NULL, args = character(), error_on_status = TRUE, …
+24. base::throw(new_process_error(res, call = sys.call(), echo = echo, …
+25. | base::signalCondition(cond)
+26. (function (e) …
+27. asNamespace("callr")$err$throw(e)
+Execution halted

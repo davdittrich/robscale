@@ -1,0 +1,67 @@
+* installing to library ‘/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu’
+* installing *source* package ‘robscale’ ...
+** this is package ‘robscale’ version ‘0.1.5’
+** using staged installation
+  CRAN-safe mode (set ROBSCALE_FAST=1 for -O3 -march=native)
+  -fopenmp-simd supported
+  SLEEF detected
+  Linux L2 Cache size: 524288
+  Linux Cache Line size: 64
+  Generated src/Makevars
+** libs
+using C++ compiler: ‘g++ (GCC) 15.2.1 20260209’
+using C++17
+g++ -std=gnu++17 -I"/usr/include/R/" -DNDEBUG  -I'/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/Rcpp/include' -I'/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include' -I'/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/BH/include' -I/usr/local/include   -fopenmp-simd -I/usr/include -DROBSCALE_HAS_SLEEF -DFASTQNSN_L2_CACHE_BYTES=524288 -DFASTQNSN_CACHE_LINE_BYTES=64 -DUSE_DIRECT_TBB -fpic  -march=x86-64 -mtune=generic -O2 -pipe -fno-plt -fexceptions         -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security         -fstack-clash-protection -fcf-protection         -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -Wp,-D_GLIBCXX_ASSERTIONS -g -ffile-prefix-map=/build/r/src=/usr/src/debug/r -flto=auto -ffat-lto-objects   -c qn_estimator.cpp -o qn_estimator.o
+In file included from /home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_sort.h:20,
+                 from qnsn_sort_utils.h:8,
+                 from qn_estimator.cpp:7:
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h: In instantiation of ‘void tbb::interface9::internal::start_for<Range, Body, Partitioner>::run_body(Range&) [with Range = tbb::blocked_range<long unsigned int>; Body = robscale::qnsn::QnCandidateWorker<int>; Partitioner = const tbb::auto_partitioner]’:
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/partitioner.h:420:27:   required from ‘void tbb::interface9::internal::dynamic_grainsize_mode<Mode>::work_balance(StartType&, Range&) [with StartType = tbb::interface9::internal::start_for<tbb::blocked_range<long unsigned int>, robscale::qnsn::QnCandidateWorker<int>, const tbb::auto_partitioner>; Range = tbb::blocked_range<long unsigned int>; Mode = tbb::interface9::internal::adaptive_mode<tbb::interface9::internal::auto_partition_type>]’
+  420 |             start.run_body( range ); // simple partitioner goes always here
+      |             ~~~~~~~~~~~~~~^~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/partitioner.h:253:28:   required from ‘void tbb::interface9::internal::partition_type_base<Partition>::execute(StartType&, Range&) [with StartType = tbb::interface9::internal::start_for<tbb::blocked_range<long unsigned int>, robscale::qnsn::QnCandidateWorker<int>, const tbb::auto_partitioner>; Range = tbb::blocked_range<long unsigned int>; Partition = tbb::interface9::internal::auto_partition_type]’
+  253 |         self().work_balance(start, range);
+      |         ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:139:29:   required from ‘tbb::task* tbb::interface9::internal::start_for<Range, Body, Partitioner>::execute() [with Range = tbb::blocked_range<long unsigned int>; Body = robscale::qnsn::QnCandidateWorker<int>; Partitioner = const tbb::auto_partitioner]’
+  139 |         my_partition.execute(*this, my_range);
+      |         ~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:137:11:   required from here
+  137 |     task* start_for<Range,Body,Partitioner>::execute() {
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:112:20: error: no match for call to ‘(const robscale::qnsn::QnCandidateWorker<int>) (tbb::blocked_range<long unsigned int>&)’
+  112 |             my_body( r );
+      |             ~~~~~~~^~~~~
+qn_estimator.cpp:146:8: note: there is 1 candidate
+  146 | struct QnCandidateWorker {
+      |        ^~~~~~~~~~~~~~~~~
+qn_estimator.cpp:164:8: note: candidate 1: ‘void robscale::qnsn::QnCandidateWorker<T>::operator()(const tbb::blocked_range<long unsigned int>&) [with T = int]’ (near match)
+  164 |   void operator()(const tbb::blocked_range<size_t>& range) {
+      |        ^~~~~~~~
+qn_estimator.cpp:164:8: note: passing ‘const robscale::qnsn::QnCandidateWorker<int>*’ as ‘this’ argument discards qualifiers
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h: In instantiation of ‘void tbb::interface9::internal::start_for<Range, Body, Partitioner>::run_body(Range&) [with Range = tbb::blocked_range<long unsigned int>; Body = robscale::qnsn::QnCandidateWorker<double>; Partitioner = const tbb::auto_partitioner]’:
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/partitioner.h:420:27:   required from ‘void tbb::interface9::internal::dynamic_grainsize_mode<Mode>::work_balance(StartType&, Range&) [with StartType = tbb::interface9::internal::start_for<tbb::blocked_range<long unsigned int>, robscale::qnsn::QnCandidateWorker<double>, const tbb::auto_partitioner>; Range = tbb::blocked_range<long unsigned int>; Mode = tbb::interface9::internal::adaptive_mode<tbb::interface9::internal::auto_partition_type>]’
+  420 |             start.run_body( range ); // simple partitioner goes always here
+      |             ~~~~~~~~~~~~~~^~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/partitioner.h:253:28:   required from ‘void tbb::interface9::internal::partition_type_base<Partition>::execute(StartType&, Range&) [with StartType = tbb::interface9::internal::start_for<tbb::blocked_range<long unsigned int>, robscale::qnsn::QnCandidateWorker<double>, const tbb::auto_partitioner>; Range = tbb::blocked_range<long unsigned int>; Partition = tbb::interface9::internal::auto_partition_type]’
+  253 |         self().work_balance(start, range);
+      |         ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:139:29:   required from ‘tbb::task* tbb::interface9::internal::start_for<Range, Body, Partitioner>::execute() [with Range = tbb::blocked_range<long unsigned int>; Body = robscale::qnsn::QnCandidateWorker<double>; Partitioner = const tbb::auto_partitioner]’
+  139 |         my_partition.execute(*this, my_range);
+      |         ~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:137:11:   required from here
+  137 |     task* start_for<Range,Body,Partitioner>::execute() {
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/RcppParallel/include/tbb/parallel_for.h:112:20: error: no match for call to ‘(const robscale::qnsn::QnCandidateWorker<double>) (tbb::blocked_range<long unsigned int>&)’
+  112 |             my_body( r );
+      |             ~~~~~~~^~~~~
+qn_estimator.cpp:146:8: note: there is 1 candidate
+  146 | struct QnCandidateWorker {
+      |        ^~~~~~~~~~~~~~~~~
+qn_estimator.cpp:164:8: note: candidate 1: ‘void robscale::qnsn::QnCandidateWorker<T>::operator()(const tbb::blocked_range<long unsigned int>&) [with T = double]’ (near match)
+  164 |   void operator()(const tbb::blocked_range<size_t>& range) {
+      |        ^~~~~~~~
+qn_estimator.cpp:164:8: note: passing ‘const robscale::qnsn::QnCandidateWorker<double>*’ as ‘this’ argument discards qualifiers
+make: *** [/usr/lib64/R/etc/Makeconf:211: qn_estimator.o] Error 1
+ERROR: compilation failed for package ‘robscale’
+* removing ‘/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/robscale’
+* restoring previous ‘/home/dd/.cache/R/renv/library/revss_temp-a0deb56a/linux-arch-rolling/R-4.5/x86_64-pc-linux-gnu/robscale’
