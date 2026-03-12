@@ -181,9 +181,9 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   } else {
     SnWorker<T> worker(sorted_x, n, inner_medians);
 #ifdef USE_DIRECT_TBB
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, 2048), worker);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size), worker);
 #else
-    RcppParallel::parallelFor(0, n, worker, 2048);
+    RcppParallel::parallelFor(0, n, worker, config.grain_size);
 #endif
   }
 
