@@ -4,12 +4,12 @@
 #include <cmath>
 #include <cstring>
 #include <memory>
+#include <vector>
 #include "selection.h"
 #include "sort_net.h"
+#include "robscale_config.h"
 
 // --- Platform-specific vectorized tanh ---
-// On macOS, include only vForce (not full Accelerate) to avoid COMPLEX
-// symbol collision between vecLib/vDSP.h and R's Rinternals.h
 #if defined(__APPLE__) && defined(__MACH__)
   #define COMPLEX vDSP_COMPLEX
   #include <Accelerate/Accelerate.h>
@@ -17,8 +17,6 @@
   #define ROBSCALE_HAS_ACCELERATE 1
 #endif
 
-// SLEEF detection (set via PKG_CXXFLAGS from configure)
-// Explicitly exclude SLEEF on macOS to ensure Accelerate remains the sole backend
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE)
   #include <sleef.h>
   #if defined(__x86_64__) || defined(_M_X64)
@@ -28,79 +26,44 @@
   #endif
 #endif
 
-// --- Macros ---
-#if defined(__GNUC__) || defined(__clang__)
-  #define ROBSCALE_LIKELY(x)   __builtin_expect(!!(x), 1)
-  #define ROBSCALE_UNLIKELY(x) __builtin_expect(!!(x), 0)
-#else
-  #define ROBSCALE_LIKELY(x)   (x)
-  #define ROBSCALE_UNLIKELY(x) (x)
-#endif
+namespace robscale {
 
-#ifdef _OPENMP
-  #pragma omp declare simd notinbranch
-#endif
-inline double vec_tanh(double x) { return std::tanh(x); }
+// --- Low-level Kernels ---
 
 // Bulk tanh: vectorized via Accelerate (macOS), SLEEF (Linux), or OpenMP SIMD
 inline void bulk_tanh(double* inout, int n) {
+  if (n <= 64) {
+    for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
+    return;
+  }
 #if defined(ROBSCALE_HAS_ACCELERATE)
   vvtanh(inout, inout, &n);
 #elif defined(ROBSCALE_HAS_SLEEF)
   int i = 0;
   #if defined(__AVX2__)
     for (; i + 4 <= n; i += 4) {
-      __m256d v = _mm256_loadu_pd(inout + i);
+      __m256d v = _mm256_loadu_pd(inout+i);
       v = Sleef_tanhd4_u10avx2(v);
-      _mm256_storeu_pd(inout + i, v);
+      _mm256_storeu_pd(inout+i, v);
     }
   #elif defined(__AVX512F__)
     for (; i + 8 <= n; i += 8) {
-      __m512d v = _mm512_loadu_pd(inout + i);
+      __m512d v = _mm512_loadu_pd(inout+i);
       v = Sleef_tanhd8_u10avx512f(v);
-      _mm512_storeu_pd(inout + i, v);
-    }
-  #elif defined(__aarch64__)
-    for (; i + 2 <= n; i += 2) {
-      float64x2_t v = vld1q_f64(inout + i);
-      v = Sleef_tanhd2_u10(v);
-      vst1q_f64(inout + i, v);
+      _mm512_storeu_pd(inout+i, v);
     }
   #endif
-  // Scalar fallback for remainder
-  for (; i < n; i++) {
-    inout[i] = std::tanh(inout[i]);
-  }
+  for (; i < n; i++) inout[i] = std::tanh(inout[i]);
 #else
   #ifdef _OPENMP
     #pragma omp simd
   #endif
-  for (int i = 0; i < n; ++i) {
-    inout[i] = vec_tanh(inout[i]);
-  }
+  for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
 #endif
 }
 
-// Key constants from Rousseeuw & Verboven (2002)
-constexpr double RHO_SCALE_CONST      = 0.37394112142347236;
-constexpr double INV_RHO_SCALE_CONST  = 1.0 / 0.37394112142347236;
-constexpr double MAD_CONSISTENCY      = 1.4826;
-constexpr double ADM_CONSISTENCY      = 1.2533141373155001;  // sqrt(pi/2)
-
-// Stack buffer size (2048 doubles = 16 KB per segment; 3x arena = 48 KB)
-constexpr int STACK_BUF_SIZE = 1024;
-
-// Median of a pre-sorted array (caller must ensure n >= 1)
-inline double median_sorted(const double* x, int n) {
-  if (n & 1) {
-    return x[n >> 1];
-  } else {
-    return (x[(n >> 1) - 1] + x[n >> 1]) * 0.5;
-  }
-}
-
 // ADM core: constant * mean(|x - center|)
-inline double adm_core(const double* x, int n, double center, double constant) {
+ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double constant) {
   double sum = 0.0;
   for (int i = 0; i < n; ++i) {
     sum += std::abs(x[i] - center);
@@ -108,33 +71,71 @@ inline double adm_core(const double* x, int n, double center, double constant) {
   return constant * sum / n;
 }
 
-// --- Selection ---
-inline double median_select(double* x, size_t n) {
+// robLoc iteration kernel
+inline double rob_loc_kernel(const double* x, int n, double t, double* tmp) {
+  for (int k = 0; k < 100; ++k) {
+    for (int i = 0; i < n; ++i) tmp[i] = (x[i] - t) * 0.5; // Scale fixed at 1 for inner
+    bulk_tanh(tmp, n);
+    double sum_psi = 0.0, sum_dpsi = 0.0;
+    for (int i = 0; i < n; ++i) {
+      double p = tmp[i];
+      sum_psi += p;
+      sum_dpsi += 1.0 - p*p;
+    }
+    double v = 2.0 * sum_psi / sum_dpsi;
+    t += v;
+    if (std::abs(v) <= 1e-10) break;
+  }
+  return t;
+}
+
+// Median of pre-sorted array
+ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
+  if (n & 1) return x[n / 2];
+  return (x[(n / 2) - 1] + x[n / 2]) * 0.5;
+}
+
+// Selection based median
+ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (n <= 8) {
     robscale::small_sort(x, n);
     return median_sorted(x, n);
   }
-  size_t k_idx = (n - 1) / 2;
-  double* k = x + k_idx;
-  robscale::floyd_rivest_select(x, k, x + n);
-  if (n & 1) return *k;
+  size_t h = (n - 1) / 2;
+  robscale::floyd_rivest_select(x, x + h, x + n);
+  if (n & 1) return x[h];
   
-  // For even n, we need the next element
-  double v1 = *k;
-  double v2 = x[k_idx + 1];
-  for (size_t i = k_idx + 2; i < n; ++i) {
+  double v1 = x[h];
+  double v2 = x[h + 1];
+  for (size_t i = h + 2; i < n; ++i) {
     if (x[i] < v2) v2 = x[i];
   }
   return (v1 + v2) * 0.5;
 }
 
-// MAD via selection: |x_i - med| into dev buffer, then median_select
-inline double mad_select(const double* x, int n, double med, double* dev) {
-  for (int i = 0; i < n; ++i) {
-    dev[i] = std::abs(x[i] - med);
-  }
-  return MAD_CONSISTENCY * median_select(dev, static_cast<size_t>(n));
+// Low-median selection
+inline double lowmedian_select(double* x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
+  size_t h = (n - 1) / 2;
+  robscale::floyd_rivest_select(x, x + h, x + n);
+  return x[h];
 }
+
+// High-median selection
+inline double highmedian_select(double* x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
+  size_t h = n / 2;
+  robscale::floyd_rivest_select(x, x + h, x + n);
+  return x[h];
+}
+
+// MAD via selection
+inline double mad_select(const double* x, int n, double med, double* dev) {
+  for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
+  return robscale::MAD_CONSISTENCY * median_select(dev, static_cast<size_t>(n));
+}
+
+} // namespace robscale
 
 #endif // ROBSCALE_ROBUST_CORE_H

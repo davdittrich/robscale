@@ -1,9 +1,9 @@
 bibentry(
   bibtype  = "Manual",
-  title    = "robscale: Fast Robust Estimation in Very Small Samples",
+  title    = "robscale: Faster Robustness: Accelerated Estimation of Location and Scale",
   author   = person("Dennis Alexis Valin", "Dittrich"),
   year     = "2026",
-  note     = "R package version 0.1.1",
+  note     = "R package version 0.1.5",
   url      = "https://github.com/davdittrich/robscale",
   doi      = "10.5281/zenodo.18828607"
 )
@@ -21,4 +21,19 @@ bibentry(
   number   = "4",
   pages    = "741--758",
   doi      = "10.1016/S0167-9473(02)00078-6"
+)
+
+bibentry(
+  bibtype  = "Article",
+  title    = "Alternatives to the Median Absolute Deviation",
+  author   = c(
+    person("Peter J.", "Rousseeuw"),
+    person("Christophe", "Croux")
+  ),
+  journal  = "Journal of the American Statistical Association",
+  year     = "1993",
+  volume   = "88",
+  number   = "424",
+  pages    = "1273--1283",
+  doi      = "10.1080/01621459.1993.10476408"
 )

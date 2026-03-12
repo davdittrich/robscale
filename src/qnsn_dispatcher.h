@@ -10,6 +10,10 @@ class Dispatcher {
 public:
   template <typename T>
   static void qn_brute_force(const T *sorted_x, size_t n, double *diffs, const RuntimeConfig& config) {
+    if (n <= 16) {
+      qn_brute_force_scalar(sorted_x, n, diffs);
+      return;
+    }
 #if defined(__AVX2__)
     qn_brute_force_avx2(sorted_x, n, diffs);
 #elif defined(__ARM_NEON)

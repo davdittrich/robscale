@@ -7,7 +7,7 @@ library(purrr)
 #' @param target_times Vector of timings for the new implementation
 #' @param ref_times Vector of timings for the reference implementation
 #' @param R Number of bootstrap replicates
-compute_bca_speedup <- function(target_times, ref_times, R = 2000) {
+compute_bca_speedup <- function(target_times, ref_times, R = 500) {
   # Take min length to align samples
   len <- min(length(target_times), length(ref_times))
   boot_data <- data.frame(
@@ -53,14 +53,14 @@ compute_bca_speedup <- function(target_times, ref_times, R = 2000) {
 }
 
 #' Analyze all benchmark results
-analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
+analyze_benchmarks <- function(rob_fast, rob_slow, legacy, rob_legacy_015 = NULL) {
   # Helper to flatten bench_mark objects
   flatten_bench <- function(bm, label) {
     if (is.null(bm)) return(NULL)
-    # Extract n, expression, and the list-column of timings
     bm %>%
       mutate(
         expr = as.character(expression),
+        n = as.numeric(n),
         label = label
       ) %>%
       select(n, expr, time, label)
@@ -74,28 +74,40 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
   df_leg_revss <- flatten_bench(legacy$revss, "legacy")
   df_leg_robustbase <- flatten_bench(legacy$robustbase, "legacy")
   
+  # 0.1.5 Gold Standard comparisons
+  df_015_m <- if(!is.null(rob_legacy_015)) flatten_bench(rob_legacy_015$m_estimators, "0.1.5") else NULL
+  df_015_scale <- if(!is.null(rob_legacy_015)) flatten_bench(rob_legacy_015$scale_estimators, "0.1.5") else NULL
+  
   # Combine into comparison sets
-  # 1. Optimized vs Legacy (Small)
+  # 1. Optimized vs Legacy (External Packages)
   comp_leg_small <- df_fast_m %>%
     inner_join(df_leg_revss, by = c("n", "expr"), suffix = c("_fast", "_leg"))
   
-  # 2. Optimized vs Legacy (Large)
+  # 2. Optimized vs Legacy (External Packages - Large)
   comp_leg_large <- df_fast_scale %>%
     inner_join(df_leg_robustbase, by = c("n", "expr"), suffix = c("_fast", "_leg"))
     
-  # 3. Optimized vs Unoptimized (Everything)
+  # 3. Optimized vs Unoptimized (Current Implementation)
   comp_fast_slow <- bind_rows(
     df_fast_m %>% inner_join(df_slow_m, by = c("n", "expr"), suffix = c("_fast", "_slow")),
     df_fast_scale %>% inner_join(df_slow_scale, by = c("n", "expr"), suffix = c("_fast", "_slow"))
   )
+
+  # 4. Optimized vs 0.1.5 Gold Standard
+  comp_fast_015 <- if(!is.null(df_015_m)) {
+    bind_rows(
+      df_fast_m %>% inner_join(df_015_m, by = c("n", "expr"), suffix = c("_fast", "_015")),
+      df_fast_scale %>% inner_join(df_015_scale, by = c("n", "expr"), suffix = c("_fast", "_015"))
+    )
+  } else NULL
   
   # Mapping function to apply bootstrap across rows
   run_analysis <- function(df, target_col, ref_col) {
+    if (is.null(df) || nrow(df) == 0) return(NULL)
     df %>%
       rowwise() %>%
       mutate(
         # In bench::mark, each entry in the 'time' list-column is a vector of timings.
-        # .data[[target_col]] already gives the element for the current row.
         analysis = list(compute_bca_speedup(as.numeric(.data[[target_col]]), as.numeric(.data[[ref_col]])))
       ) %>%
       unnest_wider(analysis) %>%
@@ -105,6 +117,7 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
   list(
     leg_small = run_analysis(comp_leg_small, "time_fast", "time_leg"),
     leg_large = run_analysis(comp_leg_large, "time_fast", "time_leg"),
-    fast_slow = run_analysis(comp_fast_slow, "time_fast", "time_slow")
+    fast_slow = run_analysis(comp_fast_slow, "time_fast", "time_slow"),
+    fast_015 = run_analysis(comp_fast_015, "time_fast", "time_015")
   )
 }

@@ -7,27 +7,29 @@ namespace robscale {
 
 #define SWAP_IF_GREATER(a, b) \
   do {                        \
-    if ((a) > (b)) {          \
-      double tmp_ = (a);      \
-      (a) = (b);              \
-      (b) = tmp_;             \
-    }                         \
+    auto min_val = (std::min)((a), (b)); \
+    auto max_val = (std::max)((a), (b)); \
+    (a) = min_val;            \
+    (b) = max_val;            \
   } while (0)
 
 // Optimal sorting networks for small n.
 // References: Knuth TAOCP Vol 3, optimal networks from sorting-network.org
 
-inline void sort_net_2(double* x) {
+template <typename T>
+inline void sort_net_2(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
 }
 
-inline void sort_net_3(double* x) {
+template <typename T>
+inline void sort_net_3(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
   SWAP_IF_GREATER(x[0], x[2]);
   SWAP_IF_GREATER(x[1], x[2]);
 }
 
-inline void sort_net_4(double* x) {
+template <typename T>
+inline void sort_net_4(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
   SWAP_IF_GREATER(x[2], x[3]);
   SWAP_IF_GREATER(x[0], x[2]);
@@ -35,7 +37,8 @@ inline void sort_net_4(double* x) {
   SWAP_IF_GREATER(x[1], x[2]);
 }
 
-inline void sort_net_5(double* x) {
+template <typename T>
+inline void sort_net_5(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
   SWAP_IF_GREATER(x[2], x[3]);
   SWAP_IF_GREATER(x[0], x[2]);
@@ -48,7 +51,8 @@ inline void sort_net_5(double* x) {
 }
 
 // 12-comparator optimal network for n=6 (verified: Knuth TAOCP 5.3.4)
-inline void sort_net_6(double* x) {
+template <typename T>
+inline void sort_net_6(T* x) {
   SWAP_IF_GREATER(x[0], x[5]);
   SWAP_IF_GREATER(x[1], x[3]);
   SWAP_IF_GREATER(x[2], x[4]);
@@ -64,7 +68,8 @@ inline void sort_net_6(double* x) {
 }
 
 // 16-comparator optimal network for n=7
-inline void sort_net_7(double* x) {
+template <typename T>
+inline void sort_net_7(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
   SWAP_IF_GREATER(x[2], x[3]);
   SWAP_IF_GREATER(x[4], x[5]);
@@ -84,7 +89,8 @@ inline void sort_net_7(double* x) {
 }
 
 // 19-comparator optimal network for n=8
-inline void sort_net_8(double* x) {
+template <typename T>
+inline void sort_net_8(T* x) {
   SWAP_IF_GREATER(x[0], x[1]);
   SWAP_IF_GREATER(x[2], x[3]);
   SWAP_IF_GREATER(x[4], x[5]);
@@ -107,7 +113,8 @@ inline void sort_net_8(double* x) {
 }
 
 // Dispatcher: use sorting networks for n<=8, std::sort for n>8
-inline void small_sort(double* x, size_t n) {
+template <typename T>
+inline void small_sort(T* x, size_t n) {
   switch (n) {
     case 0:
     case 1:

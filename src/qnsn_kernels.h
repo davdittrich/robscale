@@ -16,7 +16,7 @@ namespace robscale::qnsn {
 
 // Optimized scalar version. 
 template <typename T>
-void qn_brute_force_scalar(const T * __restrict__ sorted_x, size_t n, double * __restrict__ diffs) {
+void qn_brute_force_scalar(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double * ROBSCALE_RESTRICT diffs) {
   size_t k = 0;
   for (size_t i = 1; i < n; ++i) {
     const double xi = static_cast<double>(sorted_x[i]);
@@ -28,7 +28,7 @@ void qn_brute_force_scalar(const T * __restrict__ sorted_x, size_t n, double * _
 
 #if defined(__AVX2__)
 template <typename T>
-void qn_brute_force_avx2(const T * __restrict__ sorted_x, size_t n, double * __restrict__ diffs) {
+void qn_brute_force_avx2(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double * ROBSCALE_RESTRICT diffs) {
   size_t k = 0;
   for (size_t i = 1; i < n; ++i) {
     const double xi = static_cast<double>(sorted_x[i]);
@@ -39,8 +39,6 @@ void qn_brute_force_avx2(const T * __restrict__ sorted_x, size_t n, double * __r
     for (; j + 8 <= i; j += 8) {
       __m256d v_xj1 = {}, v_xj2 = {};
       
-      // We use set_pd which is slow, but for n <= 2048 the sorted_x array itself is small.
-      // Better is to use _mm256_loadu_pd if T is double.
       if constexpr (std::is_same_v<T, double>) {
         v_xj1 = _mm256_loadu_pd(sorted_x + j);
         v_xj2 = _mm256_loadu_pd(sorted_x + j + 4);
@@ -65,7 +63,7 @@ void qn_brute_force_avx2(const T * __restrict__ sorted_x, size_t n, double * __r
 
 #if defined(__ARM_NEON)
 template <typename T>
-void qn_brute_force_neon(const T * __restrict__ sorted_x, size_t n, double * __restrict__ diffs) {
+void qn_brute_force_neon(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double * ROBSCALE_RESTRICT diffs) {
   size_t k = 0;
   for (size_t i = 1; i < n; ++i) {
     const double xi = static_cast<double>(sorted_x[i]);

@@ -22,7 +22,7 @@ if [ "${ROBSCALE_FAST}" = "1" ]; then
     if [ -x tools/tune_thresholds ]; then
       ./tools/tune_thresholds > src/qnsn_tuned_thresholds.h
       echo "  Saved auto-tuned thresholds to src/qnsn_tuned_thresholds.h"
-      FAST_FLAGS="${FAST_FLAGS} -DROBSCALE_HAS_TUNED_THRESHOLDS"
+      FAST_FLAGS="${FAST_FLAGS} -DROBSCALE_HAS_TUNED_THRESHOLDS -DROBSCALE_FAST_MODE"
     else
       echo "  Failed to compile tuner, using defaults."
     fi

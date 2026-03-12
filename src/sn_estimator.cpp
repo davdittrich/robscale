@@ -1,3 +1,4 @@
+#include "robscale_config.h"
 #include "robust_core.h"
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
@@ -20,8 +21,8 @@
 #include <cassert>
 #include <cstdlib>
 
-#ifndef NA_REAL
-#define NA_REAL R_NaReal
+#ifndef R_NaReal
+#define R_NaReal R_NaReal
 #endif
 
 #ifdef USE_DIRECT_TBB
@@ -67,16 +68,17 @@ struct SnWorker : public WorkerBase {
     int32_t h = static_cast<int32_t>(n / 2);
 
     int32_t i = static_cast<int32_t>(begin);
-    int32_t L = std::max(0, i - h);
-    int32_t L_max_limit = std::min(i, static_cast<int32_t>(n) - 1 - h);
+    int32_t L_min_init = (std::max)(0, i - h);
+    int32_t L_max_init = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
 
-    int32_t low = L;
-    int32_t high = L_max_limit;
-    int32_t best_L = L;
+    // Initial binary search for the first element in the chunk to find an optimal starting L
+    int32_t low = L_min_init;
+    int32_t high = L_max_init;
+    int32_t L = L_min_init;
     while (low <= high) {
       int32_t mid = low + (high - low) / 2;
-      if (mid == L_max_limit) {
-        best_L = mid;
+      if (mid == L_max_init) {
+        L = mid;
         break;
       }
       double v_mid = (std::max)(static_cast<double>(sorted_x[i] - sorted_x[mid]),
@@ -85,12 +87,11 @@ struct SnWorker : public WorkerBase {
                                 static_cast<double>(sorted_x[mid + 1 + h] - sorted_x[i]));
       if (v_mid > v_next) {
         low = mid + 1;
-        best_L = mid + 1;
+        L = mid + 1;
       } else {
         high = mid - 1;
       }
     }
-    L = best_L;
 
     for (; i < static_cast<int32_t>(end); ++i) {
       int32_t L_min = (std::max)(0, i - h);
@@ -111,7 +112,7 @@ struct SnWorker : public WorkerBase {
 
 template <typename T>
 double C_sn_impl(const T* x_ptr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n < 2)) return NA_REAL;
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 overflows 64-bit boundaries.");
   }
@@ -124,7 +125,7 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     T sorted_x[SN_MAX_STACK];
     for (size_t i = 0; i < n; ++i) {
       if constexpr (std::is_floating_point_v<T>) {
-        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
+        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
       }
       sorted_x[i] = x_ptr[i];
     }
@@ -161,47 +162,50 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   }
 
   // Aligned Arena allocation: sorted_x(n*T) + inner_medians(n*T)
-  std::unique_ptr<T[]> sn_arena;
-  try {
-    sn_arena = std::make_unique<T[]>(2 * n);
-  } catch (const std::bad_alloc& e) {
-    Rcpp::stop("robscale Out of Memory: failed to allocate Sn arena.");
-  }
+  std::unique_ptr<T[]> sn_arena(new T[2 * n]);
   T* sorted_x = sn_arena.get();
-  T* inner_medians = sn_arena.get() + n;
+  T* inner_medians = sorted_x + n;
 
   for (size_t i = 0; i < n; ++i) {
     if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return NA_REAL;
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
     }
     sorted_x[i] = x_ptr[i];
   }
+
   optimized_sort(sorted_x, sorted_x + n);
 
-  SnWorker<T> worker(sorted_x, n, inner_medians);
-  if (n > config.sn_parallel_threshold) {
+  if (n < config.sn_parallel_threshold) {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
+    worker(0, n);
+  } else {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
 #ifdef USE_DIRECT_TBB
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n, 2048), worker);
 #else
     RcppParallel::parallelFor(0, n, worker, 2048);
 #endif
-  } else {
-    worker(0, n);
   }
 
-  size_t h_idx = (n - 1) / 2;
-  robscale::floyd_rivest_select(inner_medians, inner_medians + h_idx, inner_medians + n);
-  double raw = static_cast<double>(inner_medians[h_idx]);
+  double raw = lowmedian_ptr(inner_medians, n);
   return raw * CONST_SN * get_sn_factor(n);
 }
 
-} // namespace robscale::qnsn
+// Explicit template instantiations
+template double C_sn_impl<double>(const double*, size_t);
+template double C_sn_impl<float>(const float*, size_t);
 
-// --- R EXPORTS ---
+} // namespace robscale::qnsn
 
 // [[Rcpp::export]]
 double C_sn_fast(Rcpp::NumericVector x) { 
   return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size())); 
+}
+
+// [[Rcpp::export]]
+double C_sn_float(Rcpp::NumericVector x) {
+  std::vector<float> x_float(x.begin(), x.end());
+  return robscale::qnsn::C_sn_impl(x_float.data(), x_float.size());
 }
 
 // [[Rcpp::export]]

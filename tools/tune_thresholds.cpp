@@ -9,16 +9,22 @@
 
 using namespace std::chrono;
 
-// Measure median time over multiple runs to reduce noise.
-// Returns median elapsed microseconds for `iters` iterations of sorting n elements.
-double time_sort_median(int n, bool use_boost, int iters, int runs) {
-    std::mt19937 gen(42);
+// Helper to get iterations based on sample size
+int get_iters_for_n(size_t n) {
+    if (n <= 256) return 5000;
+    if (n <= 1024) return 2000;
+    if (n <= 4096) return 500;
+    return 200;
+}
+
+long long measure_once(size_t n, bool use_boost, std::mt19937& gen) {
     std::uniform_real_distribution<> dis(0, 1);
     std::vector<double> orig(n);
-    for (int i = 0; i < n; ++i) orig[i] = dis(gen);
-
+    for (size_t i = 0; i < n; ++i) orig[i] = dis(gen);
+    
     std::vector<double> v(n);
-
+    int iters = get_iters_for_n(n);
+    
     // Warmup
     for (int i = 0; i < 100; ++i) {
         std::copy(orig.begin(), orig.end(), v.begin());
@@ -28,60 +34,49 @@ double time_sort_median(int n, bool use_boost, int iters, int runs) {
             std::sort(v.begin(), v.end());
     }
 
-    std::vector<double> timings(runs);
-    for (int r = 0; r < runs; ++r) {
-        auto start = high_resolution_clock::now();
-        for (int i = 0; i < iters; ++i) {
-            std::copy(orig.begin(), orig.end(), v.begin());
-            if (use_boost)
-                boost::sort::spreadsort::float_sort(v.begin(), v.end());
-            else
-                std::sort(v.begin(), v.end());
-        }
-        auto end = high_resolution_clock::now();
-        timings[r] = static_cast<double>(duration_cast<nanoseconds>(end - start).count());
+    auto start = high_resolution_clock::now();
+    for (int i = 0; i < iters; ++i) {
+        std::copy(orig.begin(), orig.end(), v.begin());
+        if (use_boost)
+            boost::sort::spreadsort::float_sort(v.begin(), v.end());
+        else
+            std::sort(v.begin(), v.end());
     }
-    std::sort(timings.begin(), timings.end());
-    return timings[runs / 2];
+    auto end = high_resolution_clock::now();
+    return duration_cast<nanoseconds>(end - start).count() / iters;
+}
+
+long long time_sort_median(size_t n, bool use_boost) {
+    std::vector<long long> results;
+    std::mt19937 gen(42);
+    for (int i = 0; i < 5; ++i) {
+        results.push_back(measure_once(n, use_boost, gen));
+    }
+    std::sort(results.begin(), results.end());
+    return results[2]; // Median
 }
 
 int main() {
-    // Finer grid of candidate thresholds
-    std::vector<int> candidates = {128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096};
-
-    // Adaptive iteration count: more iterations for small n (where each sort is fast)
-    auto get_iters = [](int n) -> int {
-        if (n <= 256)  return 5000;
-        if (n <= 1024) return 2000;
-        if (n <= 4096) return 500;
-        return 200;
-    };
-    constexpr int RUNS = 5; // median of 5 runs per candidate
-
-    // Require boost to be at least 5% faster to declare a crossover,
-    // AND the advantage must hold at the next candidate size (confirmation).
-    constexpr double MARGIN = 0.95; // boost must be < 95% of std to count
-
-    int best_sort_thresh = 512; // conservative default
+    size_t best_sort_thresh = 4096; // safe default
+    std::vector<size_t> candidates = {128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096};
+    
     for (size_t i = 0; i < candidates.size(); ++i) {
-        int n = candidates[i];
-        int iters = get_iters(n);
-        double t_std   = time_sort_median(n, false, iters, RUNS);
-        double t_boost = time_sort_median(n, true,  iters, RUNS);
-        double ratio = t_boost / t_std;
-
-        // Boost must be clearly faster (with margin)
-        if (ratio < MARGIN) {
-            // Confirm at the next size if available
-            bool confirmed = true;
+        size_t n = candidates[i];
+        long long t_std = time_sort_median(n, false);
+        long long t_boost = time_sort_median(n, true);
+        
+        // Crossover if boost is at least 5% faster
+        if (t_boost < (t_std * 0.95)) {
+            // Confirmation at the next candidate size (if available)
             if (i + 1 < candidates.size()) {
-                int n2 = candidates[i + 1];
-                int iters2 = get_iters(n2);
-                double t_std2   = time_sort_median(n2, false, iters2, RUNS);
-                double t_boost2 = time_sort_median(n2, true,  iters2, RUNS);
-                confirmed = (t_boost2 / t_std2) < 1.0; // at least not slower at next size
-            }
-            if (confirmed) {
+                size_t next_n = candidates[i+1];
+                long long next_std = time_sort_median(next_n, false);
+                long long next_boost = time_sort_median(next_n, true);
+                if (next_boost <= next_std) {
+                    best_sort_thresh = n;
+                    break;
+                }
+            } else {
                 best_sort_thresh = n;
                 break;
             }

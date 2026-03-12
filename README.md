@@ -15,10 +15,10 @@ time-critical workflows.
 `robscale` resolves both bottlenecks. Its C++17 kernels replace
 interpreted R loops with SIMD-accelerated transcendental functions,
 Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **3.3–27.4×** speedups for the
+Against `revss`, the package achieves **3.3–29.4×** speedups for the
 small-sample M-estimators. Against `robustbase`, it achieves
-**1.6–6.8×** for $S_n$ and **1.5–5.5×** for $Q_n$ —with gains peaking
-near **6.8×** at $n = 10^7$ as TBB parallelism reduces the computational
+**1.9–5.8×** for $S_n$ and **1.8–6.1×** for $Q_n$ —with gains peaking
+near **6.1×** at $n = 10^7$ as TBB parallelism reduces the computational
 bottleneck for massive datasets.
 
 ## Installation
@@ -62,11 +62,11 @@ Table 1
 
 | Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
 |:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.5x** \[1.5x, 1.5x\] to **5.5x** \[5.4x, 5.5x\] |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.6x** \[1.6x, 1.7x\] to **6.8x** \[6.7x, 6.9x\] |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x** \[3.8x, 3.8x\] to **27.4x** \[27.0x, 27.8x\] | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.3x** \[3.2x, 3.3x\] to **25.9x** \[25.8x, 26.0x\] | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.5x** \[5.4x, 5.5x\] to **11.3x** \[11.2x, 11.5x\] | — |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.8x** \[1.8x, 1.8x\] to **6.1x** \[6.1x, 6.2x\] |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.9x** \[1.9x, 1.9x\] to **5.8x** \[5.3x, 6.1x\] |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x** \[3.8x, 3.8x\] to **29.4x** \[29.3x, 29.5x\] | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.3x** \[3.3x, 3.3x\] to **24.2x** \[24.2x, 24.2x\] | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.6x** \[5.6x, 5.6x\] to **12.4x** \[12.4x, 12.5x\] | — |
 
 </div>
 
@@ -468,20 +468,12 @@ compared against `robustbase`). Figure 1 summarizes both comparisons on
 Linux (Ryzen 9 5900HX, CRAN-compatible build with no ROBSCALE_FAST
 optimizations).
 
-<div id="fig-benchmarks">
-
-![](README_files/figure-commonmark/fig-benchmarks-1.png)
-
-Figure 1: Median speedup factor (×) vs. sample size $n$. Panel A
-compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B
-compares `qn` and `sn` against `robustbase`.
-
-</div>
+    [1] "benchmarks/speedup_fig.png"
 
 **Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
 Graphics - **CPU Governor:** powersave - **OS:** Arch Linux - **R
 version:** R version 4.5.2 (2025-10-31) - **Package version:** 0.1.5 -
-**SLEEF (Optimized Build):** Detected - **Date:** 2026-03-10
+**SLEEF (Optimized Build):** Detected - **Date:** 2026-03-12
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
@@ -547,14 +539,7 @@ The following figure explicitly compares the performance of `robscale`
 when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the
 unoptimized (portable) version of the package across all sample sizes.
 
-<div id="fig-fast-slow">
-
-![](README_files/figure-commonmark/fig-fast-slow-1.png)
-
-Figure 2: Median speedup factor (×) of optimized vs. unoptimized builds
-with 95% BCa confidence bands. Note logarithmic scales.
-
-</div>
+    [1] "benchmarks/fast_slow_fig.png"
 
 The gains in the optimized build come primarily from SIMD vectorization
 (AVX2/AVX512/Accelerate) and aggressive transcendental function

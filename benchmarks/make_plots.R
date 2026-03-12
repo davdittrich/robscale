@@ -105,3 +105,29 @@ plot_fast_slow <- function(analyzed) {
       subtitle = "robscale (FAST=1) vs robscale (FAST=0) with 95% BCa confidence bands"
     ) & theme(legend.position = "bottom")
 }
+
+#' Create detailed Gold Standard comparison plot
+#' @param analyzed The analyzed results from analyze_benchmarks()
+plot_detailed_gold <- function(analyzed) {
+  df <- analyzed$fast_015
+  
+  ggplot(df, aes(x = n, y = median_speedup, color = expr, fill = expr)) +
+    geom_hline(yintercept = 1.0, linetype = "dashed", color = "red") +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.2, color = NA) +
+    geom_line(linewidth = 0.8) + geom_point(size = 1.5) +
+    scale_x_log10(
+      breaks = 10^(0:7),
+      labels = trans_format("log10", math_format(10^.x))
+    ) +
+    scale_y_log10(labels = label_number(suffix = "x")) +
+    labs(
+      title = "Detailed Performance vs v0.1.5 Gold Standard",
+      subtitle = "Values < 1x indicate regressions. (Log-log scale)",
+      x = "Sample Size (n)",
+      y = "Median Speedup Factor (Log Scale)",
+      color = "Estimator",
+      fill = "Estimator"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+}
