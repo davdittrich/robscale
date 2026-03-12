@@ -18,3 +18,25 @@ renv/library/
 renv/python/
 renv/staging/
 renv/cache/
+
+# Debug/temp files
+*.out
+*.log
+!src/Makevars.in
+test_hang
+test_hang.cpp
+debug_hang.R
+test_adm.R
+test_qn_large.R
+test_regression.R
+test_robustbase.R
+test_side_by_side.R
+findings.md
+progress.md
+task_plan.md
+install_log.txt
+CRAN-SUBMISSION
+.markdownlint.json
+results/
+src/build.log
+src/clean_build.log
