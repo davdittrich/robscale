@@ -154,6 +154,28 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sort_shootout_correctness
+Rcpp::DataFrame sort_shootout_correctness();
+RcppExport SEXP _robscale_sort_shootout_correctness() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(sort_shootout_correctness());
+    return rcpp_result_gen;
+END_RCPP
+}
+// sort_shootout_benchmark
+Rcpp::DataFrame sort_shootout_benchmark(int rounds, int batch);
+RcppExport SEXP _robscale_sort_shootout_benchmark(SEXP roundsSEXP, SEXP batchSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< int >::type rounds(roundsSEXP);
+    Rcpp::traits::input_parameter< int >::type batch(batchSEXP);
+    rcpp_result_gen = Rcpp::wrap(sort_shootout_benchmark(rounds, batch));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
@@ -168,6 +190,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_C_sn_float", (DL_FUNC) &_robscale_C_sn_float, 1},
     {"_robscale_C_sn_int_fast", (DL_FUNC) &_robscale_C_sn_int_fast, 1},
     {"_robscale_C_get_sn_factor", (DL_FUNC) &_robscale_C_get_sn_factor, 1},
+    {"_robscale_sort_shootout_correctness", (DL_FUNC) &_robscale_sort_shootout_correctness, 0},
+    {"_robscale_sort_shootout_benchmark", (DL_FUNC) &_robscale_sort_shootout_benchmark, 2},
     {NULL, NULL, 0}
 };
 

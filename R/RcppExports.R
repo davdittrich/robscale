@@ -49,3 +49,11 @@ C_get_sn_factor <- function(n) {
     .Call(`_robscale_C_get_sn_factor`, n)
 }
 
+sort_shootout_correctness <- function() {
+    .Call(`_robscale_sort_shootout_correctness`)
+}
+
+sort_shootout_benchmark <- function(rounds = 200L, batch = 1000L) {
+    .Call(`_robscale_sort_shootout_benchmark`, rounds, batch)
+}
+
