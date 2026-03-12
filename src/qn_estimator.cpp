@@ -149,12 +149,13 @@ struct QnCandidateWorker {
   const int32_t* left;
   const int32_t* right;
   size_t* offsets; // Pointer to shared offsets array
+  size_t grain;
 
-  QnCandidateWorker(const T* x, size_t n, const int32_t* l, const int32_t* r, size_t* off)
-      : sorted_x(x), n(n), left(l), right(r), offsets(off) {}
+  QnCandidateWorker(const T* x, size_t n, const int32_t* l, const int32_t* r, size_t* off, size_t g)
+      : sorted_x(x), n(n), left(l), right(r), offsets(off), grain(g) {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const {
-    size_t block_idx = range.begin() / ROBSCALE_TBB_GRAIN_SIZE;
+    size_t block_idx = range.begin() / grain;
     size_t count = 0;
     for (size_t i = range.begin(); i < range.end(); ++i) {
       if (i > 0 && left[i] <= right[i]) count++;
@@ -171,12 +172,13 @@ struct QnCandidateFulfiller {
   const size_t* prefix_offsets;
   float* work;
   int32_t* iweight;
+  size_t grain;
 
-  QnCandidateFulfiller(const T* x, const int32_t* l, const int32_t* r, const size_t* off, float* w, int32_t* iw)
-      : sorted_x(x), left(l), right(r), prefix_offsets(off), work(w), iweight(iw) {}
+  QnCandidateFulfiller(const T* x, const int32_t* l, const int32_t* r, const size_t* off, float* w, int32_t* iw, size_t g)
+      : sorted_x(x), left(l), right(r), prefix_offsets(off), work(w), iweight(iw), grain(g) {}
 
   void operator()(const tbb::blocked_range<size_t>& range) const {
-    size_t block_idx = range.begin() / ROBSCALE_TBB_GRAIN_SIZE;
+    size_t block_idx = range.begin() / grain;
     size_t out_idx = prefix_offsets[block_idx];
     for (size_t i = range.begin(); i < range.end(); ++i) {
       if (i > 0 && left[i] <= right[i]) {
@@ -320,12 +322,13 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     size_t m = 0;
     if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
-      size_t num_blocks = (n + ROBSCALE_TBB_GRAIN_SIZE - 1) / ROBSCALE_TBB_GRAIN_SIZE + 1;
+      size_t g = config.grain_size;
+      size_t num_blocks = (n + g - 1) / g + 1;
       std::vector<size_t> block_offsets(num_blocks, 0);
-      
-      QnCandidateWorker<T> worker(sorted_x, n, left, right, block_offsets.data());
-      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, ROBSCALE_TBB_GRAIN_SIZE), worker);
-      
+
+      QnCandidateWorker<T> worker(sorted_x, n, left, right, block_offsets.data(), g);
+      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), worker);
+
       // Sequential prefix sum of offsets
       size_t current = 0;
       for (size_t i = 0; i < num_blocks; ++i) {
@@ -334,9 +337,9 @@ double C_qn_impl(const T* x_ptr, size_t n) {
         current += block_count;
       }
       m = current;
-      
-      QnCandidateFulfiller<T> fulfiller(sorted_x, left, right, block_offsets.data(), work, iweight);
-      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, ROBSCALE_TBB_GRAIN_SIZE), fulfiller);
+
+      QnCandidateFulfiller<T> fulfiller(sorted_x, left, right, block_offsets.data(), work, iweight, g);
+      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), fulfiller);
 #else
       // Fallback for non-TBB builds
       for (size_t i = 1; i < n; ++i) {
@@ -486,6 +489,9 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("qn_parallel_threshold") = (int)config.qn_parallel_threshold,
     Rcpp::Named("sn_stack_threshold") = (int)config.sn_stack_threshold,
     Rcpp::Named("sn_parallel_threshold") = (int)config.sn_parallel_threshold,
+    Rcpp::Named("sort_boost_threshold") = (int)config.sort_boost_threshold,
+    Rcpp::Named("sort_tbb_threshold") = (int)config.sort_tbb_threshold,
+    Rcpp::Named("grain_size") = (int)config.grain_size,
     Rcpp::Named("l2_cache_size") = (int)config.hw.l2_cache_size,
     Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores
   );

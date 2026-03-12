@@ -34,16 +34,14 @@
 #define ROBSCALE_SORT_TBB_THRESHOLD    6144
 #define ROBSCALE_TBB_GRAIN_SIZE       1024
 
-// Include tuned thresholds if auto-tuning was run (FAST=1 builds)
+// Default sort crossover (std::sort → boost::spreadsort)
+#define ROBSCALE_SORT_BOOST_THRESHOLD  512
+
+// Include tuned thresholds if auto-tuning was run (FAST=1 builds).
+// Tuned values (TUNED_SORT_BOOST_THRESHOLD, TUNED_SORT_TBB_THRESHOLD, etc.)
+// override the defaults above via RuntimeConfig::calculate_thresholds().
 #ifdef ROBSCALE_HAS_TUNED_THRESHOLDS
 #include "qnsn_tuned_thresholds.h"
-#endif
-
-// Use tuned value if available, otherwise default to 512
-#ifdef TUNED_SORT_BOOST_THRESHOLD
-#define ROBSCALE_SORT_BOOST_THRESHOLD  TUNED_SORT_BOOST_THRESHOLD
-#else
-#define ROBSCALE_SORT_BOOST_THRESHOLD  512
 #endif
 
 
