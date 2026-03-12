@@ -68,24 +68,25 @@ inline void sort_net_6(T* x) {
 }
 
 // 16-comparator optimal network for n=7
+// Source: Bert Dobbelaere's verified optimal sorting networks
 template <typename T>
 inline void sort_net_7(T* x) {
-  SWAP_IF_GREATER(x[0], x[1]);
+  SWAP_IF_GREATER(x[0], x[6]);
   SWAP_IF_GREATER(x[2], x[3]);
   SWAP_IF_GREATER(x[4], x[5]);
   SWAP_IF_GREATER(x[0], x[2]);
-  SWAP_IF_GREATER(x[1], x[3]);
+  SWAP_IF_GREATER(x[1], x[4]);
+  SWAP_IF_GREATER(x[3], x[6]);
+  SWAP_IF_GREATER(x[0], x[1]);
+  SWAP_IF_GREATER(x[2], x[5]);
+  SWAP_IF_GREATER(x[3], x[4]);
+  SWAP_IF_GREATER(x[1], x[2]);
   SWAP_IF_GREATER(x[4], x[6]);
-  SWAP_IF_GREATER(x[5], x[6]);
-  SWAP_IF_GREATER(x[0], x[4]);
-  SWAP_IF_GREATER(x[1], x[5]);
-  SWAP_IF_GREATER(x[2], x[6]);
-  SWAP_IF_GREATER(x[2], x[4]);
-  SWAP_IF_GREATER(x[3], x[5]);
+  SWAP_IF_GREATER(x[2], x[3]);
+  SWAP_IF_GREATER(x[4], x[5]);
   SWAP_IF_GREATER(x[1], x[2]);
   SWAP_IF_GREATER(x[3], x[4]);
   SWAP_IF_GREATER(x[5], x[6]);
-  SWAP_IF_GREATER(x[2], x[3]);
 }
 
 // 19-comparator optimal network for n=8

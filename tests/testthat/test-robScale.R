@@ -2,7 +2,9 @@ test_that("robScale computes correctly", {
   tol <- sqrt(.Machine$double.eps)
   y <- c(9, 2, 14, 4)
   expect_equal(robScale(y), 5.8798343299206977, tolerance = tol)
-  expect_equal(robScale(y[1:3]), mad(y[1:3]), tolerance = tol)
+  # For n < 4 robScale returns MAD (using precise constant 1.482602...)
+  # which differs slightly from R's mad() that uses rounded 1.4826
+  expect_equal(robScale(y[1:3]), mad(y[1:3]), tolerance = 1e-4)
 })
 
 test_that("robScale handles implosion and fallback", {

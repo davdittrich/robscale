@@ -67,15 +67,31 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     s_init = robscale::mad_select(xp, (int)n, t, dev);
   }
 
-  // Handle fallback and zero scale
+  // Small-sample fallback (matches original revss behavior)
+  int minobs = has_loc ? 3 : 4;
+  if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) {
+    if (s_init <= implbound) {
+      if (ROBSCALE_UNLIKELY(fallback == 1)) return R_NaReal;
+      if (has_loc) {
+        // Re-check MAD around the data's own median (not the supplied loc)
+        std::memcpy(w, xp, n * sizeof(double));
+        double med_orig = robscale::median_select(w, n);
+        double mad_orig = robscale::mad_select(xp, (int)n, med_orig, dev);
+        return (mad_orig <= implbound)
+          ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY)
+          : mad_orig;
+      } else {
+        return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+      }
+    }
+    return s_init;
+  }
+
+  // MAD collapse for n >= minobs
   if (ROBSCALE_UNLIKELY(s_init <= implbound && fallback == 1)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(s_init == 0.0)) {
     return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
   }
-
-  // Iterative M-estimator
-  int minobs = has_loc ? 3 : 4;
-  if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) return s_init;
 
   const double* data = xp; 
   double data_offset = t;

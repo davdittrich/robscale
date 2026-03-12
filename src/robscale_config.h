@@ -83,7 +83,7 @@
 
 namespace robscale {
   constexpr double MAD_CONSISTENCY      = 1.482602218505602;
-  constexpr double ADM_CONSISTENCY      = 1.3926; // Refined value
+  constexpr double ADM_CONSISTENCY      = 1.2533141373155001; // sqrt(pi/2), matches adm() default
   constexpr double RHO_SCALE_CONST      = 0.37394112142347236;
   constexpr double INV_RHO_SCALE_CONST  = 1.0 / 0.37394112142347236;
 }
