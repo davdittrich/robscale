@@ -31,9 +31,20 @@
 #define ROBSCALE_SN_STACK_THRESHOLD    2048
 #define ROBSCALE_SN_PARALLEL_THRESHOLD 12288
 #define ROBSCALE_QN_PARALLEL_THRESHOLD 8192
-#define ROBSCALE_SORT_BOOST_THRESHOLD  512
 #define ROBSCALE_SORT_TBB_THRESHOLD    6144
 #define ROBSCALE_TBB_GRAIN_SIZE       1024
+
+// Include tuned thresholds if auto-tuning was run (FAST=1 builds)
+#ifdef ROBSCALE_HAS_TUNED_THRESHOLDS
+#include "qnsn_tuned_thresholds.h"
+#endif
+
+// Use tuned value if available, otherwise default to 512
+#ifdef TUNED_SORT_BOOST_THRESHOLD
+#define ROBSCALE_SORT_BOOST_THRESHOLD  TUNED_SORT_BOOST_THRESHOLD
+#else
+#define ROBSCALE_SORT_BOOST_THRESHOLD  512
+#endif
 
 
 // --- Portability & Optimization Macros ---
