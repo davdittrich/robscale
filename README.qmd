@@ -673,12 +673,12 @@ the parallelism threshold:
 **Small to medium samples ($n \le 10^3$).** `robscale` leads by **`r qn_speedup_min`–`r qn_speedup_max`×**.
 The gain comes primarily from the avoidance of R dispatch overhead and the
 use of stack memory. For $Q_n$ at $n = 8$, the brute-force exact algorithm
-completes in `r qn_8_robscale` µs vs. `r qn_8_robustbase` µs for `robustbase` — a **`r qn_8_speedup`×** edge.
+completes in `r qn_8_robscale` vs. `r qn_8_robustbase` for `robustbase` — a **`r qn_8_speedup`×** edge.
 
 **Large samples ($n \ge 10^4$).** The advantage grows to **`r large_speedup_min`–`r large_speedup_max`×** as TBB
 parallelism engages.
- At $n = 10^7$, `qn` runs in `r qn_10m_robscale` s vs. `r qn_10m_robustbase` s for
-`robustbase::Qn` (**`r qn_10m_speedup`×**), and `sn` runs in `r sn_10m_robscale` s vs. `r sn_10m_robustbase` s (**`r sn_10m_speedup`×**).
+ At $n = 10^7$, `qn` runs in `r qn_10m_robscale` vs. `r qn_10m_robustbase` for
+`robustbase::Qn` (**`r qn_10m_speedup`×**), and `sn` runs in `r sn_10m_robscale` vs. `r sn_10m_robustbase` (**`r sn_10m_speedup`×**).
 Parallel efficiency is bounded by Amdahl's Law and memory bandwidth; while the
 multi-threaded kernels provide substantial gains for massive datasets,
 speedups do not scale linearly with thread count.
