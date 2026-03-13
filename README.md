@@ -144,13 +144,13 @@ where $c = 0.37394112142347236$ and $T = \text{median}(x)$ is held
 fixed. Starting value: $S^{(0)} = \text{MAD}(x)$.
 
 **Degenerate input handling:** When the sample size falls below the
-minimum for iteration (4 for unknown location, 3 for known) or the MAD
-collapses to zero, the function applies the logic selected by the
-`fallback` argument:
+minimum for iteration (4 for unknown location, 3 for known), the
+function returns the initial MAD-based scale directly if it is nonzero.
+When the MAD collapses to zero (i.e. $\text{MAD} \leq$ `implbound`), the
+`fallback` argument controls the result:
 
-- `fallback = "adm"` (Default): returns `adm(x)` if $\text{MAD} \leq$
-  `implbound`, maintaining a finite robust estimate where standard scale
-  measures fail.
+- `fallback = "adm"` (Default): returns `adm(x)`, maintaining a finite
+  robust estimate where standard scale measures fail.
 - `fallback = "na"`: returns `NA`, strictly matching the behavioral
   profile of the `revss` package.
 
@@ -231,8 +231,9 @@ on the robustness–efficiency frontier:
     **82.3%** asymptotic relative efficiency (ARE) compared to the
     sample standard deviation.
 2.  **Robustness**: All three maintain a **50% breakdown point**, though
-    $S_n$ and `robScale` trade higher efficiency for lower computational
-    complexity or better behavior in specific small-sample regimes.
+    $S_n$ and `robScale` sacrifice some statistical efficiency for lower
+    computational complexity or better behavior in specific small-sample
+    regimes.
 
 Users should expect point estimates to align closely on clean data. On
 contaminated data, $Q_n$ provides the most stable performance across the
@@ -377,9 +378,10 @@ buffer (for bulk `tanh` arguments). `revss` allocates these as R
 vectors, incurring R’s SEXPREC header overhead and adding
 garbage-collection pressure.
 
-`robscale` uses a stack-allocated arena of 512 doubles per segment. For
-$n \leq 512$—which covers the target regime and far beyond—there is zero
-heap allocation. For $n > 512$, the code falls back to
+`robscale` uses a tiered stack-allocated arena: a 128-double
+micro-buffer for $n \leq 64$ and a 2,048-double buffer per array for
+$n \leq 2{,}048$—which covers the target regime and far beyond—with zero
+heap allocation. For $n > 2{,}048$, the code falls back to
 `new[]`/`delete[]`.
 
 ### 5. Compile-time reciprocal constants
@@ -428,10 +430,11 @@ available cores for $n \geq$ `qn_parallel_threshold`.
 
 **$S_n$ — parallelized inner-median sweep.** The $S_n$ statistic is the
 low median of the vector $\{\text{med}_j |x_i - x_j|\}_{i=1}^n$.
-`robscale` computes each inner median with a sliding-window binary
-search (exploiting sortedness) in O(log n) per element, then dispatches
-the outer $n$ iterations across TBB threads via `SnWorker`. For
-$n \leq 2048$, a stack-allocated arena avoids heap allocation entirely.
+`robscale` computes each inner median with an initial binary search
+seeding a sliding-window linear scan (exploiting sortedness) in
+amortized $O(1)$ per element, then dispatches the outer $n$ iterations
+across TBB threads via `SnWorker`. For $n \leq 2048$, a stack-allocated
+arena avoids heap allocation entirely.
 
 <div id="tbl-qn-bench">
 
@@ -472,8 +475,8 @@ efficient algorithm based on sample size and hardware capabilities:
 graph TD
     A[R API: qn, sn, robLoc, robScale] --> B{Dispatch Layer}
     B -- "n <= 16" --> C[Sorting Networks]
-    B -- "16 < n < 32768" --> D[Highly optimized scalar C++]
-    B -- "n >= 32768" --> E[Parallel multi-threaded kernels]
+    B -- "17 <= n < L2 threshold" --> D[Highly optimized scalar C++]
+    B -- "n >= L2 threshold" --> E[Parallel multi-threaded kernels]
     subgraph "Hardware Acceleration"
         G[AVX2 / AVX512 / NEON]
         H[Apple Accelerate]
@@ -488,8 +491,7 @@ graph TD
 (the M-estimators `robLoc`, `robScale`, and `adm`, compared against
 `revss`) and general-size samples (the scale estimators `qn` and `sn`,
 compared against `robustbase`). Figure 1 summarizes both comparisons on
-Linux (Ryzen 9 5900HX, CRAN-compatible build with no ROBSCALE_FAST
-optimizations).
+Linux (Ryzen 9 5900HX, CRAN-compatible build with auto-detected SIMD).
 
 <div id="fig-benchmarks">
 
@@ -501,10 +503,15 @@ compares `qn` and `sn` against `robustbase`.
 
 </div>
 
-**Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
-Graphics - **CPU Governor:** powersave - **OS:** Arch Linux - **R
-version:** R version 4.5.3 (2026-03-11) - **Package version:** 0.1.6 -
-**SLEEF (Optimized Build):** Detected - **Date:** 2026-03-13
+**Benchmark environment:**
+
+- **Machine:** AMD Ryzen 9 5900HX with Radeon Graphics
+- **CPU Governor:** powersave
+- **OS:** Arch Linux
+- **R version:** R version 4.5.3 (2026-03-11)
+- **Package version:** 0.1.6
+- **SLEEF (Optimized Build):** Detected
+- **Date:** 2026-03-13
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
@@ -589,7 +596,7 @@ breakdown point.
 
 **$Q_n$ and $S_n$ statistics.**
 $Q_n = c_n \cdot d \cdot \{|x_i - x_j|; i < j\}_{(k)}$ where
-$k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $d = 2.2219$
+$k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $d = 2.2191$
 (consistency constant for Gaussian data). $S_n = c_n' \cdot 1.1926 \cdot
 \text{lomed}_i \{\text{himed}_j |x_i - x_j|\}$, where $\text{lomed}$ and
 $\text{himed}$ denote the low and high medians respectively.
