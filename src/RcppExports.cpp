@@ -35,6 +35,67 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_scale_ensemble
+double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot);
+RcppExport SEXP _robscale_cpp_scale_ensemble(SEXP xSEXP, SEXP n_bootSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_scale_ensemble(x, n_boot));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gmd_impl
+double gmd_impl(Rcpp::NumericVector x, double constant);
+RcppExport SEXP _robscale_gmd_impl(SEXP xSEXP, SEXP constantSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type constant(constantSEXP);
+    rcpp_result_gen = Rcpp::wrap(gmd_impl(x, constant));
+    return rcpp_result_gen;
+END_RCPP
+}
+// iqr_impl
+double iqr_impl(Rcpp::NumericVector x, double constant);
+RcppExport SEXP _robscale_iqr_impl(SEXP xSEXP, SEXP constantSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type constant(constantSEXP);
+    rcpp_result_gen = Rcpp::wrap(iqr_impl(x, constant));
+    return rcpp_result_gen;
+END_RCPP
+}
+// mad_impl_auto
+double mad_impl_auto(Rcpp::NumericVector x, double constant);
+RcppExport SEXP _robscale_mad_impl_auto(SEXP xSEXP, SEXP constantSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type constant(constantSEXP);
+    rcpp_result_gen = Rcpp::wrap(mad_impl_auto(x, constant));
+    return rcpp_result_gen;
+END_RCPP
+}
+// mad_impl_center
+double mad_impl_center(Rcpp::NumericVector x, double center, double constant);
+RcppExport SEXP _robscale_mad_impl_center(SEXP xSEXP, SEXP centerSEXP, SEXP constantSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type center(centerSEXP);
+    Rcpp::traits::input_parameter< double >::type constant(constantSEXP);
+    rcpp_result_gen = Rcpp::wrap(mad_impl_center(x, center, constant));
+    return rcpp_result_gen;
+END_RCPP
+}
 // C_qn_fast
 double C_qn_fast(Rcpp::NumericVector x);
 RcppExport SEXP _robscale_C_qn_fast(SEXP xSEXP) {
@@ -110,6 +171,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// sd_c4_impl
+double sd_c4_impl(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_sd_c4_impl(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(sd_c4_impl(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // C_sn_fast
 double C_sn_fast(Rcpp::NumericVector x);
 RcppExport SEXP _robscale_C_sn_fast(SEXP xSEXP) {
@@ -158,12 +230,18 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
+    {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
+    {"_robscale_gmd_impl", (DL_FUNC) &_robscale_gmd_impl, 2},
+    {"_robscale_iqr_impl", (DL_FUNC) &_robscale_iqr_impl, 2},
+    {"_robscale_mad_impl_auto", (DL_FUNC) &_robscale_mad_impl_auto, 2},
+    {"_robscale_mad_impl_center", (DL_FUNC) &_robscale_mad_impl_center, 3},
     {"_robscale_C_qn_fast", (DL_FUNC) &_robscale_C_qn_fast, 1},
     {"_robscale_C_qn_int_fast", (DL_FUNC) &_robscale_C_qn_int_fast, 1},
     {"_robscale_get_qnsn_config", (DL_FUNC) &_robscale_get_qnsn_config, 0},
     {"_robscale_C_get_qn_factor", (DL_FUNC) &_robscale_C_get_qn_factor, 1},
     {"_robscale_rob_loc_impl", (DL_FUNC) &_robscale_rob_loc_impl, 5},
     {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 7},
+    {"_robscale_sd_c4_impl", (DL_FUNC) &_robscale_sd_c4_impl, 1},
     {"_robscale_C_sn_fast", (DL_FUNC) &_robscale_C_sn_fast, 1},
     {"_robscale_C_sn_float", (DL_FUNC) &_robscale_C_sn_float, 1},
     {"_robscale_C_sn_int_fast", (DL_FUNC) &_robscale_C_sn_int_fast, 1},

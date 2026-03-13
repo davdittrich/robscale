@@ -4,11 +4,12 @@
 
 /**
  * Portably optimized robScale kernel.
+ * Non-static: also called by estimators_internal.h for the ensemble.
  */
-static ROBSCALE_INLINE double rob_scale_compute(const double* ROBSCALE_RESTRICT data, 
-                                                size_t n, double data_offset, double s, 
-                                                int maxit, double tol, 
-                                                double* ROBSCALE_RESTRICT tmp) {
+double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
+                         size_t n, double data_offset, double s,
+                         int maxit, double tol,
+                         double* ROBSCALE_RESTRICT tmp) {
   double inv_n = 1.0 / (double)n;
 
   for (int k = 0; k < maxit; ++k) {
