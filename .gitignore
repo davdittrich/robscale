@@ -3,7 +3,6 @@ src/*.so
 src/*.dll
 src/Makevars
 src/symbols.rds
-src/qnsn_tuned_thresholds.h
 .claude/
 *.Rcheck/
 *.tar.gz

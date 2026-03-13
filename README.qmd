@@ -356,8 +356,9 @@ flowchart TD
 Computes the $Q_n$ estimator of scale (Rousseeuw & Croux, 1993). Unlike
 M-estimators, $Q_n$ requires no location estimate and achieves a 50% breakdown
 point. `robscale` implements $Q_n$ with a tiered strategy: a brute-force exact
-algorithm for small $n$ (below `qn_exact_threshold`) and a cache-aware
-parallelized Johnson-style algorithm for larger samples.
+algorithm for small $n$ (below `qn_exact_threshold`) and a parallelized
+Johnson-style algorithm for larger samples, with parallelism thresholds
+derived from the detected per-core L2 cache size at runtime.
 
 ```r
 qn(c(1, 2, 3, 5, 7, 8))
@@ -618,8 +619,8 @@ based on sample size and hardware capabilities:
 graph TD
     A[R API: qn, sn, robLoc, robScale] --> B{Dispatch Layer}
     B -- "n <= 16" --> C[Sorting Networks]
-    B -- "16 < n < 32768" --> D[Highly optimized scalar C++]
-    B -- "n >= 32768" --> E[Parallel multi-threaded kernels]
+    B -- "16 < n < threshold" --> D[Highly optimized scalar C++]
+    B -- "n >= threshold" --> E[Parallel multi-threaded kernels]
     subgraph "Hardware Acceleration"
         G[AVX2 / AVX512 / NEON]
         H[Apple Accelerate]
@@ -685,8 +686,8 @@ speedups do not scale linearly with thread count.
 
 > [!IMPORTANT]
 > **Peak Performance Note**: To unlock maximum hardware-specific speedups
-> (including SIMD auto-discovery and microbenchmark-tuned thresholds), install
-> the package from source with the `ROBSCALE_FAST=1` environment variable set:
+> (including SIMD flags like `-mavx2 -mfma`), install the package from source
+> with the `ROBSCALE_FAST=1` environment variable set:
 >
 > **From the terminal:**
 > ```bash
@@ -704,7 +705,8 @@ speedups do not scale linearly with thread count.
 > ```
 >
 > Default CRAN binaries use conservative, portable settings to ensure
-> compatibility across all architectures.
+> compatibility across all architectures. Cache-aware parallelism thresholds
+> are derived from the detected L2 cache size at runtime in both builds.
 
 ### Comparison: Optimized vs. Unoptimized builds
 
@@ -718,7 +720,7 @@ The following figure explicitly compares the performance of `robscale` when comp
 knitr::include_graphics(tar_read(fast_slow_figure))
 ```
 
-The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion `r if(isTRUE(benchmark_report$fast$has_sleef)) "(using the SLEEF library for vectorized math)" else ""`. On large samples, the optimized version also benefits from tuned threading thresholds that more effectively leverage TBB.
+The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion `r if(isTRUE(benchmark_report$fast$has_sleef)) "(using the SLEEF library for vectorized math)" else ""`. Parallelism thresholds are now derived from hardware (L2 cache per core) at runtime in both builds, so the FAST=1 advantage is purely SIMD instruction selection.
 
 ## Numerical equivalence
 

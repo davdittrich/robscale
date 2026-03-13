@@ -3,12 +3,12 @@
 
 # --- Performance optimization flags ---
 # Optimization flags (-O3, -march=native) belong in ~/.R/Makevars, not here.
-# Set ROBSCALE_FAST=1 to enable auto-tuning and SIMD detection.
+# Set ROBSCALE_FAST=1 to enable SIMD detection (AVX2/FMA).
 FAST_FLAGS=""
 if [ "${ROBSCALE_FAST}" = "1" ]; then
-  echo "  ROBSCALE_FAST=1: enabling auto-tuning and SIMD detection"
+  echo "  ROBSCALE_FAST=1: enabling SIMD detection"
 else
-  echo "  CRAN-safe mode (set ROBSCALE_FAST=1 for auto-tuning)"
+  echo "  CRAN-safe mode (set ROBSCALE_FAST=1 for SIMD detection)"
 fi
 
 # Detect -fopenmp-simd support
