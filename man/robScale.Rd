@@ -69,7 +69,7 @@ This estimator is designed for high robustness and efficiency. It achieves a
 \bold{50\% breakdown point}, meaning the estimate remains reliable even if
 half the sample is contaminated by outliers. At the Gaussian distribution,
 the logistic M-estimator of scale achieves an \bold{asymptotic relative
-efficiency (ARE) of 0.76} compared to the sample standard deviation.
+efficiency (ARE) of 0.55} compared to the sample standard deviation.
 
 \strong{Numerical Computation.}
 The estimating equation is solved by multiplicative iteration (Rousseeuw &

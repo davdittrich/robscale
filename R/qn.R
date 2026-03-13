@@ -44,6 +44,13 @@
 #' \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
 #' \doi{10.1080/01621459.1993.10476408}
 #'
+#' Akinshin, A. (2022). Finite-sample Rousseeuw-Croux scale estimators.
+#' \emph{arXiv preprint arXiv:2209.12268}.
+#'
+#' @seealso \code{\link{sn}} for the \eqn{S_n} scale estimator;
+#'   \code{\link{robScale}} for the M-estimator of scale;
+#'   \code{\link{adm}} for the average distance to median.
+#'
 #' @examples
 #' qn(c(1:9))
 #' x <- c(1, 2, 3, 5, 7, 8)
