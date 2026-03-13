@@ -11,26 +11,6 @@ else
   echo "  CRAN-safe mode (set ROBSCALE_FAST=1 for auto-tuning)"
 fi
 
-# Generate tuned thresholds if ROBSCALE_FAST is used
-rm -f src/qnsn_tuned_thresholds.h
-if [ "${ROBSCALE_FAST}" = "1" ]; then
-  echo "  Running threshold auto-tuning (this may take a few seconds)..."
-  BH_INC=$("${R_HOME}/bin/Rscript" -e 'cat(system.file("include", package="BH"))')
-  if [ -n "${BH_INC}" ] && [ -d "${BH_INC}" ]; then
-    ${CXX:-c++} -O3 -march=native -std=c++17 -I"${BH_INC}" tools/tune_thresholds.cpp -o tools/tune_thresholds 2>/dev/null
-    if [ -x tools/tune_thresholds ]; then
-      ./tools/tune_thresholds > src/qnsn_tuned_thresholds.h
-      echo "  Saved auto-tuned thresholds to src/qnsn_tuned_thresholds.h"
-      FAST_FLAGS="${FAST_FLAGS} -DROBSCALE_HAS_TUNED_THRESHOLDS"
-    else
-      echo "  Failed to compile tuner, using defaults."
-    fi
-    rm -f tools/tune_thresholds
-  else
-    echo "  BH package not found, skipping tuning."
-  fi
-fi
-
 # Detect -fopenmp-simd support
 OPENMP_SIMD_FLAG=""
 echo "int main(){return 0;}" > conftest.cpp

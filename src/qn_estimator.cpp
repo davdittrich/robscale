@@ -493,7 +493,10 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("sort_tbb_threshold") = (int)config.sort_tbb_threshold,
     Rcpp::Named("grain_size") = (int)config.grain_size,
     Rcpp::Named("l2_cache_size") = (int)config.hw.l2_cache_size,
-    Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores
+    Rcpp::Named("l2_per_core") = (int)config.hw.l2_per_core,
+    Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores,
+    Rcpp::Named("num_physical_cores") = (int)config.hw.num_physical_cores,
+    Rcpp::Named("has_tuned_sort_thresholds") = false
   );
 }
 
