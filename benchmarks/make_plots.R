@@ -53,7 +53,28 @@ plot_benchmarks <- function(analyzed) {
     theme_minimal() +
     theme(legend.position = "bottom")
     
-  p1 + p2 + plot_layout(guides = "collect") & theme(legend.position = "bottom")
+  # Panel C: New scale estimators vs existing R implementations
+  df_c <- analyzed$new_estimators
+
+  p3 <- ggplot(df_c, aes(x = n, y = median_speedup, color = expr, fill = expr)) +
+    geom_ribbon(aes(ymin = ci_low, ymax = ci_high), alpha = 0.2, color = NA) +
+    geom_line(linewidth = 0.8) + geom_point(size = 1.5) +
+    scale_x_log10(
+      breaks = 10^(0:7),
+      labels = trans_format("log10", math_format(10^.x))
+    ) +
+    scale_y_continuous(labels = label_number(suffix = "x")) +
+    expand_limits(y = 0) +
+    labs(
+      title = "Panel C: New Scale Estimators",
+      subtitle = "robscale vs existing R implementations (with 95% BCa confidence bands)",
+      x = "Sample Size (n)",
+      y = "Median Speedup Factor",
+      color = "Comparison",
+      fill = "Comparison"
+    ) +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+
+  p1 + p2 + p3 + plot_layout(guides = "collect") & theme(legend.position = "bottom")
 }
-
-

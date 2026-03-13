@@ -3,7 +3,7 @@ library(tarchetypes)
 
 # Set target options:
 tar_option_set(
-  packages = c("bench", "sessioninfo", "ggplot2", "dplyr", "tidyr", "withr", "robustbase", "revss", "boot", "purrr", "callr"),
+  packages = c("bench", "sessioninfo", "ggplot2", "dplyr", "tidyr", "withr", "robustbase", "revss", "boot", "purrr", "callr", "Hmisc", "GiniDistance", "collapse"),
   format = "rds"
 )
 
@@ -43,7 +43,7 @@ list(
   tar_target(speedup_figure_obj, plot_benchmarks(analyzed_results)),
   tar_target(speedup_figure, {
     path <- "benchmarks/speedup_fig.png"
-    ggsave(path, speedup_figure_obj, width = 12, height = 6)
+    ggsave(path, speedup_figure_obj, width = 18, height = 6)
     path
   }, format = "file"),
 
