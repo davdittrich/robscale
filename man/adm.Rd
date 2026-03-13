@@ -59,7 +59,7 @@ ideal \bold{implosion fallback} for the M-estimator of scale in
 
 \strong{Computational Performance.}
 This implementation employs a tiered selection strategy: optimal sorting
-networks for very small samples (\eqn{n \le 8}) and a C++17 introselect
+networks for very small samples (\eqn{n \le 16}) and a C++17 introselect
 algorithm for larger datasets. This approach provides an \eqn{O(n)}
 worst-case time complexity, typically outperforming pure-R implementations
 by an order of magnitude. Performance is further enhanced by avoiding the

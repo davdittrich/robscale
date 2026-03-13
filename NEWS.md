@@ -1,3 +1,17 @@
+# robscale 0.1.6
+
+* Performance: Extended optimal sorting networks from n <= 8 to n <= 16 using
+  Dobbelaere's verified optimal networks. Cross-platform benchmarking confirmed
+  2-4x speedups over `std::sort` for n = 9-16 on both ARM64 (Apple Silicon)
+  and x86_64 (AMD Zen 3).
+* Bug fix: Corrected the n = 7 sorting network comparator sequence (was
+  producing incorrect sort order for certain inputs).
+* Bug fix: Restored ADM consistency constant to sqrt(pi/2) = 1.2533 (was
+  incorrectly changed to 1.3926).
+* Bug fix: Restored small-sample fallback logic in `robScale()` that was
+  inadvertently removed, causing incorrect results when MAD collapses for
+  n < 4.
+
 # robscale 0.1.5
 
 * CRAN: Removed `#pragma GCC diagnostic ignored "-Wdeprecated-volatile"` from
