@@ -97,9 +97,27 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
         }
       )
       
+      # New estimators benchmarks (gmd, iqr_scaled, mad_scaled)
+      results_new <- bench::press(
+        n = n_large,
+        {
+          set.seed(42 + n)
+          x <- rnorm(n)
+          bench::mark(
+            gmd = robscale::gmd(x),
+            iqr_scaled = robscale::iqr_scaled(x),
+            mad_scaled = robscale::mad_scaled(x),
+            check = FALSE,
+            min_iterations = get_min_iters(n),
+            min_time = 1.0
+          )
+        }
+      )
+
       list(
         m_estimators = results_m,
         scale_estimators = results_scale,
+        new_estimators = results_new,
         sys_info = sessioninfo::session_info()
       )
     })
@@ -116,6 +134,9 @@ benchmark_legacy <- function() {
     library(bench)
     library(robustbase)
     library(revss)
+    library(Hmisc)
+    library(GiniDistance)
+    library(collapse)
     
     n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
     n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
@@ -160,9 +181,28 @@ benchmark_legacy <- function() {
       }
     )
     
+    # New estimator competitors
+    results_new <- bench::press(
+      n = n_large,
+      {
+        set.seed(42 + n)
+        x <- rnorm(n)
+        bench::mark(
+          gmd = Hmisc::GiniMd(x) * 0.886226925452758,
+          gmd_gd = GiniDistance::gmd(x) * 0.886226925452758,
+          iqr_scaled = stats::IQR(x) * 0.741301109252801,
+          mad_scaled = stats::mad(x),
+          check = FALSE,
+          min_iterations = get_min_iters(n),
+          min_time = 1.0
+        )
+      }
+    )
+
     list(
       revss = results_revss,
-      robustbase = results_robustbase
+      robustbase = results_robustbase,
+      new_estimators = results_new
     )
   }, args = list(lp = .libPaths()), show = TRUE)
   

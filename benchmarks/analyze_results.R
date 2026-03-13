@@ -93,8 +93,31 @@ analyze_benchmarks <- function(rob, legacy) {
       ungroup()
   }
 
+  # 3. New estimators: robscale vs existing R implementations
+  # The expression names differ between robscale and legacy, so we join per-estimator
+  df_rob_new <- flatten_bench(rob$new_estimators, "robscale")
+  df_leg_new <- flatten_bench(legacy$new_estimators, "legacy")
+
+  # Build comparison pairs: robscale::gmd vs Hmisc::GiniMd (expr "gmd"),
+  # robscale::gmd vs GiniDistance::gmd (expr "gmd_gd"),
+  # robscale::iqr_scaled vs stats::IQR (expr "iqr_scaled"),
+  # robscale::mad_scaled vs stats::mad (expr "mad_scaled")
+  build_new_comp <- function(rob_df, leg_df, rob_expr, leg_expr, label) {
+    r <- rob_df %>% filter(expr == rob_expr) %>% select(n, time_rob = time)
+    l <- leg_df %>% filter(expr == leg_expr) %>% select(n, time_leg = time)
+    inner_join(r, l, by = "n") %>% mutate(expr = label)
+  }
+
+  comp_new <- bind_rows(
+    build_new_comp(df_rob_new, df_leg_new, "gmd", "gmd", "gmd vs Hmisc"),
+    build_new_comp(df_rob_new, df_leg_new, "gmd", "gmd_gd", "gmd vs GiniDistance"),
+    build_new_comp(df_rob_new, df_leg_new, "iqr_scaled", "iqr_scaled", "iqr_scaled vs stats"),
+    build_new_comp(df_rob_new, df_leg_new, "mad_scaled", "mad_scaled", "mad_scaled vs stats")
+  )
+
   list(
     leg_small = run_analysis(comp_leg_small, "time_rob", "time_leg"),
-    leg_large = run_analysis(comp_leg_large, "time_rob", "time_leg")
+    leg_large = run_analysis(comp_leg_large, "time_rob", "time_leg"),
+    new_estimators = run_analysis(comp_new, "time_rob", "time_leg")
   )
 }
