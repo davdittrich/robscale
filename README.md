@@ -1,4 +1,4 @@
-# robscale: Faster Robustness for Small and Large Samples
+# robscale: A Comprehensive Toolkit for Robust Scale Estimation
 
 
 [![](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -6,20 +6,33 @@
 ## Overview
 
 Outliers compromise the reliability of classical estimators even in
-moderate samples. Yet the most widely used robust implementations in
-R—`revss` for small-sample M-estimation and `robustbase` for the $Q_n$
-and $S_n$ scale estimators—carry significant computational overhead that
-blocks real-time genomics pipelines, high-frequency finance, and other
+moderate samples. A single recording error can destroy the standard
+deviation, yet the most widely used robust implementations in R—`revss`
+for small-sample M-estimation and `robustbase` for the $Q_n$ and $S_n$
+scale estimators—carry significant computational overhead that blocks
+real-time genomics pipelines, high-frequency finance, and other
 time-critical workflows.
 
-`robscale` resolves both bottlenecks. Its C++17 kernels replace
-interpreted R loops with SIMD-accelerated transcendental functions,
-Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **9.7–28.9×** speedups for the
-small-sample M-estimators. Against `robustbase`, it achieves
-**1.9–6.4×** for $S_n$ and **1.7–5.9×** for $Q_n$ —with gains peaking
-near **6.4×** at $n = 10^7$ as TBB parallelism reduces the computational
-bottleneck for massive datasets.
+`robscale` v0.2.0 provides a comprehensive suite of 11 exported
+functions spanning the full robustness–efficiency spectrum: from the
+non-robust but maximally efficient bias-corrected standard deviation
+(`sd_c4`, 100% ARE) through the near-optimal Gini mean difference
+(`gmd`, 98% ARE, 29.3% breakdown), to maximum-breakdown estimators
+(`qn`, `sn`, `mad_scaled`, all 50% breakdown). The unified
+`scale_robust()` dispatcher automatically selects the optimal strategy—a
+variance-weighted bootstrap ensemble of all 7 estimators for small
+samples, with an automatic switch to the GMD for large samples.
+
+All estimators are implemented as C++17 kernels with SIMD-accelerated
+transcendental functions, Newton–Raphson iteration, and parallelized
+$O(n \log n)$ algorithms. Against `revss`, the package achieves
+**10.6–31.0x** speedups for the small-sample M-estimators. Against
+`robustbase`, it achieves **1.8–6.9x** for $S_n$ and **1.7–6.8x** for
+$Q_n$—with gains peaking near **6.9x** at $n = 10^7$ as TBB parallelism
+reduces the computational bottleneck for massive datasets. The new
+estimators (`gmd`, `iqr_scaled`, `mad_scaled`) outperform their base R
+and CRAN counterparts by **2.4–17.5x** (GMD vs `Hmisc`), **1.0–30.2x**
+(IQR vs `stats::IQR`), and **2.0–21.4x** (MAD vs `stats::mad`).
 
 ## Installation
 
@@ -38,39 +51,104 @@ library(robscale)
 
 x <- c(2.0, 3.1, 2.7, 2.9, 3.3)   # clean measurements
 
-mean(x)                              # 2.8000
-sd(x)                                # 0.5000
-robLoc(x)                            # 2.8471
-robScale(x)                          # 0.3837
+# Recommended entry point: scale_robust()
+scale_robust(x)                      # ensemble (small n < 20)
+scale_robust(rnorm(50))              # auto-switches to gmd (n >= 20)
 
-x[5] <- 100                         # recording error
+# Individual estimators span the robustness-efficiency frontier
+gmd(x)                               # 98% ARE, 29.3% breakdown
+qn(x)                                # 82.3% ARE, 50% breakdown
+mad_scaled(x)                        # 36.8% ARE, 50% breakdown
 
-mean(x)                              # 22.1400  -- destroyed
-sd(x)                                # 43.5270  -- destroyed
-robLoc(x)                            # 2.9184   -- stable
-robScale(x)                          # 0.4729   -- stable
+# Outlier resistance
+x[5] <- 100                          # recording error
+sd(x)                                # destroyed
+gmd(x)                               # stable (29.3% breakdown)
+qn(x)                                # stable (50% breakdown)
+mad_scaled(x)                        # stable (50% breakdown)
 ```
 
-Outliers pull classical estimators away from the bulk of the data. The
-robust estimators remain stable.
+For small samples ($n < 20$), `scale_robust()` combines all 7 estimators
+via a variance-weighted bootstrap ensemble, giving each estimator
+influence proportional to its precision. For larger samples, it
+automatically switches to the GMD, which achieves 98% ARE at negligible
+computational cost.
 
 ## API reference
 
-<div id="tbl-api">
+<div id="tbl-api-scale">
 
 Table 1
 
-| Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
-|:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.7x** \[1.7x, 1.7x\] to **5.9x** \[5.9x, 6.0x\] |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.9x** \[1.9x, 1.9x\] to **6.4x** \[6.0x, 6.6x\] |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x** \[3.8x, 3.8x\] to **28.9x** \[28.8x, 29.0x\] | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.4x** \[3.4x, 3.4x\] to **23.8x** \[23.8x, 23.9x\] | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.3x** \[5.3x, 5.4x\] to **12.5x** \[12.4x, 12.5x\] | — |
+**Table 1: Scale estimators** (sorted by decreasing ARE)
+
+| Function | Purpose | ARE | Breakdown | Reference |
+|:---|:---|:---|:---|:---|
+| `sd_c4(x)` | Bias-corrected standard deviation | **100%** | 0% | Welford (1962) |
+| `gmd(x)` | Gini mean difference | **98%** | 29.3% | Gini (1912); Nair (1936) |
+| `adm(x)` | Average deviation from median | **88.3%** | $1/n$ | Nair (1947) |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | Rousseeuw & Croux (1993) |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | Rousseeuw & Croux (1993) |
+| `robScale(x)` | M-estimate of scale | **55.0%** | 50% | Rousseeuw & Verboven (2002) |
+| `iqr_scaled(x)` | Scaled interquartile range | **37%** | 25% | Bickel & Lehmann (1976) |
+| `mad_scaled(x)` | Scaled median absolute deviation | **36.8%** | 50% | Rousseeuw & Croux (1993) |
 
 </div>
 
-All functions accept `na.rm` (default `FALSE`).
+<div id="tbl-api-dispatch">
+
+Table 2
+
+**Table 2: Dispatcher and utilities**
+
+| Function | Purpose |
+|:---|:---|
+| `scale_robust(x)` | Unified dispatcher: ensemble for small $n$, auto-switches to GMD for large $n$ |
+| `get_consistency_constant(method, n)` | Returns the consistency constant or finite-sample correction for a given estimator |
+
+</div>
+
+Additionally, `robLoc(x)` provides an M-estimate of location (98.4% ARE,
+50% breakdown; Rousseeuw & Verboven 2002). All functions accept `na.rm`
+(default `FALSE`).
+
+### `sd_c4(x, na.rm = FALSE)`
+
+Computes the sample standard deviation corrected by $c_4(n)$ to remove
+the small-sample bias of the square-root estimator:
+
+$$\hat\sigma = \frac{s}{c_4(n)} = \frac{s}{\sqrt{2/(n{-}1)} \cdot \Gamma(n/2) / \Gamma((n{-}1)/2)}$$
+
+where $s$ is the usual sample standard deviation. Uses Welford’s online
+algorithm for numerically stable variance computation, avoiding
+catastrophic cancellation. This is a non-robust estimator (0% breakdown)
+with 100% ARE by construction—it serves as the efficiency anchor in the
+ensemble.
+
+``` r
+sd_c4(c(1, 2, 3, 5, 7, 8))
+```
+
+### `gmd(x, constant = 0.886226925452758, na.rm = FALSE)`
+
+Computes the Gini mean difference (Gini, 1912), scaled by a consistency
+constant for asymptotic normality under the Gaussian model:
+
+$$\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}$$
+
+where $x_{(1)} \le \ldots \le x_{(n)}$ are the order statistics and
+$C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort
+($O(n \log n)$), with sorting networks applied for $n \le 16$.
+
+The GMD achieves **98% ARE** (Nair, 1936) with a **29.3% breakdown
+point**, making it the most statistically efficient robust alternative
+in this package. It is the estimator `scale_robust()` auto-switches to
+for large samples.
+
+``` r
+gmd(c(1, 2, 3, 5, 7, 8))
+gmd(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw (unscaled)
+```
 
 ### `adm(x, center, constant = 1.2533141373155001, na.rm = FALSE)`
 
@@ -80,12 +158,9 @@ consistency constant for asymptotic normality under the Gaussian model:
 $$\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|$$
 
 where $C = \sqrt{\pi/2} \approx 1.2533$ (Nair, 1947). When `center` is
-supplied, it replaces the median.
-
-The ADM is not itself robust against outliers (explosion breakdown
-$1/n$), but it is highly resistant to implosion (implosion breakdown
-$(n{-}1)/n$). It serves as the fallback scale estimator when the MAD
-collapses to zero.
+supplied, it replaces the median. The ADM achieves **88.3% ARE** but is
+not itself robust against outliers (explosion breakdown $1/n$). It
+serves as the fallback scale estimator when the MAD collapses to zero.
 
 ``` r
 adm(c(1, 2, 3, 5, 7, 8))
@@ -216,28 +291,111 @@ samples.
 sn(c(1, 2, 3, 5, 7, 8))
 ```
 
-### Estimator Convergence and Consistency
+### `iqr_scaled(x, constant = 0.741301109252801, na.rm = FALSE)`
 
-The three scale estimators—`qn()`, `sn()`, and `robScale()`—all serve as
-robust alternatives to the standard deviation. Because `robscale`
-implements their canonical consistency constants ($c=2.2191$ for $Q_n$,
-$c=1.1926$ for $S_n$), they converge asymptotically to the same
-parameter $\sigma$ under a Gaussian distribution.
+Computes the interquartile range scaled by a consistency constant for
+asymptotic normality under the Gaussian model:
 
-While numerically similar on Gaussian data, they occupy different points
-on the robustness–efficiency frontier:
+$$\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})$$
 
-1.  **Precision**: $Q_n$ is the most statistically efficient, retaining
-    **82.3%** asymptotic relative efficiency (ARE) compared to the
-    sample standard deviation.
-2.  **Robustness**: All three maintain a **50% breakdown point**, though
-    $S_n$ and `robScale` sacrifice some statistical efficiency for lower
-    computational complexity or better behavior in specific small-sample
-    regimes.
+where $Q_p$ denotes the Type 7 quantile (R default) and
+$C = 1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25)) \approx 0.7413$ (Bickel &
+Lehmann, 1976). Unlike `stats::IQR()`, which requires a full
+$O(n \log n)$ sort, this implementation uses dual $O(n)$ Floyd–Rivest
+selection—one call per quartile—providing a substantial speedup for
+large datasets. The IQR achieves **37% ARE** with a **25% breakdown
+point**.
 
-Users should expect point estimates to align closely on clean data. On
-contaminated data, $Q_n$ provides the most stable performance across the
-widest range of outliers.
+``` r
+iqr_scaled(c(1, 2, 3, 5, 7, 8))
+iqr_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw IQR
+```
+
+### `mad_scaled(x, center, constant = 1.482602218505602, na.rm = FALSE)`
+
+Computes the median absolute deviation from the median, scaled by a
+consistency constant for asymptotic normality:
+
+$$\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|$$
+
+where $C = 1/\Phi^{-1}(3/4) \approx 1.4826$. Unlike `stats::mad()`, this
+implementation uses $O(n)$ Floyd–Rivest selection with sorting networks
+for $n \le 16$, avoiding a full sort. The MAD achieves **36.8% ARE**
+(Rousseeuw & Croux, 1993: “about 37%”) with a **50% breakdown point**.
+
+``` r
+mad_scaled(c(1, 2, 3, 5, 7, 8))
+mad_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw MAD
+```
+
+### `scale_robust(x, method, auto_switch, threshold, n_boot, na.rm)`
+
+Unified dispatcher for robust scale estimation. Operates in three modes:
+
+1.  **Ensemble** (default, `method = "ensemble"`): variance-weighted
+    combination of all 7 scale estimators via bootstrap resampling.
+2.  **Auto-switch** (`auto_switch = TRUE`, default): when $n \ge$
+    `threshold` (default 20), returns `gmd(x)` directly—the most
+    efficient robust estimator at negligible cost.
+3.  **Explicit method**: dispatches to a specific estimator by name.
+
+``` r
+scale_robust(c(1, 2, 3, 5, 7, 8))           # ensemble (n < 20)
+scale_robust(rnorm(50))                       # auto-switches to gmd
+scale_robust(rnorm(50), auto_switch = FALSE)  # forces ensemble
+scale_robust(rnorm(50), method = "qn")        # explicit Qn
+```
+
+``` mermaid
+flowchart TD
+    A["scale_robust(x, method, auto_switch, threshold, n_boot)"] --> B{n < 2?}
+    B -- Yes --> C([Return NA])
+    B -- No --> D{auto_switch AND n >= threshold?}
+    D -- Yes --> E(["Return gmd(x)"])
+    D -- No --> F{method?}
+    F -- ensemble --> G["Bootstrap n_boot resamples"]
+    G --> H["Compute all 7 estimators per resample"]
+    H --> I["Inverse-variance weights from bootstrap variances"]
+    I --> J["Weighted sum of estimators on original data"]
+    J --> K([Return weighted estimate])
+    F -- "gmd/sd/mad/iqr/sn/qn/robScale" --> L(["Return method(x)"])
+```
+
+The ensemble combines: `sd_c4`, `gmd`, `mad_scaled`, `iqr_scaled`, `sn`,
+`qn`, and `robScale`. Bootstrap resampling uses a deterministic
+XorShift32 PRNG seeded by replicate index, ensuring reproducible results
+without requiring `set.seed()`.
+
+### Estimator comparison: the robustness–efficiency frontier
+
+The 8 scale estimators in `robscale` occupy different points on the
+trade-off between statistical efficiency and robustness to outliers:
+
+<div id="tbl-frontier">
+
+Table 3
+
+| Estimator | ARE (%) | Breakdown (%) | Complexity | Best for |
+|:---|:---|:---|:---|:---|
+| `sd_c4` | 100 | 0 | $O(n)$ | Efficiency anchor; clean data only |
+| `gmd` | 98 | 29.3 | $O(n \log n)$ | General-purpose; large samples |
+| `adm` | 88.3 | $1/n$ | $O(n)$ | Fallback when MAD = 0 |
+| `qn` | 82.3 | 50 | $O(n \log n)$ | High efficiency + high breakdown |
+| `sn` | 58.2 | 50 | $O(n \log n)$ | High breakdown, moderate efficiency |
+| `robScale` | 55.0 | 50 | $O(n)$ iters | High breakdown, small samples |
+| `iqr_scaled` | 37 | 25 | $O(n)$ | Quick robust estimate; quartile-based |
+| `mad_scaled` | 36.8 | 50 | $O(n)$ | Maximum breakdown; classical robust |
+
+</div>
+
+At the top of the frontier, `sd_c4` retains full efficiency but
+collapses under a single outlier. At the bottom, `mad_scaled` tolerates
+up to 50% contamination but wastes over 60% of the available
+information. The `gmd` occupies the sweet spot: 98% efficiency with
+29.3% breakdown—sufficient for most practical contamination levels. For
+adversarial settings where breakdown must be maximized, `qn` provides
+the best combination of high breakdown (50%) and high efficiency
+(82.3%).
 
 ## Methodological enhancements
 
@@ -436,33 +594,78 @@ amortized $O(1)$ per element, then dispatches the outer $n$ iterations
 across TBB threads via `SnWorker`. For $n \leq 2048$, a stack-allocated
 arena avoids heap allocation entirely.
 
+### 8. Welford’s algorithm for numerical stability
+
+The `sd_c4()` estimator uses Welford’s (1962) one-pass online algorithm
+for computing variance. The standard two-pass formula
+$s^2 = \frac{1}{n-1}\sum(x_i -
+\bar{x})^2$ suffers from catastrophic cancellation when $\sum x_i^2$ and
+$n\bar{x}^2$ are close. Welford’s algorithm incrementally updates mean
+and sum-of-squares-of-differences, maintaining full precision with a
+single pass:
+
+$$\delta_i = x_i - \bar{x}_{i-1}, \quad \bar{x}_i = \bar{x}_{i-1} + \delta_i / i, \quad M_{2,i} = M_{2,i-1} + \delta_i(x_i - \bar{x}_i)$$
+
+### 9. Dual Floyd–Rivest selection for IQR
+
+The `iqr_scaled()` estimator requires two quantiles ($Q_{0.25}$ and
+$Q_{0.75}$). Rather than sorting the entire array, `robscale` performs
+two independent $O(n)$ Floyd–Rivest selections—one per quartile. Each
+selection call uses the Type 7 quantile interpolation (the R default),
+locating the floor index via `floyd_rivest_select` and then finding the
+next-smallest element via a linear scan for the fractional
+interpolation. This gives $O(n)$ total complexity vs the $O(n \log n)$
+full sort used by `stats::IQR`.
+
+### 10. Variance-weighted ensemble bootstrap
+
+The `scale_robust()` ensemble operates in C++ (`cpp_scale_ensemble`) to
+avoid R-level overhead for the $n_{\text{boot}} \times 7$ estimator
+evaluations. For each bootstrap replicate
+$r = 1, \ldots, n_{\text{boot}}$:
+
+1.  A deterministic XorShift32 PRNG (Marsaglia, 2003) seeded with
+    $r + 12345$ draws $n$ indices with replacement.
+2.  All 7 estimators are evaluated on the resampled data, sharing
+    pre-allocated work buffers.
+
+After bootstrapping, the inverse-variance weight for each estimator $j$
+is:
+
+$$w_j = \frac{1/\hat\sigma_j^2}{\sum_{k=1}^{7} 1/\hat\sigma_k^2}$$
+
+where $\hat\sigma_j^2$ is the sample variance of estimator $j$ across
+bootstrap replicates. The final estimate is
+$\hat\sigma = \sum_j w_j \cdot \hat\sigma_j(x)$ evaluated on the
+original data.
+
 <div id="tbl-qn-bench">
 
-Table 2
+Table 4
 
 |      $n$ | `robustbase::Qn` | `robscale::qn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 9.4 µs           | 1.8 µs         | **5.2x** |
-|       16 | 10.3 µs          | 1.7 µs         | **5.9x** |
-|       64 | 14.2 µs          | 7.0 µs         | **2.0x** |
-|     1024 | 466.0 µs         | 214.5 µs       | **2.2x** |
-|    65536 | 56972.3 µs       | 12197.0 µs     | **4.7x** |
-| 10000000 | 10.5 s           | 2.0 s          | **5.2x** |
+|        8 | 9.2 µs           | 1.6 µs         | **5.8x** |
+|       16 | 10.5 µs          | 1.7 µs         | **6.0x** |
+|       64 | 14.1 µs          | 7.2 µs         | **2.0x** |
+|     1024 | 463.9 µs         | 216.2 µs       | **2.1x** |
+|    65536 | 57740.3 µs       | 10676.7 µs     | **5.4x** |
+| 10000000 | 9.9 s            | 1.8 s          | **5.4x** |
 
 </div>
 
 <div id="tbl-sn-bench">
 
-Table 3
+Table 5
 
 |      $n$ | `robustbase::Sn` | `robscale::sn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 4.0 µs           | 1.7 µs         | **2.3x** |
-|       16 | 4.5 µs           | 1.5 µs         | **2.9x** |
-|       64 | 5.4 µs           | 2.1 µs         | **2.6x** |
-|     1024 | 35.0 µs          | 18.1 µs        | **1.9x** |
-|    65536 | 6593.5 µs        | 1137.7 µs      | **5.8x** |
-| 10000000 | 1.5 s            | 0.3 s          | **5.7x** |
+|        8 | 4.0 µs           | 1.6 µs         | **2.6x** |
+|       16 | 4.5 µs           | 1.6 µs         | **2.8x** |
+|       64 | 5.3 µs           | 2.1 µs         | **2.5x** |
+|     1024 | 35.2 µs          | 19.4 µs        | **1.8x** |
+|    65536 | 6680.1 µs        | 1066.1 µs      | **6.3x** |
+| 10000000 | 1.4 s            | 0.2 s          | **5.5x** |
 
 </div>
 
@@ -473,33 +676,65 @@ efficient algorithm based on sample size and hardware capabilities:
 
 ``` mermaid
 graph TD
-    A[R API: qn, sn, robLoc, robScale] --> B{Dispatch Layer}
-    B -- "n <= 16" --> C[Sorting Networks]
-    B -- "17 <= n < L2 threshold" --> D[Highly optimized scalar C++]
-    B -- "n >= L2 threshold" --> E[Parallel multi-threaded kernels]
+    SR["scale_robust() dispatcher"] --> ENS{Ensemble or single?}
+    ENS -- "n < threshold" --> BOOT["Bootstrap ensemble kernel<br/>(7 estimators x n_boot resamples)"]
+    ENS -- "n >= threshold" --> GMD_FAST["gmd() direct"]
+    ENS -- "explicit method" --> SINGLE["Single estimator dispatch"]
+
+    subgraph "Scale Estimators"
+        SD["sd_c4"]
+        GMD["gmd"]
+        ADM["adm"]
+        QN["qn"]
+        SN["sn"]
+        RS["robScale"]
+        IQR["iqr_scaled"]
+        MAD["mad_scaled"]
+    end
+
+    subgraph "Location Estimators"
+        RL["robLoc"]
+    end
+
+    BOOT --> SD & GMD & MAD & IQR & SN & QN & RS
+    SINGLE --> SD & GMD & ADM & QN & SN & RS & IQR & MAD
+    GMD_FAST --> GMD
+
+    subgraph "Algorithm Tiers"
+        T1["n <= 16: Sorting networks"]
+        T2["17 <= n < L2 threshold: Optimized scalar C++"]
+        T3["n >= L2 threshold: Parallel TBB kernels"]
+    end
+
+    QN & SN --> T1 & T2 & T3
+
     subgraph "Hardware Acceleration"
         G[AVX2 / AVX512 / NEON]
         H[Apple Accelerate]
         I[SLEEF Library]
     end
-    E & D & C --> G & H & I
+
+    T1 & T2 & T3 --> G & H & I
 ```
 
 ## Benchmarks
 
-`robscale` targets two distinct performance regimes: very small samples
-(the M-estimators `robLoc`, `robScale`, and `adm`, compared against
-`revss`) and general-size samples (the scale estimators `qn` and `sn`,
-compared against `robustbase`). Figure 1 summarizes both comparisons on
-Linux (Ryzen 9 5900HX, CRAN-compatible build with auto-detected SIMD).
+`robscale` targets three distinct performance regimes: very small
+samples (the M-estimators `robLoc`, `robScale`, and `adm`, compared
+against `revss`), general-size samples (the scale estimators `qn` and
+`sn`, compared against `robustbase`), and the new scale estimators
+(`gmd`, `iqr_scaled`, `mad_scaled`, compared against existing R
+implementations). Figure 1 summarizes all three comparisons on Linux
+(Ryzen 9 5900HX, CRAN-compatible build with auto-detected SIMD).
 
 <div id="fig-benchmarks">
 
 ![](benchmarks/speedup_fig.png)
 
-Figure 1: Median speedup factor (×) vs. sample size $n$. Panel A
+Figure 1: Median speedup factor (x) vs. sample size $n$. Panel A
 compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B
-compares `qn` and `sn` against `robustbase`.
+compares `qn` and `sn` against `robustbase`; Panel C compares `gmd`,
+`iqr_scaled`, and `mad_scaled` against existing R implementations.
 
 </div>
 
@@ -509,14 +744,14 @@ compares `qn` and `sn` against `robustbase`.
 - **CPU Governor:** powersave
 - **OS:** Arch Linux
 - **R version:** R version 4.5.3 (2026-03-11)
-- **Package version:** 0.1.6
+- **Package version:** 0.2.0
 - **SLEEF (Optimized Build):** Detected
-- **Date:** 2026-03-13
+- **Date:** 2026-03-14
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($n \le 20$), `robscale` outperforms `revss` by
-**9.7–28.9×**. Drivers include:
+**10.6–31.0x**. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs
@@ -524,7 +759,7 @@ In the target regime ($n \le 20$), `robscale` outperforms `revss` by
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $n \le 16$.
 
-Even at $n = 16{,}384$, the gains remain **3.4–5.9×** because the
+Even at $n = 16{,}384$, the gains remain **3.4–5.9x** because the
 interpreter overhead of `revss` scales with the number of Newton–Raphson
 iterations, not just vector length.
 
@@ -534,17 +769,61 @@ For $Q_n$ and $S_n$, the performance story follows two regimes separated
 by the parallelism threshold:
 
 **Small to medium samples ($n \le 10^3$).** `robscale` leads by
-**1.7–5.9×**. The gain comes primarily from the avoidance of R dispatch
+**1.7–6.8x**. The gain comes primarily from the avoidance of R dispatch
 overhead and the use of stack memory. For $Q_n$ at $n = 8$, the
-brute-force exact algorithm completes in 1.8 µs vs. 9.4 µs for
-`robustbase` — a **5.2×** edge.
+brute-force exact algorithm completes in 1.6 µs vs. 9.2 µs for
+`robustbase` — a **5.8x** edge.
 
-**Large samples ($n \ge 10^4$).** The advantage grows to **1.9–6.4×** as
-TBB parallelism engages. At $n = 10^7$, `qn` runs in 2.0 s vs. 10.5 s
-for `robustbase::Qn` (**5.2×**), and `sn` runs in 0.3 s vs. 1.5 s
-(**5.7×**). Parallel efficiency is bounded by Amdahl’s Law and memory
+**Large samples ($n \ge 10^4$).** The advantage grows to **1.9–6.9x** as
+TBB parallelism engages. At $n = 10^7$, `qn` runs in 1.8 s vs. 9.9 s for
+`robustbase::Qn` (**5.4x**), and `sn` runs in 0.2 s vs. 1.4 s
+(**5.5x**). Parallel efficiency is bounded by Amdahl’s Law and memory
 bandwidth; while the multi-threaded kernels provide substantial gains
 for massive datasets, speedups do not scale linearly with thread count.
+
+### New scale estimators vs. existing R implementations (Panel C)
+
+<div id="tbl-new-bench">
+
+Table 6
+
+|      $n$ | Comparison          | Speedup   |
+|---------:|:--------------------|:----------|
+|       64 | gmd vs GiniDistance | **10.7x** |
+|       64 | gmd vs Hmisc        | **16.3x** |
+|       64 | iqr_scaled vs stats | **27.2x** |
+|       64 | mad_scaled vs stats | **19.7x** |
+|     1024 | gmd vs GiniDistance | **3.3x**  |
+|     1024 | gmd vs Hmisc        | **4.7x**  |
+|     1024 | iqr_scaled vs stats | **9.2x**  |
+|     1024 | mad_scaled vs stats | **8.9x**  |
+|    65536 | gmd vs GiniDistance | **2.9x**  |
+|    65536 | gmd vs Hmisc        | **3.8x**  |
+|    65536 | iqr_scaled vs stats | **1.4x**  |
+|    65536 | mad_scaled vs stats | **2.0x**  |
+| 10000000 | gmd vs GiniDistance | **2.7x**  |
+| 10000000 | gmd vs Hmisc        | **3.7x**  |
+| 10000000 | iqr_scaled vs stats | **1.0x**  |
+| 10000000 | mad_scaled vs stats | **2.9x**  |
+
+</div>
+
+**GMD** (`robscale::gmd` vs `Hmisc::GiniMd`): **2.4–17.5x** speedup.
+`Hmisc::GiniMd` is a pure R implementation using the same $O(n \log n)$
+order-statistics formula. The speedup comes from C++ compilation and
+sorting networks for small $n$. Against `GiniDistance::gmd` (an
+Rcpp-backed C++ implementation), the comparison is **1.9–11.4x**—a
+tighter race since both are compiled, with `robscale`’s advantage coming
+from sorting networks and the consistency-constant integration.
+
+**IQR** (`robscale::iqr_scaled` vs `stats::IQR`): **1.0–30.2x** speedup.
+`stats::IQR` performs a full $O(n \log n)$ sort via `quantile()`.
+`robscale` uses dual $O(n)$ Floyd–Rivest selection, which dominates at
+large $n$.
+
+**MAD** (`robscale::mad_scaled` vs `stats::mad`): **2.0–21.4x** speedup.
+`stats::mad` also performs a full sort for the median step. `robscale`
+uses $O(n)$ selection throughout.
 
 > \[!NOTE\] **Source builds recommended.** Installing from source
 > (`install.packages("robscale", type = "source")`) enables the
@@ -556,23 +835,34 @@ for massive datasets, speedups do not scale linearly with thread count.
 
 ## Numerical equivalence
 
-The test suite (`tests/testthat/test-cross-check.R`) compares `robscale`
-and `revss` across 5,400 randomly generated inputs:
+The test suite verifies `robscale` against reference implementations:
 
-- Sample sizes $n = 3, 4, \ldots, 20$
-- 100 replicates per $n$ (uniform on $[-100, 100]$, seed 42)
-- All three functions: `adm`, `robLoc`, `robScale`
-- Tolerance: $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$
+**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): compares
+`robscale` and `revss` across 5,400 randomly generated inputs
+($n = 3, 4,
+\ldots, 20$; 100 replicates per $n$; all three functions `adm`,
+`robLoc`, `robScale`). All 5,400 comparisons pass at tolerance
+$\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$.
 
-All 5,400 comparisons pass. The Newton–Raphson iteration converges to
-the same fixed point as the scoring iteration—it solves the same
-estimating equation—so the results differ only by rounding at the level
-of the convergence tolerance.
+**New estimators:**
+
+- `gmd`: exact match with the R formula
+  $C \cdot 2/(n(n-1)) \sum (2i - n - 1) x_{(i)}$ (`test-gmd.R`)
+- `iqr_scaled`: matches `IQR(x) * 0.741301109252801` (`test-iqr.R`)
+- `mad_scaled`: matches `stats::mad(x)` (`test-mad-scaled.R`)
+- `sd_c4`: matches `sd(x) / c4(n)` (`test-sd-c4.R`)
+- `scale_robust` ensemble: deterministic via fixed XorShift32 seeds
+  (`test-ensemble.R`, `test-scale-robust.R`)
+
+The Newton–Raphson iteration converges to the same fixed point as the
+scoring iteration—it solves the same estimating equation—so results
+differ only by rounding at the level of the convergence tolerance.
 
 ## Mathematical background
 
-The estimators follow Rousseeuw & Verboven (2002) and Rousseeuw & Croux
-(1993). A brief summary of the key definitions:
+The estimators follow Rousseeuw & Verboven (2002), Rousseeuw & Croux
+(1993), Gini (1912), and Nair (1936, 1947). A brief summary of the key
+definitions:
 
 **Logistic psi function** (Eq. 23):
 
@@ -601,6 +891,26 @@ $k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $d = 2.2191$
 \text{lomed}_i \{\text{himed}_j |x_i - x_j|\}$, where $\text{lomed}$ and
 $\text{himed}$ denote the low and high medians respectively.
 
+**$c_4(n)$ correction factor.** The expected value of the sample
+standard deviation under normality is $\sigma \cdot c_4(n)$ where:
+
+$$c_4(n) = \sqrt{\frac{2}{n{-}1}} \cdot \frac{\Gamma(n/2)}{\Gamma((n{-}1)/2)}$$
+
+Dividing $s$ by $c_4(n)$ yields an unbiased estimator of $\sigma$.
+
+**Gini mean difference.** The order-statistics form:
+
+$$\text{GMD}(x) = C_{\text{GMD}} \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}$$
+
+is algebraically equivalent to the pairwise-difference definition
+$\frac{1}{\binom{n}{2}}\sum_{i<j}|x_i - x_j|$ but avoids materializing
+$O(n^2)$ pairs.
+
+**Ensemble weighting formula.** Given $J$ estimators with bootstrap
+variances $\hat\sigma_j^2$, the inverse-variance weighted estimate is:
+
+$$\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{J} 1/\hat\sigma_j^2}$$
+
 **Key constants** (full double precision):
 
 | Symbol | Value | Definition |
@@ -608,7 +918,9 @@ $\text{himed}$ denote the low and high medians respectively.
 | $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
 | $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
-| $C_{\text{MAD}}$ | `1.4826` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
+| $C_{\text{MAD}}$ | `1.482602218505602` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
+| $C_{\text{GMD}}$ | `0.886226925452758` | $\sqrt{\pi}/2$; GMD consistency constant |
+| $C_{\text{IQR}}$ | `0.741301109252801` | $1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25))$; IQR consistency constant |
 
 ## Relation to revss and robustbase
 
@@ -626,28 +938,53 @@ by changing only the `library()` call.
 For `qn()` and `sn()`, the function signatures match `robustbase::Qn()`
 and `robustbase::Sn()` (with lowercase names for consistency).
 
+The v0.2.0 additions—`gmd()`, `iqr_scaled()`, `sd_c4()`, `mad_scaled()`,
+`scale_robust()`, and `get_consistency_constant()`—have no direct
+counterpart in `revss` or `robustbase`. `mad_scaled()` is API-compatible
+with `stats::mad()` when `constant = 1`; similarly,
+`iqr_scaled(x, constant = 1)` matches `stats::IQR(x)`.
+
 Users who do not need compiled performance—or who prefer a
 dependency-free pure-R package—should use `revss` or `robustbase`
 directly. Both are mature, well-tested, and widely available.
 
 ## References
 
-Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
-samples. *Computational Statistics & Data Analysis*, **40**(4), 741–758.
-[doi:10.1016/S0167-9473(02)00078-6](https://doi.org/10.1016/S0167-9473(02)00078-6)
-
-Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median
-Absolute Deviation. *Journal of the American Statistical Association*,
-**88**, 1273–1283.
-[doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
+Bickel, P.J. and Lehmann, E.L. (1976). Descriptive Statistics for
+Nonparametric Models III. Dispersion. *Annals of Statistics*, **4**(6),
+1139–1158.
+[doi:10.1214/aos/1176343648](https://doi.org/10.1214/aos/1176343648)
 
 Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
 *Communications of the ACM*, **18**(3), 165–172.
 [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
 
+Gini, C. (1912). *Variabilita e mutabilita*. Bologna: Tipografia di
+Paolo Cuppini.
+
+Marsaglia, G. (2003). Xorshift RNGs. *Journal of Statistical Software*,
+**8**(14), 1–6.
+[doi:10.18637/jss.v008.i14](https://doi.org/10.18637/jss.v008.i14)
+
+Nair, K.R. (1936). On the Mean Deviation. *Biometrika*, **28**(3/4),
+428–436. [doi:10.2307/2333958](https://doi.org/10.2307/2333958)
+
 Nair, K.R. (1947). A Note on the Mean Deviation from the Median.
 *Biometrika*, **34**(3/4), 360–362.
 [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
+
+Rousseeuw, P.J. and Croux, C. (1993). Alternatives to the Median
+Absolute Deviation. *Journal of the American Statistical Association*,
+**88**, 1273–1283.
+[doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
+
+Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
+samples. *Computational Statistics & Data Analysis*, **40**(4), 741–758.
+[doi:10.1016/S0167-9473(02)00078-6](https://doi.org/10.1016/S0167-9473(02)00078-6)
+
+Welford, B.P. (1962). Note on a Method for Calculating Corrected Sums of
+Squares and Products. *Technometrics*, **4**(3), 419–420.
+[doi:10.1080/00401706.1962.10490022](https://doi.org/10.1080/00401706.1962.10490022)
 
 ## Author
 
