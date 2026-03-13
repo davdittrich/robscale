@@ -191,7 +191,9 @@ benchmark_legacy <- function() {
           gmd = Hmisc::GiniMd(x) * 0.886226925452758,
           gmd_gd = GiniDistance::gmd(x) * 0.886226925452758,
           iqr_scaled = stats::IQR(x) * 0.741301109252801,
+          iqr_collapse = diff(collapse::fquantile(x, c(0.25, 0.75))) * 0.741301109252801,
           mad_scaled = stats::mad(x),
+          mad_collapse = collapse::fmad(x, na.rm = FALSE),
           check = FALSE,
           min_iterations = get_min_iters(n),
           min_time = 1.0
