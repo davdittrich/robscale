@@ -29,7 +29,7 @@
 #' time, this implementation employs a specialized \eqn{O(n \log n)} algorithm.
 #' The package utilizes a tiered execution strategy:
 #' \itemize{
-#'   \item \bold{Optimal sorting networks} for very small samples (\eqn{n \le 8}).
+#'   \item \bold{Optimal sorting networks} for very small samples (\eqn{n \le 16}).
 #'     These networks eliminate branch misprediction in the target regimes of
 #'     extremely small samples.
 #'   \item A specialized \bold{Johnson--Mizoguchi selection} algorithm for

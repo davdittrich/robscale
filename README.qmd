@@ -314,7 +314,7 @@ qn(c(1, 2, 3, 5, 7, 8))
 
 Computes the $S_n$ estimator of scale (Rousseeuw & Croux, 1993). $S_n$ is more
 statistically efficient than the MAD and maintains a 50% breakdown point.
-`robscale` uses optimal sorting networks for $n \le 8$ and a highly
+`robscale` uses optimal sorting networks for $n \le 16$ and a highly
 optimized parallelized inner-median algorithm for general samples.
 
 ```r
@@ -432,10 +432,11 @@ and `mad()`, which call `sort()` internally: an $O(n \log n)$ operation.
 single linear scan over the upper partition locates the $(k{+}1)$th element
 needed for averaging.
 
-For $n \leq 8$---the core target regime---the selection step uses optimal
-sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4). These are conditional
-compare-and-swap sequences---typically compiled to branchless machine code at
-`-O2`---with the minimum number of comparisons for each $n$:
+For $n \leq 16$---the core target regime---the selection step uses optimal
+sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4; Dobbelaere's verified
+optimal networks for $n = 9$--$16$). These are conditional compare-and-swap
+sequences---typically compiled to branchless machine code at `-O2`---with the
+minimum number of comparisons for each $n$:
 
 | $n$ | Comparators |
 | ---: | ---: |
@@ -445,8 +446,16 @@ compare-and-swap sequences---typically compiled to branchless machine code at
 | 6 | 12 |
 | 7 | 16 |
 | 8 | 19 |
+| 9 | 25 |
+| 10 | 29 |
+| 12 | 39 |
+| 14 | 51 |
+| 16 | 60 |
 
-For $9 \leq n < 600$, the code delegates to `std::nth_element` (introselect),
+Cross-platform benchmarking confirmed 2--4$\times$ speedups over `std::sort`
+for $n = 9$--$16$ on both ARM64 (Apple Silicon) and x86\_64 (AMD Zen 3).
+
+For $17 \leq n < 600$, the code delegates to `std::nth_element` (introselect),
 which provides $O(n)$ worst-case selection with median-of-three pivot
 selection. For $n \geq 600$, the Floyd--Rivest algorithm (Floyd & Rivest,
 1975) applies a statistical narrowing step that reduces the active window to
@@ -535,8 +544,8 @@ based on sample size and hardware capabilities:
 ```mermaid
 graph TD
     A[R API: qn, sn, robLoc, robScale] --> B{Dispatch Layer}
-    B -- "n <= 8" --> C[Sorting Networks]
-    B -- "8 < n < 32768" --> D[Highly optimized scalar C++]
+    B -- "n <= 16" --> C[Sorting Networks]
+    B -- "16 < n < 32768" --> D[Highly optimized scalar C++]
     B -- "n >= 32768" --> E[Parallel multi-threaded kernels]
     subgraph "Hardware Acceleration"
         G[AVX2 / AVX512 / NEON]
@@ -577,7 +586,7 @@ In the target regime ($n \le 20$), `robscale` outperforms `revss` by
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs 6–8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
-- Deploying optimal sorting networks for $n \le 8$.
+- Deploying optimal sorting networks for $n \le 16$.
 
 Even at $n = 16{,}384$, the gains remain **3.5×–4.3×** because the interpreter
 overhead of `revss` scales with the number of Newton–Raphson iterations, not

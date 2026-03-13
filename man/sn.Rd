@@ -41,7 +41,7 @@ algorithm, avoiding the \eqn{O(n^2)} complexity of the naive definition.
 The execution strategy is tiered for maximum efficiency:
 \itemize{
   \item \bold{Optimal sorting networks} are used for the target regime of
-    very small samples (\eqn{n \le 8}). These networks minimize control
+    very small samples (\eqn{n \le 16}). These networks minimize control
     flow overhead and maximize pipeline utilization.
   \item \bold{Highly tuned kernels} are employed for general datasets,
     leveraging C++17 features for cache-aware computation.

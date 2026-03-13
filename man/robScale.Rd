@@ -8,7 +8,7 @@ robScale(
   x,
   loc = NULL,
   fallback = c("adm", "na"),
-  implbound = 0.0001,
+  implbound = 1e-04,
   na.rm = FALSE,
   maxit = 80L,
   tol = sqrt(.Machine$double.eps)
