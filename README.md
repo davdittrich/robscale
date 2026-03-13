@@ -489,7 +489,15 @@ compared against `robustbase`). Figure 1 summarizes both comparisons on
 Linux (Ryzen 9 5900HX, CRAN-compatible build with no ROBSCALE_FAST
 optimizations).
 
-    [1] "benchmarks/speedup_fig.png"
+<div id="fig-benchmarks">
+
+![](benchmarks/speedup_fig.png)
+
+Figure 1: Median speedup factor (×) vs. sample size $n$. Panel A
+compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B
+compares `qn` and `sn` against `robustbase`.
+
+</div>
 
 **Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
 Graphics - **CPU Governor:** powersave - **OS:** Arch Linux - **R
@@ -560,7 +568,14 @@ The following figure explicitly compares the performance of `robscale`
 when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the
 unoptimized (portable) version of the package across all sample sizes.
 
-    [1] "benchmarks/fast_slow_fig.png"
+<div id="fig-fast-slow">
+
+![](benchmarks/fast_slow_fig.png)
+
+Figure 2: Comparison of optimized (`ROBSCALE_FAST=1`) vs. unoptimized
+builds.
+
+</div>
 
 The gains in the optimized build come primarily from SIMD vectorization
 (AVX2/AVX512/Accelerate) and aggressive transcendental function

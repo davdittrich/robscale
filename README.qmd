@@ -639,7 +639,7 @@ CRAN-compatible build with no ROBSCALE_FAST optimizations).
 ```{r}
 #| label: fig-benchmarks
 #| fig-cap: "Median speedup factor (×) vs. sample size $n$. Panel A compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B compares `qn` and `sn` against `robustbase`."
-tar_read(speedup_figure)
+knitr::include_graphics(tar_read(speedup_figure))
 ```
 
 **Benchmark environment:**
@@ -712,10 +712,10 @@ The following figure explicitly compares the performance of `robscale` when comp
 
 ```{r}
 #| label: fig-fast-slow
-#| fig-cap: "Median speedup factor (×) of optimized vs. unoptimized builds with 95% BCa confidence bands. Note logarithmic scales."
+#| fig-cap: "Comparison of optimized (`ROBSCALE_FAST=1`) vs. unoptimized builds."
 #| fig-width: 8
 #| fig-height: 5
-tar_read(fast_slow_figure)
+knitr::include_graphics(tar_read(fast_slow_figure))
 ```
 
 The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion `r if(isTRUE(benchmark_report$fast$has_sleef)) "(using the SLEEF library for vectorized math)" else ""`. On large samples, the optimized version also benefits from tuned threading thresholds that more effectively leverage TBB.
