@@ -9,17 +9,34 @@
 None, this is a package documentation object.
 }
 \description{
-Robust estimation ensures statistical reliability in data 
-contaminated by outliers. Yet, computational bottlenecks in existing R 
-implementations frequently obstruct both very small sample analysis and 
-large-scale processing. 'robscale' resolves these inefficiencies by 
-providing high-performance C++17 implementations of logistic M-estimators
-and the Qn and Sn scale estimators. By leveraging platform-specific Single
-Instruction, Multiple Data (SIMD) vectorization and Intel Threading 
-Building Blocks (TBB) parallelism, the package delivers speedups of 
-11–39x for small samples and up to 10x for massive datasets. These 
-performance gains enable the integration of robust statistics into modern, 
-time-critical computational workflows.
+A comprehensive suite of high-performance robust scale and location
+estimators. The package provides:
+}
+\details{
+\strong{Scale estimators:}
+\itemize{
+  \item \code{\link{qn}}, \code{\link{sn}} --- Rousseeuw & Croux (1993) with
+    SIMD and TBB parallelism
+  \item \code{\link{robScale}} --- logistic M-estimator with Newton-Raphson
+    and SIMD-accelerated tanh
+  \item \code{\link{gmd}} --- Gini mean difference (98\% ARE)
+  \item \code{\link{mad_scaled}}, \code{\link{iqr_scaled}} --- scaled MAD and
+    IQR with O(n) selection
+  \item \code{\link{sd_c4}} --- unbiased standard deviation with c4 correction
+  \item \code{\link{adm}} --- average distance to the median (implosion fallback)
+}
+
+\strong{Location estimator:}
+\itemize{
+  \item \code{\link{robLoc}} --- logistic M-estimator of location
+}
+
+\strong{Unified API:}
+\itemize{
+  \item \code{\link{scale_robust}} --- adaptive dispatcher with
+    variance-weighted ensemble for small samples, automatic GMD switching
+    for larger samples
+}
 }
 \references{
 Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.

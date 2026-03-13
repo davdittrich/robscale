@@ -1,22 +1,19 @@
 Package: robscale
 Type: Package
 Title: Faster Robustness: Accelerated Estimation of Location and Scale
-Version: 0.1.6
+Version: 0.2.0
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
-Description: Robust estimation ensures statistical reliability in data
-    contaminated by outliers. Yet, computational bottlenecks in existing 'R'
-    implementations frequently obstruct both very small sample analysis and
-    large-scale processing. 'robscale' resolves these inefficiencies by
-    providing high-performance implementations of logistic M-estimators
-    and the 'Qn' and 'Sn' scale estimators. By leveraging platform-specific Single
-    Instruction, Multiple Data (SIMD) vectorization and Intel Threading
-    Building Blocks (TBB) parallelism, the package delivers speedups of
-    11–39x for small samples and up to 10x for massive datasets. These
-    performance gains enable the integration of robust statistics into modern,
-    time-critical computational workflows. Replaces 'revss' with an 'Rcpp'
-    backend.
+Description: A comprehensive suite of high-performance robust scale and
+    location estimators. Provides logistic M-estimators, the 'Qn' and 'Sn'
+    scale estimators of Rousseeuw & Croux (1993), the Gini mean difference,
+    scaled MAD and IQR, unbiased standard deviation, and a variance-weighted
+    ensemble that adaptively combines all estimators. Leverages
+    platform-specific SIMD vectorization and Intel Threading Building Blocks
+    (TBB) parallelism for speedups of 2-39x over existing implementations.
+    A unified dispatcher ('scale_robust') automatically selects the optimal
+    estimator based on sample size. Replaces 'revss' with an 'Rcpp' backend.
 License: MIT + file LICENSE
 URL: https://github.com/davdittrich/robscale,
     https://doi.org/10.5281/zenodo.18828607
