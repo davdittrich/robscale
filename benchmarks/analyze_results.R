@@ -53,7 +53,7 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
 }
 
 #' Analyze all benchmark results
-analyze_benchmarks <- function(rob_fast, rob_slow, legacy, rob_legacy_015 = NULL) {
+analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
   # Helper to flatten bench_mark objects
   flatten_bench <- function(bm, label) {
     if (is.null(bm)) return(NULL)
@@ -74,9 +74,6 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy, rob_legacy_015 = NULL
   df_leg_revss <- flatten_bench(legacy$revss, "legacy")
   df_leg_robustbase <- flatten_bench(legacy$robustbase, "legacy")
   
-  # 0.1.5 Gold Standard comparisons
-  df_015_m <- if(!is.null(rob_legacy_015)) flatten_bench(rob_legacy_015$m_estimators, "0.1.5") else NULL
-  df_015_scale <- if(!is.null(rob_legacy_015)) flatten_bench(rob_legacy_015$scale_estimators, "0.1.5") else NULL
   
   # Combine into comparison sets
   # 1. Optimized vs Legacy (External Packages)
@@ -93,14 +90,6 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy, rob_legacy_015 = NULL
     df_fast_scale %>% inner_join(df_slow_scale, by = c("n", "expr"), suffix = c("_fast", "_slow"))
   )
 
-  # 4. Optimized vs 0.1.5 Gold Standard
-  comp_fast_015 <- if(!is.null(df_015_m)) {
-    bind_rows(
-      df_fast_m %>% inner_join(df_015_m, by = c("n", "expr"), suffix = c("_fast", "_015")),
-      df_fast_scale %>% inner_join(df_015_scale, by = c("n", "expr"), suffix = c("_fast", "_015"))
-    )
-  } else NULL
-  
   # Mapping function to apply bootstrap across rows
   run_analysis <- function(df, target_col, ref_col) {
     if (is.null(df) || nrow(df) == 0) return(NULL)
@@ -113,11 +102,10 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy, rob_legacy_015 = NULL
       unnest_wider(analysis) %>%
       ungroup()
   }
-  
+
   list(
     leg_small = run_analysis(comp_leg_small, "time_fast", "time_leg"),
     leg_large = run_analysis(comp_leg_large, "time_fast", "time_leg"),
-    fast_slow = run_analysis(comp_fast_slow, "time_fast", "time_slow"),
-    fast_015 = run_analysis(comp_fast_015, "time_fast", "time_015")
+    fast_slow = run_analysis(comp_fast_slow, "time_fast", "time_slow")
   )
 }
