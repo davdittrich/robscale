@@ -539,51 +539,13 @@ for `robustbase::Qn` (**5.2×**), and `sn` runs in 0.3 s vs. 1.5 s
 bandwidth; while the multi-threaded kernels provide substantial gains
 for massive datasets, speedups do not scale linearly with thread count.
 
-> \[!IMPORTANT\] **Peak Performance Note**: To unlock maximum
-> hardware-specific speedups (including SIMD auto-discovery and
-> microbenchmark-tuned thresholds), install the package from source with
-> the `ROBSCALE_FAST=1` environment variable set:
->
-> **From the terminal:**
->
-> ``` bash
-> ROBSCALE_FAST=1 R CMD INSTALL robscale
-> ```
->
-> **From an R session (RStudio):**
->
-> ``` r
-> Sys.setenv(ROBSCALE_FAST = "1")
-> # Install from CRAN (compiling from source for peak performance)
-> install.packages("robscale", type = "source")
->
-> # Or install from GitHub (requires remotes/devtools)
-> remotes::install_github("davdittrich/robscale")
-> ```
->
-> Default CRAN binaries use conservative, portable settings to ensure
-> compatibility across all architectures.
-
-### Comparison: Optimized vs. Unoptimized builds
-
-The following figure explicitly compares the performance of `robscale`
-when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the
-unoptimized (portable) version of the package across all sample sizes.
-
-<div id="fig-fast-slow">
-
-![](benchmarks/fast_slow_fig.png)
-
-Figure 2: Comparison of optimized (`ROBSCALE_FAST=1`) vs. unoptimized
-builds.
-
-</div>
-
-The gains in the optimized build come primarily from SIMD vectorization
-(AVX2/AVX512/Accelerate) and aggressive transcendental function
-expansion (using the SLEEF library for vectorized math). On large
-samples, the optimized version also benefits from tuned threading
-thresholds that more effectively leverage TBB.
+> \[!NOTE\] **Source builds recommended.** Installing from source
+> (`install.packages("robscale", type = "source")`) enables the
+> `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64,
+> NEON on ARM64) and link platform-specific libraries (Apple Accelerate,
+> SLEEF). Pre-built CRAN binaries use portable settings and may not
+> include these optimizations. Parallelism thresholds are derived from
+> the detected per-core L2 cache size at runtime on all platforms.
 
 ## Numerical equivalence
 
