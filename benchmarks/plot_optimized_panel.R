@@ -45,7 +45,7 @@ p2 <- ggplot(df_right, aes(x = n, y = speedup, color = estimator, fill = estimat
 
 # Combine with patchwork
 p_combined <- p1 + p2 + plot_annotation(
-  title = "robscale Speedup over Legacy Implementations (ROBSCALE_FAST=TRUE)",
+  title = "robscale Speedup over Legacy Implementations",
   subtitle = "Speedup = Median(Legacy) / Median(robscale). Ribbon is 95% bootstrap CI."
 )
 

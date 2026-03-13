@@ -50,9 +50,9 @@
   parallelization.
 * Added `robustbase` to `Suggests` for reference and benchmarking.
 * Added documentation examples for all five exported functions.
-* Performance optimizations: Fixed `configure` script to ensure that
-  hardware-specific SIMD flags (e.g., `-mavx2`) are strictly opt-in
-  via `ROBSCALE_FAST=1`.
+* Performance optimizations: `configure` script auto-detects SIMD
+  capabilities (AVX2/FMA on x86_64, NEON on ARM64) without requiring
+  any environment variables.
 
 # robscale 0.1.1
 

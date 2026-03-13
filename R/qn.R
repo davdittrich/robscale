@@ -35,7 +35,8 @@
 #'   \item A specialized \bold{Johnson--Mizoguchi selection} algorithm for
 #'     medium-sized datasets.
 #'   \item \bold{Cache-aware parallelization} via Intel TBB (Threading Building
-#'     Blocks, when \code{ROBSCALE_FAST=1}) for large-scale data.
+#'     Blocks) for large-scale data, with thresholds derived from the detected
+#'     per-core L2 cache size.
 #' }
 #'
 #' @references
