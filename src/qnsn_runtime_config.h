@@ -50,41 +50,23 @@ private:
   }
 
   void calculate_thresholds() {
-    // Per-core L2 estimate (conservative: divide by logical cores)
-    size_t per_core_l2 = hw.l2_cache_size / (std::max)(hw.num_logical_cores, size_t(1));
+    size_t per_core_l2 = hw.l2_per_core;  // Correct on all platforms
 
     // --- Sort thresholds ---
-    // sort_boost: std::sort → boost::spreadsort crossover
-    #ifdef TUNED_SORT_BOOST_THRESHOLD
-    sort_boost_threshold = TUNED_SORT_BOOST_THRESHOLD;
-    #else
-    sort_boost_threshold = ROBSCALE_SORT_BOOST_THRESHOLD;
-    #endif
+    sort_boost_threshold = ROBSCALE_SORT_BOOST_THRESHOLD;  // 512, not cache-sensitive
 
     // sort_tbb: go parallel when data exceeds per-core L2
     // Each element is 8 bytes (double), sorting needs ~2x workspace
-    #ifdef TUNED_SORT_TBB_THRESHOLD
-    sort_tbb_threshold = TUNED_SORT_TBB_THRESHOLD;
-    #else
     sort_tbb_threshold = (std::max)(size_t(4096), per_core_l2 / (sizeof(double) * 2));
-    #endif
 
     // --- Parallel thresholds ---
     // Qn: inner loop does binary searches + writes to bounds arrays (3 arrays)
-    #ifdef TUNED_QN_PARALLEL_THRESHOLD
-    qn_parallel_threshold = TUNED_QN_PARALLEL_THRESHOLD;
-    #else
     qn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) + 2 * sizeof(int32_t)));
-    #endif
 
     // Sn: inner loop accesses sorted_x + writes inner_medians (2 arrays)
-    #ifdef TUNED_SN_PARALLEL_THRESHOLD
-    sn_parallel_threshold = TUNED_SN_PARALLEL_THRESHOLD;
-    #else
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
-    #endif
 
     // --- Grain size ---
     // Each grain block should fit in per-core L2

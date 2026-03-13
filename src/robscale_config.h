@@ -26,23 +26,11 @@
  * These paths use stack-allocated buffers and bypass Rcpp boundary overhead.
  */
 
-// Performance-critical thresholds for Qn/Sn (Aligned to v0.1.5 Gold Standard)
+// Fixed thresholds (not cache-sensitive; cache-sensitive thresholds are
+// derived from hw.l2_per_core at runtime in RuntimeConfig::calculate_thresholds)
 #define ROBSCALE_QN_EXACT_THRESHOLD    64
 #define ROBSCALE_SN_STACK_THRESHOLD    2048
-#define ROBSCALE_SN_PARALLEL_THRESHOLD 12288
-#define ROBSCALE_QN_PARALLEL_THRESHOLD 8192
-#define ROBSCALE_SORT_TBB_THRESHOLD    6144
-#define ROBSCALE_TBB_GRAIN_SIZE       1024
-
-// Default sort crossover (std::sort → boost::spreadsort)
 #define ROBSCALE_SORT_BOOST_THRESHOLD  512
-
-// Include tuned thresholds if auto-tuning was run (FAST=1 builds).
-// Tuned values (TUNED_SORT_BOOST_THRESHOLD, TUNED_SORT_TBB_THRESHOLD, etc.)
-// override the defaults above via RuntimeConfig::calculate_thresholds().
-#ifdef ROBSCALE_HAS_TUNED_THRESHOLDS
-#include "qnsn_tuned_thresholds.h"
-#endif
 
 
 // --- Portability & Optimization Macros ---
