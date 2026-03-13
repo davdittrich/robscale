@@ -33,12 +33,22 @@
 #'     flow overhead and maximize pipeline utilization.
 #'   \item \bold{Highly tuned kernels} are employed for general datasets,
 #'     leveraging C++17 features for cache-aware computation.
+#'   \item \bold{Cache-aware parallelization} via Intel TBB (Threading Building
+#'     Blocks) for large-scale data, with thresholds derived from the detected
+#'     per-core L2 cache size.
 #' }
 #'
 #' @references
 #' Rousseeuw, P. J., and Croux, C. (1993). Alternatives to the Median Absolute Deviation.
 #' \emph{Journal of the American Statistical Association}, \bold{88}(424), 1273--1283.
 #' \doi{10.1080/01621459.1993.10476408}
+#'
+#' Akinshin, A. (2022). Finite-sample Rousseeuw-Croux scale estimators.
+#' \emph{arXiv preprint arXiv:2209.12268}.
+#'
+#' @seealso \code{\link{qn}} for the \eqn{Q_n} scale estimator;
+#'   \code{\link{robScale}} for the M-estimator of scale;
+#'   \code{\link{adm}} for the average distance to median.
 #'
 #' @examples
 #' sn(c(1:9))

@@ -34,7 +34,7 @@
 #' strictly monotone. These properties ensure that the resulting M-estimator is
 #' both robust to outliers and numerically stable. At the Gaussian distribution,
 #' the logistic M-estimator of location achieves high efficiency, with an
-#' \bold{asymptotic relative efficiency (ARE) of 0.95} compared to the sample
+#' \bold{asymptotic relative efficiency (ARE) of 0.98} compared to the sample
 #' mean.
 #'
 #' \strong{Small-Sample Strategy.}

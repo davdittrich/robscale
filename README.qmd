@@ -222,7 +222,7 @@ format_speedup_range <- function(df, estimator_name) {
 api_data <- data.frame(
   Function = c("`qn(x)`", "`sn(x)`", "`robLoc(x)`", "`robScale(x)`", "`adm(x)`"),
   Purpose = c("$Q_n$ scale estimator", "$S_n$ scale estimator", "M-estimate of location", "M-estimate of scale", "Average distance to median"),
-  ARE = c("**82.3%**", "**58.2%**", "**41.3%**", "**60.5%**", "**88.3%**"),
+  ARE = c("**82.3%**", "**58.2%**", "**98.4%**", "**55.0%**", "**88.3%**"),
   Breakdown = c("50%", "50%", "50%", "50%", "$1/n$"),
   `Speedup vs revss` = c("—", "—", 
                          format_speedup_range(m_analyzed, "robLoc"),
