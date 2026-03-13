@@ -53,7 +53,7 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
 }
 
 #' Analyze all benchmark results
-analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
+analyze_benchmarks <- function(rob, legacy) {
   # Helper to flatten bench_mark objects
   flatten_bench <- function(bm, label) {
     if (is.null(bm)) return(NULL)
@@ -65,30 +65,20 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
       ) %>%
       select(n, expr, time, label)
   }
-  
-  df_fast_m <- flatten_bench(rob_fast$m_estimators, "fast")
-  df_fast_scale <- flatten_bench(rob_fast$scale_estimators, "fast")
-  df_slow_m <- flatten_bench(rob_slow$m_estimators, "slow")
-  df_slow_scale <- flatten_bench(rob_slow$scale_estimators, "slow")
-  
+
+  df_rob_m <- flatten_bench(rob$m_estimators, "robscale")
+  df_rob_scale <- flatten_bench(rob$scale_estimators, "robscale")
+
   df_leg_revss <- flatten_bench(legacy$revss, "legacy")
   df_leg_robustbase <- flatten_bench(legacy$robustbase, "legacy")
-  
-  
-  # Combine into comparison sets
-  # 1. Optimized vs Legacy (External Packages)
-  comp_leg_small <- df_fast_m %>%
-    inner_join(df_leg_revss, by = c("n", "expr"), suffix = c("_fast", "_leg"))
-  
-  # 2. Optimized vs Legacy (External Packages - Large)
-  comp_leg_large <- df_fast_scale %>%
-    inner_join(df_leg_robustbase, by = c("n", "expr"), suffix = c("_fast", "_leg"))
-    
-  # 3. Optimized vs Unoptimized (Current Implementation)
-  comp_fast_slow <- bind_rows(
-    df_fast_m %>% inner_join(df_slow_m, by = c("n", "expr"), suffix = c("_fast", "_slow")),
-    df_fast_scale %>% inner_join(df_slow_scale, by = c("n", "expr"), suffix = c("_fast", "_slow"))
-  )
+
+  # 1. robscale vs revss (M-estimators)
+  comp_leg_small <- df_rob_m %>%
+    inner_join(df_leg_revss, by = c("n", "expr"), suffix = c("_rob", "_leg"))
+
+  # 2. robscale vs robustbase (Scale estimators)
+  comp_leg_large <- df_rob_scale %>%
+    inner_join(df_leg_robustbase, by = c("n", "expr"), suffix = c("_rob", "_leg"))
 
   # Mapping function to apply bootstrap across rows
   run_analysis <- function(df, target_col, ref_col) {
@@ -104,8 +94,7 @@ analyze_benchmarks <- function(rob_fast, rob_slow, legacy) {
   }
 
   list(
-    leg_small = run_analysis(comp_leg_small, "time_fast", "time_leg"),
-    leg_large = run_analysis(comp_leg_large, "time_fast", "time_leg"),
-    fast_slow = run_analysis(comp_fast_slow, "time_fast", "time_slow")
+    leg_small = run_analysis(comp_leg_small, "time_rob", "time_leg"),
+    leg_large = run_analysis(comp_leg_large, "time_rob", "time_leg")
   )
 }

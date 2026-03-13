@@ -1,21 +1,14 @@
 #!/usr/bin/env Rscript
 # Quick regression check for robscale — lightweight standalone alternative to the
-# full _targets.R pipeline. Runs three comparisons (FAST=1 vs legacy, FAST=0 vs
-# legacy, FAST=1 vs FAST=0) on a reduced grid and prints pass/warn/fail verdicts.
+# full _targets.R pipeline. Compares robscale vs legacy packages (revss/robustbase)
+# on a reduced grid and prints pass/warn/fail verdicts.
 #
-# Usage: Rscript benchmarks/quick_regression_check.R          (all 3 comparisons, quick)
-#        Rscript benchmarks/quick_regression_check.R --comp3  (FAST=1 vs FAST=0 only, full iterations)
-# Expected runtime: ~3-5 min (default), ~5-10 min (--comp3)
+# Usage: Rscript benchmarks/quick_regression_check.R
+# Expected runtime: ~3-5 min
 
 library(bench)
 library(withr)
 library(dplyr, warn.conflicts = FALSE)
-
-# ---------------------------------------------------------------------------
-# CLI arguments
-# ---------------------------------------------------------------------------
-args <- commandArgs(trailingOnly = TRUE)
-COMP3_ONLY <- "--comp3" %in% args
 
 # ---------------------------------------------------------------------------
 # Grid definitions
@@ -23,8 +16,7 @@ COMP3_ONLY <- "--comp3" %in% args
 n_m <- c(4L, 8L, 16L, 64L, 256L, 1024L, 4096L, 16384L)
 n_qnsn <- c(8L, 32L, 128L, 512L, 2048L, 8192L, 32768L, 131072L, 524288L, 1048576L)
 
-# Quick mode: 10x fewer iterations than the full pipeline
-get_iters_quick <- function(n) {
+get_iters <- function(n) {
   if (n <= 128L)       200L
   else if (n <= 4096L) 100L
   else if (n <= 65536L) 50L
@@ -32,28 +24,15 @@ get_iters_quick <- function(n) {
   else                  20L
 }
 
-# Full mode: matches the full _targets.R pipeline
-get_iters_full <- function(n) {
-  if (n <= 128L)        2000L
-  else if (n <= 2048L)  1000L
-  else if (n <= 16384L)  200L
-  else if (n <= 1048576L) 50L
-  else                    20L
-}
-
-get_iters <- if (COMP3_ONLY) get_iters_full else get_iters_quick
-
 # ---------------------------------------------------------------------------
-# Installation helpers (mirrors run_benchmarks.R)
+# Installation helper
 # ---------------------------------------------------------------------------
-install_robscale <- function(fast, lib_path) {
+install_robscale <- function(lib_path) {
   dir.create(lib_path, showWarnings = FALSE, recursive = TRUE)
   current_libs <- .libPaths()
   env_libs <- paste(current_libs, collapse = .Platform$path.sep)
-  envs <- c(ROBSCALE_FAST = as.character(fast),
-            R_LIBS = env_libs,
-            R_LIBS_USER = env_libs)
-  message("Installing robscale (FAST=", fast, ") into ", lib_path, " ...")
+  envs <- c(R_LIBS = env_libs, R_LIBS_USER = env_libs)
+  message("Installing robscale into ", lib_path, " ...")
   res <- system2(
     R.home("bin/R"),
     args = c("CMD", "INSTALL", ".", paste0("--library=", lib_path),
@@ -62,7 +41,7 @@ install_robscale <- function(fast, lib_path) {
     stdout = TRUE, stderr = TRUE
   )
   if (!is.null(attr(res, "status"))) {
-    stop("Installation failed (FAST=", fast, "): ", paste(res, collapse = "\n"))
+    stop("Installation failed: ", paste(res, collapse = "\n"))
   }
   invisible(res)
 }
@@ -203,55 +182,29 @@ print_table <- function(df, title) {
 # ===========================================================================
 main <- function() {
   start_time <- proc.time()
+  message("Quick regression check: robscale vs legacy (revss/robustbase)")
 
-  if (COMP3_ONLY) {
-    message("Mode: --comp3 (FAST=1 vs FAST=0 only, full iterations)")
-  } else {
-    message("Mode: default (all 3 comparisons, quick iterations)")
-  }
+  # 1. Install robscale
+  lib <- tempfile("robscale_")
+  install_robscale(lib_path = lib)
 
-  # 1. Install two builds
-  lib_fast <- tempfile("robscale_fast_")
-  lib_slow <- tempfile("robscale_slow_")
-  install_robscale(fast = 1, lib_path = lib_fast)
-  install_robscale(fast = 0, lib_path = lib_slow)
+  # 2. Benchmark legacy packages
+  message("\nBenchmarking legacy packages (revss + robustbase) ...")
+  legacy <- bench_legacy()
 
-  # 2. Benchmark legacy packages (skip in --comp3 mode)
-  if (!COMP3_ONLY) {
-    message("\nBenchmarking legacy packages (revss + robustbase) ...")
-    legacy <- bench_legacy()
-  }
+  # 3. Benchmark robscale
+  message("\nBenchmarking robscale ...")
+  rob <- bench_robscale_build(lib)
 
-  # 3. Benchmark FAST=1
-  message("\nBenchmarking robscale FAST=1 ...")
-  fast <- bench_robscale_build(lib_fast)
+  # 4. Compute speedups
+  comp <- compute_speedup(rob, legacy, "robscale_vs_legacy")
 
-  # 4. Benchmark FAST=0
-  message("\nBenchmarking robscale FAST=0 ...")
-  slow <- bench_robscale_build(lib_slow)
+  # 5. Print results
+  print_table(comp, "robscale vs legacy (revss/robustbase)")
 
-  # 5. Compute speedups
-  if (!COMP3_ONLY) {
-    comp1 <- compute_speedup(fast, legacy, "FAST1_vs_legacy")
-    comp2 <- compute_speedup(slow, legacy, "FAST0_vs_legacy")
-  }
-  comp3 <- compute_speedup(fast, slow, "FAST1_vs_FAST0")
-
-  # 6. Print results
-  if (!COMP3_ONLY) {
-    print_table(comp1, "Comparison 1: robscale FAST=1 vs legacy (revss/robustbase)")
-    print_table(comp2, "Comparison 2: robscale FAST=0 vs legacy (revss/robustbase)")
-  }
-  print_table(comp3, "Comparison 3: robscale FAST=1 vs FAST=0")
-
-  # 7. Overall verdict
-  if (COMP3_ONLY) {
-    all_results <- comp3
-  } else {
-    all_results <- bind_rows(comp1, comp2, comp3)
-  }
-  any_fail <- any(all_results$status == "FAIL")
-  any_warn <- any(all_results$status == "WARN")
+  # 6. Overall verdict
+  any_fail <- any(comp$status == "FAIL")
+  any_warn <- any(comp$status == "WARN")
 
   cat("\n", strrep("=", 70), "\n")
   if (any_fail) {
@@ -265,11 +218,10 @@ main <- function() {
   cat(sprintf("  Total time: %.1f seconds\n", elapsed))
   cat(strrep("=", 70), "\n")
 
-  # 8. Save CSV
-  suffix <- if (COMP3_ONLY) "_comp3" else ""
+  # 7. Save CSV
   out_file <- file.path("benchmarks",
-                        paste0("quick_check_", format(Sys.Date(), "%Y%m%d"), suffix, ".csv"))
-  write_df <- all_results |>
+                        paste0("quick_check_", format(Sys.Date(), "%Y%m%d"), ".csv"))
+  write_df <- comp |>
     mutate(
       median_new_s = as.numeric(median_new),
       median_ref_s = as.numeric(median_ref)

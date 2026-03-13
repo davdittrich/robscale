@@ -635,7 +635,7 @@ graph TD
 M-estimators `robLoc`, `robScale`, and `adm`, compared against `revss`) and
 general-size samples (the scale estimators `qn` and `sn`, compared against
 `robustbase`). Figure 1 summarizes both comparisons on Linux (Ryzen 9 5900HX,
-CRAN-compatible build with no ROBSCALE_FAST optimizations).
+source build).
 
 ```{r}
 #| label: fig-benchmarks
@@ -649,7 +649,7 @@ knitr::include_graphics(tar_read(speedup_figure))
 - **OS:** `r sys_os`
 - **R version:** `r sys_r`
 - **Package version:** `r pkg_version`
-- **SLEEF (Optimized Build):** `r ifelse(isTRUE(benchmark_report$fast$has_sleef), "Detected", "Not Detected")`
+- **SLEEF:** `r ifelse(isTRUE(benchmark_report$fast$has_sleef), "Detected", "Not Detected")`
 - **Date:** `r sys_date`
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
@@ -684,43 +684,12 @@ Parallel efficiency is bounded by Amdahl's Law and memory bandwidth; while the
 multi-threaded kernels provide substantial gains for massive datasets,
 speedups do not scale linearly with thread count.
 
-> [!IMPORTANT]
-> **Peak Performance Note**: To unlock maximum hardware-specific speedups
-> (including SIMD flags like `-mavx2 -mfma`), install the package from source
-> with the `ROBSCALE_FAST=1` environment variable set:
->
-> **From the terminal:**
-> ```bash
-> ROBSCALE_FAST=1 R CMD INSTALL robscale
-> ```
->
-> **From an R session (RStudio):**
-> ```r
-> Sys.setenv(ROBSCALE_FAST = "1")
-> # Install from CRAN (compiling from source for peak performance)
-> install.packages("robscale", type = "source")
->
-> # Or install from GitHub (requires remotes/devtools)
-> remotes::install_github("davdittrich/robscale")
-> ```
->
-> Default CRAN binaries use conservative, portable settings to ensure
-> compatibility across all architectures. Cache-aware parallelism thresholds
-> are derived from the detected L2 cache size at runtime in both builds.
-
-### Comparison: Optimized vs. Unoptimized builds
-
-The following figure explicitly compares the performance of `robscale` when compiled with peak optimizations (`ROBSCALE_FAST=1`) against the unoptimized (portable) version of the package across all sample sizes.
-
-```{r}
-#| label: fig-fast-slow
-#| fig-cap: "Comparison of optimized (`ROBSCALE_FAST=1`) vs. unoptimized builds."
-#| fig-width: 8
-#| fig-height: 5
-knitr::include_graphics(tar_read(fast_slow_figure))
-```
-
-The gains in the optimized build come primarily from SIMD vectorization (AVX2/AVX512/Accelerate) and aggressive transcendental function expansion `r if(isTRUE(benchmark_report$fast$has_sleef)) "(using the SLEEF library for vectorized math)" else ""`. Parallelism thresholds are now derived from hardware (L2 cache per core) at runtime in both builds, so the FAST=1 advantage is purely SIMD instruction selection.
+> [!NOTE]
+> **Source builds recommended.** Installing from source (`install.packages("robscale", type = "source")`)
+> enables the `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64, NEON on ARM64)
+> and link platform-specific libraries (Apple Accelerate, SLEEF). Pre-built CRAN binaries
+> use portable settings and may not include these optimizations. Parallelism thresholds
+> are derived from the detected per-core L2 cache size at runtime on all platforms.
 
 ## Numerical equivalence
 
