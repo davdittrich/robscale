@@ -152,7 +152,9 @@ max_large_speedup <- format_speedup(max(s_analyzed$median_speedup))
 gmd_hmisc <- n_analyzed %>% filter(expr == "gmd vs Hmisc")
 gmd_gd <- n_analyzed %>% filter(expr == "gmd vs GiniDistance")
 iqr_stats <- n_analyzed %>% filter(expr == "iqr_scaled vs stats")
+iqr_collapse <- n_analyzed %>% filter(expr == "iqr_scaled vs collapse")
 mad_stats <- n_analyzed %>% filter(expr == "mad_scaled vs stats")
+mad_collapse <- n_analyzed %>% filter(expr == "mad_scaled vs collapse")
 
 gmd_hmisc_min <- format_speedup(min(gmd_hmisc$median_speedup, na.rm = TRUE))
 gmd_hmisc_max <- format_speedup(max(gmd_hmisc$median_speedup, na.rm = TRUE))
@@ -160,8 +162,12 @@ gmd_gd_min <- format_speedup(min(gmd_gd$median_speedup, na.rm = TRUE))
 gmd_gd_max <- format_speedup(max(gmd_gd$median_speedup, na.rm = TRUE))
 iqr_stats_min <- format_speedup(min(iqr_stats$median_speedup, na.rm = TRUE))
 iqr_stats_max <- format_speedup(max(iqr_stats$median_speedup, na.rm = TRUE))
+iqr_collapse_min <- format_speedup(min(iqr_collapse$median_speedup, na.rm = TRUE))
+iqr_collapse_max <- format_speedup(max(iqr_collapse$median_speedup, na.rm = TRUE))
 mad_stats_min <- format_speedup(min(mad_stats$median_speedup, na.rm = TRUE))
 mad_stats_max <- format_speedup(max(mad_stats$median_speedup, na.rm = TRUE))
+mad_collapse_min <- format_speedup(min(mad_collapse$median_speedup, na.rm = TRUE))
+mad_collapse_max <- format_speedup(max(mad_collapse$median_speedup, na.rm = TRUE))
 ```
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -992,11 +998,18 @@ sorting networks and the consistency-constant integration.
 
 **IQR** (`robscale::iqr_scaled` vs `stats::IQR`): **`r iqr_stats_min`--`r iqr_stats_max`x** speedup.
 `stats::IQR` performs a full $O(n \log n)$ sort via `quantile()`. `robscale`
-uses dual $O(n)$ Floyd--Rivest selection, which dominates at large $n$.
+uses dual $O(n)$ Floyd--Rivest selection, which dominates at large $n$. Against
+`collapse::fquantile` (a C-backed quantile implementation), the speedup is
+**`r iqr_collapse_min`--`r iqr_collapse_max`x**---a more informative comparison
+since both are compiled, revealing whether Floyd--Rivest selection outpaces
+`collapse`'s C implementation.
 
 **MAD** (`robscale::mad_scaled` vs `stats::mad`): **`r mad_stats_min`--`r mad_stats_max`x** speedup.
-`stats::mad` also performs a full sort for the median step. `robscale` uses
-$O(n)$ selection throughout.
+`stats::mad` performs a full sort for the median step. Against
+`collapse::fmad` (a C-backed fast MAD), the speedup is
+**`r mad_collapse_min`--`r mad_collapse_max`x**---the key comparison since both
+are compiled; `robscale`'s advantage comes from $O(n)$ Floyd--Rivest selection
+vs `collapse`'s sorting-based approach.
 
 > [!NOTE]
 > **Source builds recommended.** Installing from source (`install.packages("robscale", type = "source")`)
