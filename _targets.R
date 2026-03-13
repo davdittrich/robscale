@@ -14,21 +14,29 @@ source("benchmarks/analyze_results.R")
 
 # Pipeline
 list(
+  # Track source files
+  tar_target(src_files, list.files("src", recursive = TRUE, full.names = TRUE), format = "file"),
+  tar_target(r_files, list.files("R", recursive = TRUE, full.names = TRUE), format = "file"),
+  
   # Benchmark legacy (robustbase, revss)
   tar_target(legacy_bench, benchmark_legacy()),
   
   # Benchmark robscale unoptimized
-  tar_target(rob_unoptimized, benchmark_robscale(install_env = list(ROBSCALE_FAST = "0"))),
+  tar_target(rob_unoptimized, {
+    force(src_files)
+    force(r_files)
+    benchmark_robscale(install_env = list(ROBSCALE_FAST = "0"))
+  }),
   
   # Benchmark robscale optimized
-  tar_target(rob_optimized, benchmark_robscale(install_env = list(ROBSCALE_FAST = "1"))),
+  tar_target(rob_optimized, {
+    force(src_files)
+    force(r_files)
+    benchmark_robscale(install_env = list(ROBSCALE_FAST = "1"))
+  }),
   
-  # Benchmark robscale 0.1.5 Gold Standard (Unoptimized)
-  tar_target(rob_legacy_015, benchmark_robscale(install_env = list(ROBSCALE_FAST = "0"), 
-                                               source_path = "/tmp/robscale_clean_015")),
-
   # Rigorous statistical analysis
-  tar_target(analyzed_results, analyze_benchmarks(rob_optimized, rob_unoptimized, legacy_bench, rob_legacy_015)),
+  tar_target(analyzed_results, analyze_benchmarks(rob_optimized, rob_unoptimized, legacy_bench)),
   
   tar_target(benchmark_report, {
     list(
@@ -55,13 +63,6 @@ list(
     path
   }, format = "file"),
 
-  # Create detailed Gold Standard comparison plot
-  tar_target(detailed_gold_figure_obj, plot_detailed_gold(analyzed_results)),
-  tar_target(detailed_gold_figure, {
-    path <- "benchmarks/detailed_gold_figure.png"
-    ggsave(path, detailed_gold_figure_obj, width = 10, height = 6)
-    path
-  }, format = "file"),
   
   # Render README.qmd
   tar_quarto(readme, "README.qmd")

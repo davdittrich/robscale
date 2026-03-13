@@ -15,10 +15,10 @@ time-critical workflows.
 `robscale` resolves both bottlenecks. Its C++17 kernels replace
 interpreted R loops with SIMD-accelerated transcendental functions,
 Newton–Raphson iteration, and parallelized $O(n \log n)$ algorithms.
-Against `revss`, the package achieves **3.3–29.4×** speedups for the
+Against `revss`, the package achieves **9.7–28.6×** speedups for the
 small-sample M-estimators. Against `robustbase`, it achieves
-**1.9–5.8×** for $S_n$ and **1.8–6.1×** for $Q_n$ —with gains peaking
-near **6.1×** at $n = 10^7$ as TBB parallelism reduces the computational
+**1.9–6.5×** for $S_n$ and **1.8–6.0×** for $Q_n$ —with gains peaking
+near **6.5×** at $n = 10^7$ as TBB parallelism reduces the computational
 bottleneck for massive datasets.
 
 ## Installation
@@ -62,11 +62,11 @@ Table 1
 
 | Function | Purpose | ARE | Breakdown | Speedup vs revss | Speedup vs robustbase |
 |:---|:---|:---|:---|:---|:---|
-| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.8x** \[1.8x, 1.8x\] to **6.1x** \[6.1x, 6.2x\] |
-| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.9x** \[1.9x, 1.9x\] to **5.8x** \[5.3x, 6.1x\] |
-| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.8x** \[3.8x, 3.8x\] to **29.4x** \[29.3x, 29.5x\] | — |
-| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.3x** \[3.3x, 3.3x\] to **24.2x** \[24.2x, 24.2x\] | — |
-| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.6x** \[5.6x, 5.6x\] to **12.4x** \[12.4x, 12.5x\] | — |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | — | **1.8x** \[1.8x, 1.8x\] to **6.0x** \[5.9x, 6.1x\] |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | — | **1.9x** \[1.9x, 1.9x\] to **6.5x** \[6.2x, 6.7x\] |
+| `robLoc(x)` | M-estimate of location | **41.3%** | 50% | **3.7x** \[3.7x, 3.7x\] to **28.6x** \[28.5x, 28.8x\] | — |
+| `robScale(x)` | M-estimate of scale | **60.5%** | 50% | **3.3x** \[3.3x, 3.3x\] to **23.7x** \[23.7x, 23.8x\] | — |
+| `adm(x)` | Average distance to median | **88.3%** | $1/n$ | **5.4x** \[5.4x, 5.5x\] to **13.0x** \[13.0x, 13.1x\] | — |
 
 </div>
 
@@ -208,7 +208,7 @@ qn(c(1, 2, 3, 5, 7, 8))
 
 Computes the $S_n$ estimator of scale (Rousseeuw & Croux, 1993). $S_n$
 is more statistically efficient than the MAD and maintains a 50%
-breakdown point. `robscale` uses optimal sorting networks for $n \le 8$
+breakdown point. `robscale` uses optimal sorting networks for $n \le 16$
 and a highly optimized parallelized inner-median algorithm for general
 samples.
 
@@ -337,11 +337,11 @@ operation.
 a single linear scan over the upper partition locates the $(k{+}1)$th
 element needed for averaging.
 
-For $n \leq 8$—the core target regime—the selection step uses optimal
-sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4). These are
-conditional compare-and-swap sequences—typically compiled to branchless
-machine code at `-O2`—with the minimum number of comparisons for each
-$n$:
+For $n \leq 16$—the core target regime—the selection step uses optimal
+sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4; Dobbelaere’s verified
+optimal networks for $n = 9$–$16$). These are conditional
+compare-and-swap sequences—typically compiled to branchless machine code
+at `-O2`—with the minimum number of comparisons for each $n$:
 
 | $n$ | Comparators |
 |----:|------------:|
@@ -351,8 +351,17 @@ $n$:
 |   6 |          12 |
 |   7 |          16 |
 |   8 |          19 |
+|   9 |          25 |
+|  10 |          29 |
+|  12 |          39 |
+|  14 |          51 |
+|  16 |          60 |
 
-For $9 \leq n < 600$, the code delegates to `std::nth_element`
+Cross-platform benchmarking confirmed 2–4$\times$ speedups over
+`std::sort` for $n = 9$–$16$ on both ARM64 (Apple Silicon) and x86_64
+(AMD Zen 3).
+
+For $17 \leq n < 600$, the code delegates to `std::nth_element`
 (introselect), which provides $O(n)$ worst-case selection with
 median-of-three pivot selection. For $n \geq 600$, the Floyd–Rivest
 algorithm (Floyd & Rivest, 1975) applies a statistical narrowing step
@@ -424,21 +433,33 @@ search (exploiting sortedness) in O(log n) per element, then dispatches
 the outer $n$ iterations across TBB threads via `SnWorker`. For
 $n \leq 2048$, a stack-allocated arena avoids heap allocation entirely.
 
-|        $n$ | `robustbase::Qn` ($\mu s$) | `robscale::qn` ($\mu s$) |  Speedup |
-|-----------:|---------------------------:|-------------------------:|---------:|
-|          8 |                        8.9 |                      1.3 | **6.8×** |
-|         64 |                       13.6 |                      5.3 | **2.6×** |
-|      1 024 |                      462.7 |                    276.9 | **1.7×** |
-|     65 536 |                     49 324 |                   12 247 | **4.0×** |
-| 10 000 000 |                 23 374 593 |                2 403 552 | **9.7×** |
+<div id="tbl-qn-bench">
 
-|        $n$ | `robustbase::Sn` ($\mu s$) | `robscale::sn` ($\mu s$) |  Speedup |
-|-----------:|---------------------------:|-------------------------:|---------:|
-|          8 |                        4.1 |                      1.3 | **3.3×** |
-|         64 |                        5.3 |                      1.8 | **3.0×** |
-|      1 024 |                       33.0 |                     17.4 | **1.9×** |
-|     65 536 |                      7 265 |                    1 315 | **5.5×** |
-| 10 000 000 |                  1 461 045 |                  250 588 | **5.8×** |
+Table 2
+
+|      $n$ | `robustbase::Qn` | `robscale::qn` | Speedup  |
+|---------:|:-----------------|:---------------|:---------|
+|        8 | 9.3 µs           | 1.8 µs         | **5.1x** |
+|       64 | 14.2 µs          | 7.1 µs         | **2.0x** |
+|     1024 | 465.9 µs         | 217.8 µs       | **2.1x** |
+|    65536 | 57191.7 µs       | 9542.6 µs      | **6.0x** |
+| 10000000 | 10.0 s           | 2.2 s          | **4.6x** |
+
+</div>
+
+<div id="tbl-sn-bench">
+
+Table 3
+
+|      $n$ | `robustbase::Sn` | `robscale::sn` | Speedup  |
+|---------:|:-----------------|:---------------|:---------|
+|        8 | 4.0 µs           | 1.8 µs         | **2.2x** |
+|       64 | 5.4 µs           | 2.3 µs         | **2.4x** |
+|     1024 | 35.3 µs          | 18.4 µs        | **1.9x** |
+|    65536 | 6610.7 µs        | 1147.8 µs      | **5.8x** |
+| 10000000 | 1.4 s            | 0.3 s          | **5.4x** |
+
+</div>
 
 ## Architecture overview
 
@@ -448,8 +469,8 @@ efficient algorithm based on sample size and hardware capabilities:
 ``` mermaid
 graph TD
     A[R API: qn, sn, robLoc, robScale] --> B{Dispatch Layer}
-    B -- "n <= 8" --> C[Sorting Networks]
-    B -- "8 < n < 32768" --> D[Highly optimized scalar C++]
+    B -- "n <= 16" --> C[Sorting Networks]
+    B -- "16 < n < 32768" --> D[Highly optimized scalar C++]
     B -- "n >= 32768" --> E[Parallel multi-threaded kernels]
     subgraph "Hardware Acceleration"
         G[AVX2 / AVX512 / NEON]
@@ -472,21 +493,21 @@ optimizations).
 
 **Benchmark environment:** - **Machine:** AMD Ryzen 9 5900HX with Radeon
 Graphics - **CPU Governor:** powersave - **OS:** Arch Linux - **R
-version:** R version 4.5.2 (2025-10-31) - **Package version:** 0.1.5 -
-**SLEEF (Optimized Build):** Detected - **Date:** 2026-03-12
+version:** R version 4.5.3 (2026-03-11) - **Package version:** 0.1.6 -
+**SLEEF (Optimized Build):** Detected - **Date:** 2026-03-13
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($n \le 20$), `robscale` outperforms `revss` by
-**11×–39×**. Drivers include:
+**9.7–28.6×**. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs
   6–8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
-- Deploying optimal sorting networks for $n \le 8$.
+- Deploying optimal sorting networks for $n \le 16$.
 
-Even at $n = 16{,}384$, the gains remain **3.5×–4.3×** because the
+Even at $n = 16{,}384$, the gains remain **3.3–5.9×** because the
 interpreter overhead of `revss` scales with the number of Newton–Raphson
 iterations, not just vector length.
 
@@ -496,15 +517,15 @@ For $Q_n$ and $S_n$, the performance story follows two regimes separated
 by the parallelism threshold:
 
 **Small to medium samples ($n \le 10^3$).** `robscale` leads by
-**1.7×–6.8×**. The gain comes primarily from the avoidance of R dispatch
+**1.8–6.0×**. The gain comes primarily from the avoidance of R dispatch
 overhead and the use of stack memory. For $Q_n$ at $n = 8$, the
-brute-force exact algorithm completes in 1.3 µs vs. 8.9 µs for
-`robustbase` — a **6.8×** edge.
+brute-force exact algorithm completes in 1.8 µs µs vs. 9.3 µs µs for
+`robustbase` — a **5.1×** edge.
 
-**Large samples ($n \ge 10^4$).** The advantage grows to **4×–10×** as
-TBB parallelism engages. At $n = 10^7$, `qn` runs in 2.4 s vs. 23.4 s
-for `robustbase::Qn` (**9.7×**), and `sn` runs in 0.25 s vs. 1.46 s
-(**5.8×**). Parallel efficiency is bounded by Amdahl’s Law and memory
+**Large samples ($n \ge 10^4$).** The advantage grows to **3.8–6.5×** as
+TBB parallelism engages. At $n = 10^7$, `qn` runs in 2.2 s s vs. 10.0 s
+s for `robustbase::Qn` (**4.6×**), and `sn` runs in 0.3 s s vs. 1.4 s s
+(**5.4×**). Parallel efficiency is bounded by Amdahl’s Law and memory
 bandwidth; while the multi-threaded kernels provide substantial gains
 for massive datasets, speedups do not scale linearly with thread count.
 

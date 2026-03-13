@@ -26,30 +26,43 @@ format_speedup <- function(x) {
 # Load benchmark results
 tar_load(benchmark_report)
 
+# Sanitize dataframes (unlist list-columns from targets/bench)
+# M-estimators (revss)
+m_analyzed <- benchmark_report$analyzed$leg_small %>%
+  mutate(n = as.numeric(unlist(n)))
+
+m_raw_rob <- benchmark_report$fast$m_estimators %>%
+  mutate(n = as.numeric(unlist(n)), expr = as.character(expression))
+m_raw_ref <- benchmark_report$legacy$revss %>%
+  mutate(n = as.numeric(unlist(n)), expr = as.character(expression))
+
+# Scale-estimators (robustbase)
+s_analyzed <- benchmark_report$analyzed$leg_large %>%
+  mutate(n = as.numeric(unlist(n)))
+
+s_raw_rob <- benchmark_report$fast$scale_estimators %>%
+  mutate(n = as.numeric(unlist(n)), expr = as.character(expression))
+s_raw_ref <- benchmark_report$legacy$robustbase %>%
+  mutate(n = as.numeric(unlist(n)), expr = as.character(expression))
+
 # 0. Capture System Metadata
 sys_info <- sessioninfo::platform_info()
 
-# Dynamic Hardware Info
+# ... (rest of metadata functions) ...
 get_cpu_name <- function() {
   if (file.exists("/proc/cpuinfo")) {
     cpu_info <- system("grep 'model name' /proc/cpuinfo | head -n1 | cut -d':' -f2", intern = TRUE)
     if (length(cpu_info) > 0) return(trimws(cpu_info))
   } else {
-    # Try macOS fallback
     cpu_brand <- try(system("sysctl -n machdep.cpu.brand_string", intern = TRUE), silent = TRUE)
     if (!inherits(cpu_brand, "try-error") && length(cpu_brand) > 0) return(trimws(cpu_brand))
   }
   return("Unknown CPU")
 }
 
-# CPU Scaling Governor (Linux only)
 get_cpu_governor <- function() {
   gov_path <- "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  if (file.exists(gov_path)) {
-    trimws(readLines(gov_path, n = 1))
-  } else {
-    "unknown"
-  }
+  if (file.exists(gov_path)) trimws(readLines(gov_path, n = 1)) else "unknown"
 }
 
 hw_cpu <- get_cpu_name()
@@ -57,8 +70,6 @@ sys_gov <- get_cpu_governor()
 sys_os <- sys_info$os
 sys_r <- sys_info$version
 sys_date <- as.character(Sys.Date())
-
-# Version from DESCRIPTION
 pkg_version <- read.dcf("DESCRIPTION")[, "Version"]
 
 # Helper to format speedup with CI
@@ -68,14 +79,29 @@ format_speedup_ci <- function(med, lo, hi) {
   sprintf("**%sx** [%sx, %sx]", format_speedup(med), format_speedup(lo), format_speedup(hi))
 }
 
-# 1. Processing M-estimators (Panel A: robscale (fast) vs revss)
-m_analyzed <- benchmark_report$analyzed$leg_small
+# Helper to format durations (expects seconds)
+format_duration <- function(s_val) {
+  if (is.null(s_val) || is.na(s_val)) return("—")
+  s_val <- as.numeric(s_val)
+  if (s_val < 0.1) {
+    # Less than 100ms -> use µs
+    sprintf("%.1f µs", s_val * 1e6)
+  } else {
+    # 100ms or more -> use s
+    sprintf("%.1f s", s_val)
+  }
+}
 
-m_speedup_min <- format_speedup(min(m_analyzed$median_speedup))
-m_speedup_max <- format_speedup(max(m_analyzed$median_speedup))
+# 1. Processing M-estimators (Panel A: robscale (fast) vs revss)
+m_target_regime <- m_analyzed %>% filter(n <= 20)
+m_speedup_min <- format_speedup(min(m_target_regime$median_speedup))
+m_speedup_max <- format_speedup(max(m_target_regime$median_speedup))
+
+m_16k <- m_analyzed %>% filter(n == 16384)
+m_16k_min <- format_speedup(min(m_16k$median_speedup))
+m_16k_max <- format_speedup(max(m_16k$median_speedup))
 
 # 2. Processing Scale-estimators (Panel B: robscale (fast) vs robustbase)
-s_analyzed <- benchmark_report$analyzed$leg_large
 qn_analyzed <- s_analyzed %>% filter(expr == "qn")
 sn_analyzed <- s_analyzed %>% filter(expr == "sn")
 
@@ -85,8 +111,35 @@ qn_speedup_max <- format_speedup(max(qn_analyzed$median_speedup))
 sn_speedup_min <- format_speedup(min(sn_analyzed$median_speedup))
 sn_speedup_max <- format_speedup(max(sn_analyzed$median_speedup))
 
-# 3. Processing Optimized vs Unoptimized (Variation: fast vs slow)
-v_analyzed <- benchmark_report$analyzed$fast_slow
+large_regime <- s_analyzed %>% filter(n >= 10000)
+large_speedup_min <- format_speedup(min(large_regime$median_speedup))
+large_speedup_max <- format_speedup(max(large_regime$median_speedup))
+
+# Specific points for discussion
+get_stat <- function(df, n_val, expr_val, col = "median_speedup") {
+  val <- df %>% filter(n == n_val, expr == expr_val) %>% pull(!!sym(col))
+  if (length(val) == 0) return(NA)
+  val[1]
+}
+
+# Robust extraction of median time
+get_med_time <- function(df, n_val, expr_val) {
+  row <- df %>% filter(n == n_val, expr == expr_val)
+  if (nrow(row) == 0) return(NA)
+  median(as.numeric(unlist(row$time)))
+}
+
+qn_8_speedup <- format_speedup(get_stat(qn_analyzed, 8, "qn"))
+qn_8_robscale <- format_duration(get_med_time(s_raw_rob, 8, "qn"))
+qn_8_robustbase <- format_duration(get_med_time(s_raw_ref, 8, "qn"))
+
+qn_10m_speedup <- format_speedup(get_stat(qn_analyzed, 10000000, "qn"))
+qn_10m_robscale <- format_duration(get_med_time(s_raw_rob, 10000000, "qn"))
+qn_10m_robustbase <- format_duration(get_med_time(s_raw_ref, 10000000, "qn"))
+
+sn_10m_speedup <- format_speedup(get_stat(sn_analyzed, 10000000, "sn"))
+sn_10m_robscale <- format_duration(get_med_time(s_raw_rob, 10000000, "sn"))
+sn_10m_robustbase <- format_duration(get_med_time(s_raw_ref, 10000000, "sn"))
 
 max_large_speedup <- format_speedup(max(s_analyzed$median_speedup))
 ```
@@ -520,21 +573,41 @@ sortedness) in O(log n) per element, then dispatches the outer $n$ iterations
 across TBB threads via `SnWorker`. For $n \leq 2048$, a
 stack-allocated arena avoids heap allocation entirely.
 
-| $n$ | `robustbase::Qn` ($\mu s$) | `robscale::qn` ($\mu s$) | Speedup |
-| ---: | ---: | ---: | ---: |
-| 8 | 8.9 | 1.3 | **6.8×** |
-| 64 | 13.6 | 5.3 | **2.6×** |
-| 1 024 | 462.7 | 276.9 | **1.7×** |
-| 65 536 | 49 324 | 12 247 | **4.0×** |
-| 10 000 000 | 23 374 593 | 2 403 552 | **9.7×** |
+```{r}
+#| label: tbl-qn-bench
+#| results: asis
 
-| $n$ | `robustbase::Sn` ($\mu s$) | `robscale::sn` ($\mu s$) | Speedup |
-| ---: | ---: | ---: | ---: |
-| 8 | 4.1 | 1.3 | **3.3×** |
-| 64 | 5.3 | 1.8 | **3.0×** |
-| 1 024 | 33.0 | 17.4 | **1.9×** |
-| 65 536 | 7 265 | 1 315 | **5.5×** |
-| 10 000 000 | 1 461 045 | 250 588 | **5.8×** |
+qn_table_data <- qn_analyzed %>%
+  filter(n %in% c(8, 64, 1024, 65536, 10000000)) %>%
+  rowwise() %>%
+  mutate(
+    rob_time = format_duration(get_med_time(s_raw_rob, n, "qn")),
+    ref_time = format_duration(get_med_time(s_raw_ref, n, "qn")),
+    Speedup = sprintf("**%.1fx**", median_speedup)
+  ) %>%
+  ungroup() %>%
+  select(n, `robustbase::Qn` = ref_time, `robscale::qn` = rob_time, Speedup)
+
+knitr::kable(qn_table_data, col.names = c("$n$", "`robustbase::Qn`", "`robscale::qn`", "Speedup"))
+```
+
+```{r}
+#| label: tbl-sn-bench
+#| results: asis
+
+sn_table_data <- sn_analyzed %>%
+  filter(n %in% c(8, 64, 1024, 65536, 10000000)) %>%
+  rowwise() %>%
+  mutate(
+    rob_time = format_duration(get_med_time(s_raw_rob, n, "sn")),
+    ref_time = format_duration(get_med_time(s_raw_ref, n, "sn")),
+    Speedup = sprintf("**%.1fx**", median_speedup)
+  ) %>%
+  ungroup() %>%
+  select(n, `robustbase::Sn` = ref_time, `robscale::sn` = rob_time, Speedup)
+
+knitr::kable(sn_table_data, col.names = c("$n$", "`robustbase::Sn`", "`robscale::sn`", "Speedup"))
+```
 
 ## Architecture overview
 
@@ -581,14 +654,14 @@ tar_read(speedup_figure)
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($n \le 20$), `robscale` outperforms `revss` by
-**11×–39×**. Drivers include:
+**`r m_speedup_min`–`r m_speedup_max`×**. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs 6–8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $n \le 16$.
 
-Even at $n = 16{,}384$, the gains remain **3.5×–4.3×** because the interpreter
+Even at $n = 16{,}384$, the gains remain **`r m_16k_min`–`r m_16k_max`×** because the interpreter
 overhead of `revss` scales with the number of Newton–Raphson iterations, not
 just vector length.
 
@@ -597,14 +670,15 @@ just vector length.
 For $Q_n$ and $S_n$, the performance story follows two regimes separated by
 the parallelism threshold:
 
-**Small to medium samples ($n \le 10^3$).** `robscale` leads by **1.7×–6.8×**.
+**Small to medium samples ($n \le 10^3$).** `robscale` leads by **`r qn_speedup_min`–`r qn_speedup_max`×**.
 The gain comes primarily from the avoidance of R dispatch overhead and the
 use of stack memory. For $Q_n$ at $n = 8$, the brute-force exact algorithm
-completes in 1.3 µs vs. 8.9 µs for `robustbase` — a **6.8×** edge.
+completes in `r qn_8_robscale` µs vs. `r qn_8_robustbase` µs for `robustbase` — a **`r qn_8_speedup`×** edge.
 
-**Large samples ($n \ge 10^4$).** The advantage grows to **4×–10×** as TBB
-parallelism engages. At $n = 10^7$, `qn` runs in 2.4 s vs. 23.4 s for
-`robustbase::Qn` (**9.7×**), and `sn` runs in 0.25 s vs. 1.46 s (**5.8×**).
+**Large samples ($n \ge 10^4$).** The advantage grows to **`r large_speedup_min`–`r large_speedup_max`×** as TBB
+parallelism engages.
+ At $n = 10^7$, `qn` runs in `r qn_10m_robscale` s vs. `r qn_10m_robustbase` s for
+`robustbase::Qn` (**`r qn_10m_speedup`×**), and `sn` runs in `r sn_10m_robscale` s vs. `r sn_10m_robustbase` s (**`r sn_10m_speedup`×**).
 Parallel efficiency is bounded by Amdahl's Law and memory bandwidth; while the
 multi-threaded kernels provide substantial gains for massive datasets,
 speedups do not scale linearly with thread count.
