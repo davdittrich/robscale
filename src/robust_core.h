@@ -98,7 +98,7 @@ ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
 // Selection based median
 ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= 8) {
+  if (n <= 16) {
     robscale::small_sort(x, n);
     return median_sorted(x, n);
   }

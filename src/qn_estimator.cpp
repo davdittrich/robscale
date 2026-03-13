@@ -253,15 +253,15 @@ double qn_brute_force_exact(const T* x_ptr, size_t n) {
     sorted_buf[i] = x_ptr[i];
   }
 
-  if (n <= 8) {
+  if (n <= 16) {
     robscale::small_sort(sorted_buf, n);
   } else {
     std::sort(sorted_buf, sorted_buf + n);
   }
 
-  // Use SIMD dispatcher for anything where n > 8
+  // Use SIMD dispatcher for anything where n > 16
   const auto& config = RuntimeConfig::get();
-  if (n > 8) {
+  if (n > 16) {
     Dispatcher::qn_brute_force(sorted_buf, n, diffs_buf, config);
   } else {
     qn_brute_force_scalar(sorted_buf, n, diffs_buf);

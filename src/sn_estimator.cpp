@@ -130,13 +130,9 @@ double C_sn_impl(const T* x_ptr, size_t n) {
       sorted_x[i] = x_ptr[i];
     }
     
-    // Opt-1: Sorting Network for n <= 8
-    if (n <= 8) {
-      if constexpr (std::is_same_v<T, double>) {
-        robscale::small_sort(sorted_x, n);
-      } else {
-        std::sort(sorted_x, sorted_x + n);
-      }
+    // Opt-1: Sorting Network for n <= 16
+    if (n <= 16) {
+      robscale::small_sort(sorted_x, n);
     } else {
       optimized_sort(sorted_x, sorted_x + n);
     }
