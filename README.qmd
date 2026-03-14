@@ -181,14 +181,15 @@ M-estimation and `robustbase` for the $Q_n$ and $S_n$ scale estimators---carry
 significant computational overhead that blocks real-time genomics pipelines,
 high-frequency finance, and other time-critical workflows.
 
-`robscale` v0.2.0 provides a comprehensive suite of 11 exported functions
-spanning the full robustness--efficiency spectrum: from the non-robust but
+`robscale` v0.2.0 provides 11 exported functions spanning the full
+robustness--efficiency spectrum: from the non-robust but
 maximally efficient bias-corrected standard deviation (`sd_c4`, 100% ARE) through
 the near-optimal Gini mean difference (`gmd`, 98% ARE, 29.3% breakdown), to
 maximum-breakdown estimators (`qn`, `sn`, `mad_scaled`, all 50% breakdown).
-The unified `scale_robust()` dispatcher automatically selects the optimal
+The unified `scale_robust()` dispatcher selects the appropriate
 strategy---a variance-weighted bootstrap ensemble of all 7 estimators for small
-samples, with an automatic switch to the GMD for large samples.
+samples, with an automatic switch to the GMD for large samples. All scale
+estimators support analytical or bootstrap confidence intervals via `ci = TRUE`.
 
 All estimators are implemented as C++17 kernels with SIMD-accelerated
 transcendental functions, Newton--Raphson iteration, and parallelized
@@ -229,6 +230,10 @@ scale_robust(rnorm(50))              # auto-switches to gmd (n >= 20)
 gmd(x)                               # 98% ARE, 29.3% breakdown
 qn(x)                                # 82.3% ARE, 50% breakdown
 mad_scaled(x)                        # 36.8% ARE, 50% breakdown
+
+# Confidence intervals
+qn(x, ci = TRUE)                     # point estimate + 95% CI
+gmd(x, ci = TRUE, level = 0.99)      # 99% CI
 
 # Outlier resistance
 x[5] <- 100                          # recording error
@@ -327,9 +332,13 @@ knitr::kable(dispatch_data)
 
 Additionally, `robLoc(x)` provides an M-estimate of location (98.4% ARE, 50%
 breakdown; Rousseeuw & Verboven 2002). All functions accept `na.rm` (default
-`FALSE`).
+`FALSE`). Most scale estimators accept `ci = FALSE` and `level = 0.95`; when
+`ci = TRUE`, they return an object of class `"robscale_ci"` containing the point
+estimate and a confidence interval (analytical for individual estimators,
+bootstrap for `scale_robust()`). The exceptions are `adm()` and `robLoc()`,
+which do not support confidence intervals.
 
-### `sd_c4(x, na.rm = FALSE)`
+### `sd_c4(x, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the sample standard deviation corrected by $c_4(n)$ to remove the
 small-sample bias of the square-root estimator:
@@ -345,7 +354,7 @@ construction---it serves as the efficiency anchor in the ensemble.
 sd_c4(c(1, 2, 3, 5, 7, 8))
 ```
 
-### `gmd(x, constant = 0.886226925452758, na.rm = FALSE)`
+### `gmd(x, constant = 0.886226925452758, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the Gini mean difference (Gini, 1912), scaled by a consistency
 constant for asymptotic normality under the Gaussian model:
@@ -373,9 +382,9 @@ constant for asymptotic normality under the Gaussian model:
 $$\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|$$
 
 where $C = \sqrt{\pi/2} \approx 1.2533$ (Nair, 1947). When `center` is
-supplied, it replaces the median. The ADM achieves **88.3% ARE** but is not
-itself robust against outliers (explosion breakdown $1/n$). It serves
-as the fallback scale estimator when the MAD collapses to zero.
+supplied, it replaces the median. The ADM achieves **88.3% ARE** but breaks down at a single outlier
+($1/n$ breakdown point). It serves as the fallback scale estimator when
+the MAD collapses to zero.
 
 ```r
 adm(c(1, 2, 3, 5, 7, 8))
@@ -421,7 +430,7 @@ flowchart TD
     N -- Yes --> O([Return t])
 ```
 
-### `robScale(x, loc = NULL, fallback = c("adm", "na"), implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
+### `robScale(x, loc = NULL, fallback = c("adm", "na"), implbound = 1e-4, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps), ci = FALSE, level = 0.95)`
 
 M-estimator for scale using multiplicative iteration with the rho function---the
 square of the logistic psi (Rousseeuw & Verboven 2002, Eq. 27):
@@ -477,7 +486,7 @@ flowchart TD
     M -- Yes --> N([Return s])
 ```
 
-### `qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE)`
+### `qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the $Q_n$ estimator of scale (Rousseeuw & Croux, 1993). Unlike
 M-estimators, $Q_n$ requires no location estimate and achieves a 50% breakdown
@@ -487,9 +496,10 @@ parallelized Johnson-style algorithm for larger samples.
 
 ```r
 qn(c(1, 2, 3, 5, 7, 8))
+qn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 ```
 
-### `sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE)`
+### `sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the $S_n$ estimator of scale (Rousseeuw & Croux, 1993). $S_n$ is more
 statistically efficient than the MAD and maintains a 50% breakdown point.
@@ -498,9 +508,10 @@ optimized parallelized inner-median algorithm for general samples.
 
 ```r
 sn(c(1, 2, 3, 5, 7, 8))
+sn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 ```
 
-### `iqr_scaled(x, constant = 0.741301109252801, na.rm = FALSE)`
+### `iqr_scaled(x, constant = 0.741301109252801, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the interquartile range scaled by a consistency constant for
 asymptotic normality under the Gaussian model:
@@ -519,7 +530,7 @@ iqr_scaled(c(1, 2, 3, 5, 7, 8))
 iqr_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw IQR
 ```
 
-### `mad_scaled(x, center, constant = 1.482602218505602, na.rm = FALSE)`
+### `mad_scaled(x, center, constant = 1.482602218505602, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the median absolute deviation from the median, scaled by a consistency
 constant for asymptotic normality:
@@ -536,7 +547,7 @@ mad_scaled(c(1, 2, 3, 5, 7, 8))
 mad_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw MAD
 ```
 
-### `scale_robust(x, method, auto_switch, threshold, n_boot, na.rm)`
+### `scale_robust(x, method, auto_switch, threshold, n_boot, na.rm, ci = FALSE, level = 0.95, boot_method = c("auto", "bca", "percentile", "parametric"))`
 
 Unified dispatcher for robust scale estimation. Operates in three modes:
 
@@ -547,11 +558,16 @@ Unified dispatcher for robust scale estimation. Operates in three modes:
    estimator at negligible cost.
 3. **Explicit method**: dispatches to a specific estimator by name.
 
+When `ci = TRUE`, the ensemble and auto-switch modes use bootstrap confidence
+intervals (BCa by default); explicit single-method dispatch uses analytical
+intervals based on each estimator's asymptotic relative efficiency.
+
 ```r
 scale_robust(c(1, 2, 3, 5, 7, 8))           # ensemble (n < 20)
 scale_robust(rnorm(50))                       # auto-switches to gmd
 scale_robust(rnorm(50), auto_switch = FALSE)  # forces ensemble
 scale_robust(rnorm(50), method = "qn")        # explicit Qn
+scale_robust(c(1, 2, 3, 5, 7, 8), ci = TRUE) # ensemble + bootstrap CI
 ```
 
 ```mermaid
