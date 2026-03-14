@@ -181,6 +181,11 @@ benchmark_legacy <- function() {
       }
     )
     
+    fast_mad <- function(x, constant = 1.4826) {
+      m <- collapse::fmedian(x)
+      return(collapse::fmedian(abs(x - m)) * constant)
+    }
+
     # New estimator competitors
     results_new <- bench::press(
       n = n_large,
@@ -193,7 +198,7 @@ benchmark_legacy <- function() {
           iqr_scaled = stats::IQR(x) * 0.741301109252801,
           iqr_collapse = diff(collapse::fquantile(x, c(0.25, 0.75))) * 0.741301109252801,
           mad_scaled = stats::mad(x),
-          mad_collapse = collapse::fmad(x, na.rm = FALSE),
+          mad_collapse = fast_mad(x),
           check = FALSE,
           min_iterations = get_min_iters(n),
           min_time = 1.0

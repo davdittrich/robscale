@@ -1005,8 +1005,7 @@ since both are compiled, revealing whether Floyd--Rivest selection outpaces
 `collapse`'s C implementation.
 
 **MAD** (`robscale::mad_scaled` vs `stats::mad`): **`r mad_stats_min`--`r mad_stats_max`x** speedup.
-`stats::mad` performs a full sort for the median step. Against
-`collapse::fmad` (a C-backed fast MAD), the speedup is
+`stats::mad` performs a full sort for the median step. Against a custom fast MAD (using `collapse::fmedian`), the speedup is
 **`r mad_collapse_min`--`r mad_collapse_max`x**---the key comparison since both
 are compiled; `robscale`'s advantage comes from $O(n)$ Floyd--Rivest selection
 vs `collapse`'s sorting-based approach.
