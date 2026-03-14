@@ -14,37 +14,43 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
     target = as.numeric(target_times[1:len]),
     ref = as.numeric(ref_times[1:len])
   )
-  
+
   # Ratio of medians function
   ratio_median <- function(d, i) {
     target_med <- median(d[i, "target"])
     ref_med <- median(d[i, "ref"])
     ref_med / target_med
   }
-  
+
   # Bootstrap
   set.seed(42)
-  b <- boot::boot(boot_data, ratio_median, R = R)
-  
+  b <- boot::boot(boot_data, ratio_median, R = R, parallel = "multicore", ncpus = 8)
+
   # Try BCa
-  ci <- tryCatch({
-    res <- boot::boot.ci(b, type = "bca")
-    # bca is 4th and 5th element of $bca
-    c(res$bca[4], res$bca[5])
-  }, error = function(e) {
-    # Fallback to percentile if BCa fails (e.g. constant values)
-    tryCatch({
-      res <- boot::boot.ci(b, type = "perc")
-      c(res$percent[4], res$percent[5])
-    }, error = function(e2) {
-      # If even percentile fails, check if all values are equal
-      if (all(b$t == b$t0)) {
-        return(c(b$t0, b$t0))
-      }
-      c(NA, NA)
-    })
-  })
-  
+  ci <- tryCatch(
+    {
+      res <- boot::boot.ci(b, type = "bca")
+      # bca is 4th and 5th element of $bca
+      c(res$bca[4], res$bca[5])
+    },
+    error = function(e) {
+      # Fallback to percentile if BCa fails (e.g. constant values)
+      tryCatch(
+        {
+          res <- boot::boot.ci(b, type = "perc")
+          c(res$percent[4], res$percent[5])
+        },
+        error = function(e2) {
+          # If even percentile fails, check if all values are equal
+          if (all(b$t == b$t0)) {
+            return(c(b$t0, b$t0))
+          }
+          c(NA, NA)
+        }
+      )
+    }
+  )
+
   list(
     median_speedup = median(boot_data$ref) / median(boot_data$target),
     ci_low = ci[1],
@@ -56,7 +62,9 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
 analyze_benchmarks <- function(rob, legacy) {
   # Helper to flatten bench_mark objects
   flatten_bench <- function(bm, label) {
-    if (is.null(bm)) return(NULL)
+    if (is.null(bm)) {
+      return(NULL)
+    }
     bm %>%
       mutate(
         expr = as.character(expression),
@@ -82,7 +90,9 @@ analyze_benchmarks <- function(rob, legacy) {
 
   # Mapping function to apply bootstrap across rows
   run_analysis <- function(df, target_col, ref_col) {
-    if (is.null(df) || nrow(df) == 0) return(NULL)
+    if (is.null(df) || nrow(df) == 0) {
+      return(NULL)
+    }
     df %>%
       rowwise() %>%
       mutate(
@@ -100,8 +110,12 @@ analyze_benchmarks <- function(rob, legacy) {
 
   # Build comparison pairs: robscale vs each legacy competitor
   build_new_comp <- function(rob_df, leg_df, rob_expr, leg_expr, label) {
-    r <- rob_df %>% filter(expr == rob_expr) %>% select(n, time_rob = time)
-    l <- leg_df %>% filter(expr == leg_expr) %>% select(n, time_leg = time)
+    r <- rob_df %>%
+      filter(expr == rob_expr) %>%
+      select(n, time_rob = time)
+    l <- leg_df %>%
+      filter(expr == leg_expr) %>%
+      select(n, time_leg = time)
     inner_join(r, l, by = "n") %>% mutate(expr = label)
   }
 
