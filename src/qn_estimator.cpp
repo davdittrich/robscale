@@ -496,7 +496,12 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("l2_per_core") = (int)config.hw.l2_per_core,
     Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores,
     Rcpp::Named("num_physical_cores") = (int)config.hw.num_physical_cores,
-    Rcpp::Named("has_tuned_sort_thresholds") = false
+    Rcpp::Named("has_tuned_sort_thresholds") = false,
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+    Rcpp::Named("has_omp_simd") = true
+#else
+    Rcpp::Named("has_omp_simd") = false
+#endif
   );
 }
 

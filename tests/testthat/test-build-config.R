@@ -28,6 +28,12 @@ test_that("generated Makevars has no dead macros", {
   expect_false(grepl("FASTQNSN_CACHE_LINE_BYTES", content))
 })
 
+test_that("has_omp_simd config field is reported", {
+  config <- robscale:::get_qnsn_config()
+  expect_true("has_omp_simd" %in% names(config))
+  expect_type(config$has_omp_simd, "logical")
+})
+
 test_that("SIMD level matches platform", {
   config <- robscale:::get_qnsn_config()
   arch <- Sys.info()[["machine"]]

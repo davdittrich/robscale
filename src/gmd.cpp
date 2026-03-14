@@ -8,6 +8,9 @@
 // GMD sorted kernel: assumes x is already sorted ascending
 static ROBSCALE_INLINE double gmd_sorted(const double* x, int n, double constant) {
   double sum = 0.0;
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd reduction(+:sum)
+#endif
   for (int i = 0; i < n; ++i)
     sum += (2.0 * (i + 1) - n - 1.0) * x[i];
   return constant * 2.0 * sum / (static_cast<double>(n) * (n - 1));
