@@ -45,3 +45,88 @@ test_that("ensemble handles data with ties", {
   val <- robscale:::cpp_scale_ensemble(c(5, 5, 5, 5, 6), 200L)
   expect_true(is.finite(val))
 })
+
+# --- Snapshot and determinism stress tests ---
+
+test_that("ensemble snapshot values are stable", {
+  # Tight tolerance (1e-14) accommodates ULP-level differences between
+
+  # debug (-O0) and optimized (-O3) builds caused by SIMD pragma vectorization.
+  # Determinism tests below use expect_identical for parallelism safety.
+  set.seed(1)
+  expect_equal(
+    robscale:::cpp_scale_ensemble(rnorm(5), 200L),
+    1.033903445605208, tolerance = 1e-14
+  )
+  set.seed(42)
+  expect_equal(
+    robscale:::cpp_scale_ensemble(rnorm(10), 200L),
+    0.8309502035368722, tolerance = 1e-14
+  )
+  set.seed(123)
+  expect_equal(
+    robscale:::cpp_scale_ensemble(rnorm(500), 200L),
+    0.9615157755575315, tolerance = 1e-14
+  )
+})
+
+test_that("ensemble is deterministic over 50 repeats (n=10)", {
+  set.seed(99)
+  x <- rnorm(10)
+  ref <- robscale:::cpp_scale_ensemble(x, 200L)
+  for (i in seq_len(50)) {
+    expect_identical(robscale:::cpp_scale_ensemble(x, 200L), ref)
+  }
+})
+
+test_that("ensemble is deterministic for various n", {
+  for (n in c(2, 5, 10, 15, 50, 200)) {
+    set.seed(n)
+    x <- rnorm(n)
+    e1 <- robscale:::cpp_scale_ensemble(x, 200L)
+    e2 <- robscale:::cpp_scale_ensemble(x, 200L)
+    expect_identical(e1, e2, label = paste("n =", n))
+  }
+})
+
+test_that("ensemble is deterministic with large n_boot", {
+  set.seed(7)
+  x <- rnorm(10)
+  e1 <- robscale:::cpp_scale_ensemble(x, 500L)
+  e2 <- robscale:::cpp_scale_ensemble(x, 500L)
+  expect_identical(e1, e2)
+})
+
+test_that("ensemble is deterministic with large n", {
+  set.seed(11)
+  x <- rnorm(500)
+  e1 <- robscale:::cpp_scale_ensemble(x, 200L)
+  e2 <- robscale:::cpp_scale_ensemble(x, 200L)
+  expect_identical(e1, e2)
+})
+
+test_that("ensemble determinism at threshold boundary (n*n_boot=10000)", {
+  set.seed(33)
+  x <- rnorm(50)
+  ref <- robscale:::cpp_scale_ensemble(x, 200L)
+  for (i in seq_len(20)) {
+    expect_identical(robscale:::cpp_scale_ensemble(x, 200L), ref)
+  }
+})
+
+test_that("ensemble determinism above threshold (n=100)", {
+  set.seed(44)
+  x <- rnorm(100)
+  ref <- robscale:::cpp_scale_ensemble(x, 200L)
+  for (i in seq_len(20)) {
+    expect_identical(robscale:::cpp_scale_ensemble(x, 200L), ref)
+  }
+})
+
+test_that("ensemble determinism high n_boot at threshold (n=10, n_boot=1000)", {
+  set.seed(55)
+  x <- rnorm(10)
+  e1 <- robscale:::cpp_scale_ensemble(x, 1000L)
+  e2 <- robscale:::cpp_scale_ensemble(x, 1000L)
+  expect_identical(e1, e2)
+})

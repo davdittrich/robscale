@@ -55,7 +55,7 @@ inline void bulk_tanh(double* inout, int n) {
   #endif
   for (; i < n; i++) inout[i] = std::tanh(inout[i]);
 #else
-  #ifdef _OPENMP
+  #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
     #pragma omp simd
   #endif
   for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
@@ -65,6 +65,9 @@ inline void bulk_tanh(double* inout, int n) {
 // ADM core: constant * mean(|x - center|)
 ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double constant) {
   double sum = 0.0;
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd reduction(+:sum)
+#endif
   for (int i = 0; i < n; ++i) {
     sum += std::abs(x[i] - center);
   }

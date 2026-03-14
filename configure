@@ -3,9 +3,11 @@
 
 # Detect -fopenmp-simd support
 OPENMP_SIMD_FLAG=""
+OPENMP_SIMD_DEFINE=""
 echo "int main(){return 0;}" > conftest.cpp
 if ${CXX:-c++} -fopenmp-simd -c conftest.cpp -o conftest.o 2>/dev/null; then
   OPENMP_SIMD_FLAG="-fopenmp-simd"
+  OPENMP_SIMD_DEFINE="-DROBSCALE_HAS_OMP_SIMD"
   echo "  -fopenmp-simd supported"
 else
   echo "  -fopenmp-simd not supported, skipping"
@@ -70,6 +72,7 @@ rm -f src/*.o src/robscale.so
 
 # Generate Makevars from template
 sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
+    -e "s|@OPENMP_SIMD_DEFINE@|${OPENMP_SIMD_DEFINE}|" \
     -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
     -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
     -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
