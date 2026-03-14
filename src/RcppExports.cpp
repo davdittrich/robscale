@@ -47,6 +47,81 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_scale_ensemble_ci
+Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot, double level, int method_code);
+RcppExport SEXP _robscale_cpp_scale_ensemble_ci(SEXP xSEXP, SEXP n_bootSEXP, SEXP levelSEXP, SEXP method_codeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
+    Rcpp::traits::input_parameter< double >::type level(levelSEXP);
+    Rcpp::traits::input_parameter< int >::type method_code(method_codeSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_scale_ensemble_ci(x, n_boot, level, method_code));
+    return rcpp_result_gen;
+END_RCPP
+}
+#ifdef ROBSCALE_BENCH_INTERNALS
+// C_sn_sorted_test
+double C_sn_sorted_test(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_sn_sorted_test(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_sn_sorted_test(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_qn_sorted_test
+double C_qn_sorted_test(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_qn_sorted_test(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_qn_sorted_test(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bench_ensemble_internals
+Rcpp::DataFrame bench_ensemble_internals(Rcpp::NumericVector x, int n_boot, int reps);
+RcppExport SEXP _robscale_bench_ensemble_internals(SEXP xSEXP, SEXP n_bootSEXP, SEXP repsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
+    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bench_ensemble_internals(x, n_boot, reps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bench_sort_cost_us
+double bench_sort_cost_us(Rcpp::NumericVector x, int reps);
+RcppExport SEXP _robscale_bench_sort_cost_us(SEXP xSEXP, SEXP repsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bench_sort_cost_us(x, reps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bench_estimator_breakdown
+Rcpp::NumericVector bench_estimator_breakdown(Rcpp::NumericVector x, int reps);
+RcppExport SEXP _robscale_bench_estimator_breakdown(SEXP xSEXP, SEXP repsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
+    rcpp_result_gen = Rcpp::wrap(bench_estimator_breakdown(x, reps));
+    return rcpp_result_gen;
+END_RCPP
+}
+#endif // ROBSCALE_BENCH_INTERNALS
 // gmd_impl
 double gmd_impl(Rcpp::NumericVector x, double constant);
 RcppExport SEXP _robscale_gmd_impl(SEXP xSEXP, SEXP constantSEXP) {
@@ -231,6 +306,14 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
+    {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},
+#ifdef ROBSCALE_BENCH_INTERNALS
+    {"_robscale_C_sn_sorted_test", (DL_FUNC) &_robscale_C_sn_sorted_test, 1},
+    {"_robscale_C_qn_sorted_test", (DL_FUNC) &_robscale_C_qn_sorted_test, 1},
+    {"_robscale_bench_ensemble_internals", (DL_FUNC) &_robscale_bench_ensemble_internals, 3},
+    {"_robscale_bench_sort_cost_us", (DL_FUNC) &_robscale_bench_sort_cost_us, 2},
+    {"_robscale_bench_estimator_breakdown", (DL_FUNC) &_robscale_bench_estimator_breakdown, 2},
+#endif
     {"_robscale_gmd_impl", (DL_FUNC) &_robscale_gmd_impl, 2},
     {"_robscale_iqr_impl", (DL_FUNC) &_robscale_iqr_impl, 2},
     {"_robscale_mad_impl_auto", (DL_FUNC) &_robscale_mad_impl_auto, 2},

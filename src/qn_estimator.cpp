@@ -235,79 +235,61 @@ struct QnRefineWorker : public WorkerBase {
 
 // End of performance critical section
 
-// qn_brute_force_exact: Specialized for tiny n
+// Post-sort brute-force kernel: sorted_x is read-only, n <= 64.
 template <typename T>
-double qn_brute_force_exact(const T* x_ptr, size_t n) {
+double qn_brute_force_kernel(const T* sorted_x, size_t n) {
   size_t num_pairs = n * (n - 1) / 2;
   size_t h_qn = n / 2 + 1;
   size_t k_target = h_qn * (h_qn - 1) / 2;
 
-  // Tiny stack-only path for n <= 64
-  T sorted_buf[64];
   double diffs_buf[2048]; // 64*63/2 = 2016
 
-  for (size_t i = 0; i < n; i++) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-    }
-    sorted_buf[i] = x_ptr[i];
-  }
-
-  if (n <= 16) {
-    robscale::small_sort(sorted_buf, n);
-  } else {
-    std::sort(sorted_buf, sorted_buf + n);
-  }
-
-  // Use SIMD dispatcher for anything where n > 16
   const auto& config = RuntimeConfig::get();
   if (n > 16) {
-    Dispatcher::qn_brute_force(sorted_buf, n, diffs_buf, config);
+    Dispatcher::qn_brute_force(sorted_x, n, diffs_buf, config);
   } else {
-    qn_brute_force_scalar(sorted_buf, n, diffs_buf);
+    qn_brute_force_scalar(sorted_x, n, diffs_buf);
   }
 
   robscale::floyd_rivest_select(diffs_buf, diffs_buf + k_target - 1, diffs_buf + num_pairs);
   return diffs_buf[k_target - 1] * CONST_QN * get_qn_factor(n);
 }
 
+// Original entry point: validate + copy + sort + kernel
 template <typename T>
-double C_qn_impl(const T* x_ptr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
-  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
-    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
+double qn_brute_force_exact(const T* x_ptr, size_t n) {
+  T sorted_buf[64];
+  for (size_t i = 0; i < n; i++) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_buf[i] = x_ptr[i];
   }
+  if (n <= 16) {
+    robscale::small_sort(sorted_buf, n);
+  } else {
+    std::sort(sorted_buf, sorted_buf + n);
+  }
+  return qn_brute_force_kernel(sorted_buf, n);
+}
 
+// Post-sort refinement kernel: sorted_x is read-only, n > qn_exact_threshold.
+template <typename T>
+double qn_refinement_kernel(const T* sorted_x, size_t n) {
   auto &config = RuntimeConfig::get();
-  
-  if (n <= config.qn_exact_threshold) {
-    return qn_brute_force_exact(x_ptr, n);
-  }
 
-  // Properly-typed allocations to avoid alignment UB
-  std::unique_ptr<T[]> sorted_x_buf;
   std::unique_ptr<float[]> work_buf;
   std::unique_ptr<int32_t[]> bounds_buf;
   try {
-    sorted_x_buf.reset(new T[n]);
     work_buf.reset(new float[n]);
     bounds_buf.reset(new int32_t[3 * n]);
   } catch (const std::bad_alloc& e) {
     Rcpp::stop("robscale Out of Memory: failed to allocate Qn arena.");
   }
-  T* sorted_x = sorted_x_buf.get();
   float* work = work_buf.get();
   int32_t* iweight = bounds_buf.get();
   int32_t* left = bounds_buf.get() + n;
   int32_t* right = bounds_buf.get() + 2 * n;
-
-  for (size_t i = 0; i < n; i++) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-    }
-    sorted_x[i] = x_ptr[i];
-  }
-  optimized_sort(sorted_x, sorted_x + n);
 
   size_t h = n / 2 + 1;
   uint64_t k_target = static_cast<uint64_t>(h) * (h - 1) / 2;
@@ -329,7 +311,6 @@ double C_qn_impl(const T* x_ptr, size_t n) {
       QnCandidateWorker<T> worker(sorted_x, n, left, right, block_offsets.data(), g);
       tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), worker);
 
-      // Sequential prefix sum of offsets
       size_t current = 0;
       for (size_t i = 0; i < num_blocks; ++i) {
         size_t block_count = block_offsets[i];
@@ -341,7 +322,6 @@ double C_qn_impl(const T* x_ptr, size_t n) {
       QnCandidateFulfiller<T> fulfiller(sorted_x, left, right, block_offsets.data(), work, iweight, g);
       tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), fulfiller);
 #else
-      // Fallback for non-TBB builds
       for (size_t i = 1; i < n; ++i) {
         if (left[i] <= right[i]) {
           int32_t w_val = right[i] - left[i] + 1;
@@ -404,14 +384,13 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   }
 
   std::unique_ptr<double[]> diffs(new double[nR - nL]);
-  
+
   if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
     size_t g = config.get_dynamic_grain_size(n);
     size_t num_blocks = (n + g - 1) / g + 1;
     std::vector<size_t> block_offsets(num_blocks, 0);
-    
-    // Pass 1: Count candidates per block
+
     tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
       size_t b_idx = r.begin() / g;
       size_t count = 0;
@@ -428,7 +407,6 @@ double C_qn_impl(const T* x_ptr, size_t n) {
       current += b_c;
     }
 
-    // Pass 2: Fulfill candidates
     tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
       size_t b_idx = r.begin() / g;
       size_t o = block_offsets[b_idx];
@@ -461,8 +439,57 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   double final_raw = diffs[k_target - nL - 1];
   return final_raw * CONST_QN * get_qn_factor(n);
 }
-#if defined(__GNUC__) || defined(__clang__)
-#endif
+
+template <typename T>
+double C_qn_impl(const T* x_ptr, size_t n) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
+    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
+  }
+
+  auto &config = RuntimeConfig::get();
+
+  if (n <= config.qn_exact_threshold) {
+    return qn_brute_force_exact(x_ptr, n);
+  }
+
+  // Copy + sort, then delegate to refinement kernel
+  std::unique_ptr<T[]> sorted_x_buf;
+  try {
+    sorted_x_buf.reset(new T[n]);
+  } catch (const std::bad_alloc& e) {
+    Rcpp::stop("robscale Out of Memory: failed to allocate Qn sorted buffer.");
+  }
+  T* sorted_x = sorted_x_buf.get();
+
+  for (size_t i = 0; i < n; i++) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_x[i] = x_ptr[i];
+  }
+  optimized_sort(sorted_x, sorted_x + n);
+
+  return qn_refinement_kernel(sorted_x, n);
+}
+
+// Sorted variant: input MUST be sorted ascending. No copy, no sort, no NaN scan.
+template <typename T>
+double C_qn_impl_sorted(const T* sorted_x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  assert(std::is_sorted(sorted_x, sorted_x + n));
+
+  auto &config = RuntimeConfig::get();
+  if (n <= config.qn_exact_threshold) {
+    return qn_brute_force_kernel(sorted_x, n);
+  }
+  return qn_refinement_kernel(sorted_x, n);
+}
+
+// Explicit template instantiations
+template double C_qn_impl_sorted<double>(const double*, size_t);
+template double C_qn_impl<double>(const double*, size_t);
+template double C_qn_impl<int>(const int*, size_t);
 
 } // namespace robscale::qnsn
 

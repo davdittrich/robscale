@@ -11,6 +11,8 @@
 namespace robscale::qnsn {
   template <typename T> double C_qn_impl(const T* x, size_t n);
   template <typename T> double C_sn_impl(const T* x, size_t n);
+  template <typename T> double C_qn_impl_sorted(const T* x, size_t n);
+  template <typename T> double C_sn_impl_sorted(const T* x, size_t n);
 }
 
 // rob_scale_compute: promoted from static in rob_scale.cpp
@@ -31,23 +33,12 @@ inline double gmd(double* buf, int n) {
     std::sort(buf, buf + n);  // plain std::sort for ensemble's small resamples
   }
   double sum = 0.0;
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd reduction(+:sum)
+#endif
   for (int i = 0; i < n; ++i)
     sum += (2.0 * (i + 1) - n - 1.0) * buf[i];
   return GMD_CONSISTENCY * 2.0 * sum / (static_cast<double>(n) * (n - 1));
-}
-
-// MAD: uses dev buffer for absolute deviations, O(n)
-// buf is used as scratch for median selection (destructive)
-// dev is used for absolute deviations
-inline double mad(double* buf, double* dev, int n) {
-  if (n < 2) return 0.0;
-  double med = robscale::median_select(buf, n);
-  // Need original data for deviations — but buf was destroyed by median_select.
-  // Caller must provide dev[] already filled with |x_i - med|
-  // ... Actually, let's take a different approach: accept original data pointer
-  // This function won't be called directly — see mad_from_data below
-  (void)dev; (void)med;
-  return 0.0; // placeholder
 }
 
 // MAD from original data: computes median, then MAD
@@ -124,8 +115,19 @@ inline double qn(const double* x, int n) {
   return robscale::qnsn::C_qn_impl<double>(x, static_cast<size_t>(n));
 }
 
+// Sorted variants: input MUST be sorted ascending. No copy, no sort.
+inline double sn_sorted(const double* sorted_x, int n) {
+  if (n < 2) return 0.0;
+  return robscale::qnsn::C_sn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
+}
+
+inline double qn_sorted(const double* sorted_x, int n) {
+  if (n < 2) return 0.0;
+  return robscale::qnsn::C_qn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
+}
+
 // robScale (M-scale): Newton-Raphson iteration
-// Needs two buffers: buf (for median/scratch), dev (for MAD deviations + tanh scratch)
+// Needs two buffers: buf (for median/scratch), dev (for MAD deviations)
 inline double rob_scale(const double* x, double* buf, double* dev, int n) {
   if (n < 4) return 0.0; // minimum for robScale without known location
 

@@ -6,8 +6,13 @@
 #' @param constant Consistency constant. Default is \eqn{1.1926}.
 #' @param finite.corr Logical; if \code{TRUE}, a finite-sample correction factor is applied.
 #' @param na.rm Logical; if \code{TRUE}, \code{NA} values are removed before computation.
+#' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+#'   with the point estimate and asymptotic confidence interval.
+#'   Default: \code{FALSE}.
+#' @param level Confidence level for the interval (default 0.95).
 #'
-#' @return The \eqn{S_n} estimator of scale.
+#' @return If \code{ci = FALSE} (default), the \eqn{S_n} estimator of scale
+#'   (a scalar). If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 #'
 #' @details
 #' The \eqn{S_n} estimator is defined as the median of medians:
@@ -55,31 +60,31 @@
 #' x <- c(1, 2, 3, 5, 7, 8)
 #' sn(x)
 #'
+#' # Asymptotic confidence interval
+#' sn(x, ci = TRUE)
+#'
 #' @export
-sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE) {
+sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE,
+               ci = FALSE, level = 0.95) {
   if (na.rm) x <- x[!is.na(x)]
   n <- length(x)
   if (n < 2) return(NA_real_)
-  
-  if (is.double(x)) {
-    if (identical(constant, 1.1926) && finite.corr) return(.Call(`_robscale_C_sn_fast`, x))
-    res <- .Call(`_robscale_C_sn_fast`, x)
-  } else if (is.integer(x)) {
-    if (identical(constant, 1.1926) && finite.corr) return(.Call(`_robscale_C_sn_int_fast`, x))
+
+  if (is.integer(x)) {
     res <- .Call(`_robscale_C_sn_int_fast`, x)
   } else {
-    x <- as.double(x)
-    if (identical(constant, 1.1926) && finite.corr) return(.Call(`_robscale_C_sn_fast`, x))
+    if (!is.double(x)) x <- as.double(x)
     res <- .Call(`_robscale_C_sn_fast`, x)
   }
-  
+
   if (!identical(constant, 1.1926)) {
     res <- res * (constant / 1.19259855312321)
   }
-  
+
   if (!finite.corr) {
     res <- res / .Call(`_robscale_C_get_sn_factor`, n)
   }
-  
+
+  if (ci) return(.analytical_ci(res, n, are = 0.58, level, "sn"))
   res
 }
