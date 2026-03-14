@@ -20,6 +20,10 @@
 #' @param tol Convergence tolerance. Iteration stops when the relative
 #'   change in the scale estimate falls below \code{tol}. Defaults to
 #'   \code{sqrt(.Machine$double.eps)}.
+#' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+#'   with the point estimate and asymptotic confidence interval.
+#'   Default: \code{FALSE}.
+#' @param level Confidence level for the interval (default 0.95).
 #'
 #' @details
 #' The M-estimate of scale \eqn{S_n}{Sn} is defined as the solution to the
@@ -81,10 +85,11 @@
 #'   \item If \code{fallback = "na"}, the function returns \code{NA}.
 #' }
 #'
-#' @return A single numeric value: the robust M-estimate of scale.
-#'   Returns \code{NA} if \code{x} has length zero (after removal of
-#'   \code{NA}s when \code{na.rm = TRUE}) or if the MAD collapses and
-#'   \code{fallback = "na"}.
+#' @return If \code{ci = FALSE} (default), a single numeric value: the robust
+#'   M-estimate of scale. Returns \code{NA} if \code{x} has length zero (after
+#'   removal of \code{NA}s when \code{na.rm = TRUE}) or if the MAD collapses
+#'   and \code{fallback = "na"}.
+#'   If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 #'
 #' @references
 #' Rousseeuw, P. J. and Verboven, S. (2002) Robust estimation in very small
@@ -114,11 +119,15 @@
 #' # MAD implosion: identical values cause MAD = 0
 #' robScale(c(5, 5, 5, 5, 6))     # falls back to adm()
 #'
+#' # Asymptotic confidence interval
+#' robScale(x, ci = TRUE)
+#'
 #' @keywords univar robust
 #' @export
 robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
                      implbound = 1e-4, na.rm = FALSE,
-                     maxit = 80L, tol = sqrt(.Machine$double.eps)) {
+                     maxit = 80L, tol = sqrt(.Machine$double.eps),
+                     ci = FALSE, level = 0.95) {
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -126,12 +135,15 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
-  if (length(x) == 0L) return(NA_real_)
-  
+  n <- length(x)
+  if (n == 0L) return(NA_real_)
+
   fallback <- match.arg(fallback)
   fallback_code <- if (fallback == "adm") 0L else 1L
 
   has_loc <- !is.null(loc)
   loc_val <- if (has_loc) loc else 0.0
-  rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
+  res <- rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
+  if (ci) return(.analytical_ci(res, n, are = 0.55, level, "robScale"))
+  res
 }

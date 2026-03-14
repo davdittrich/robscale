@@ -13,6 +13,30 @@ cpp_scale_ensemble <- function(x, n_boot) {
     .Call(`_robscale_cpp_scale_ensemble`, x, n_boot)
 }
 
+cpp_scale_ensemble_ci <- function(x, n_boot, level, method_code) {
+    .Call(`_robscale_cpp_scale_ensemble_ci`, x, n_boot, level, method_code)
+}
+
+C_sn_sorted_test <- function(x) {
+    .Call(`_robscale_C_sn_sorted_test`, x)
+}
+
+C_qn_sorted_test <- function(x) {
+    .Call(`_robscale_C_qn_sorted_test`, x)
+}
+
+bench_ensemble_internals <- function(x, n_boot, reps) {
+    .Call(`_robscale_bench_ensemble_internals`, x, n_boot, reps)
+}
+
+bench_sort_cost_us <- function(x, reps) {
+    .Call(`_robscale_bench_sort_cost_us`, x, reps)
+}
+
+bench_estimator_breakdown <- function(x, reps) {
+    .Call(`_robscale_bench_estimator_breakdown`, x, reps)
+}
+
 gmd_impl <- function(x, constant) {
     .Call(`_robscale_gmd_impl`, x, constant)
 }

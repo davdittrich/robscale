@@ -10,6 +10,10 @@
 #' @param na.rm Logical. If \code{TRUE}, \code{NA} values are stripped from
 #'   \code{x} before computation. If \code{FALSE} (the default), the presence
 #'   of any \code{NA} raises an error.
+#' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+#'   with the point estimate and asymptotic confidence interval.
+#'   Default: \code{FALSE}.
+#' @param level Confidence level for the interval (default 0.95).
 #'
 #' @details
 #' The Gini mean difference is defined as
@@ -28,9 +32,10 @@
 #' to the sample standard deviation, making it the most efficient robust
 #' alternative in this package. Its breakdown point is approximately 29.3\%.
 #'
-#' @return A single numeric value: the scaled Gini mean difference.
-#'   Returns \code{0} if \code{n < 2}; returns \code{NA} if \code{x} has
-#'   length zero after removal of \code{NA}s.
+#' @return If \code{ci = FALSE} (default), a single numeric value: the scaled
+#'   Gini mean difference. Returns \code{0} if \code{n < 2}; returns \code{NA}
+#'   if \code{x} has length zero after removal of \code{NA}s.
+#'   If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 #'
 #' @references
 #' Gini, C. (1912) \emph{Variabilita e mutabilita}. Bologna.
@@ -46,9 +51,13 @@
 #' gmd(x)                      # with consistency constant
 #' gmd(x, constant = 1)        # raw Gini mean difference
 #'
+#' # Asymptotic confidence interval
+#' gmd(x, ci = TRUE)
+#'
 #' @keywords univar robust
 #' @export
-gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE) {
+gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE,
+                ci = FALSE, level = 0.95) {
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -56,6 +65,9 @@ gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE) {
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
-  if (length(x) == 0L) return(NA_real_)
-  gmd_impl(x, constant)
+  n <- length(x)
+  if (n == 0L) return(NA_real_)
+  res <- gmd_impl(x, constant)
+  if (ci) return(.analytical_ci(res, n, are = 0.98, level, "gmd"))
+  res
 }

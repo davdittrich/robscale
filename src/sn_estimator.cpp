@@ -110,33 +110,14 @@ struct SnWorker : public WorkerBase {
   }
 };
 
+// Post-sort kernel: sorted_x is read-only, allocates its own inner_medians.
 template <typename T>
-double C_sn_impl(const T* x_ptr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
-  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
-    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 overflows 64-bit boundaries.");
-  }
-
+double sn_kernel(const T* sorted_x, size_t n) {
   auto &config = RuntimeConfig::get();
   constexpr size_t SN_MAX_STACK = 2048;
-  
+
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);
-    T sorted_x[SN_MAX_STACK];
-    for (size_t i = 0; i < n; ++i) {
-      if constexpr (std::is_floating_point_v<T>) {
-        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-      }
-      sorted_x[i] = x_ptr[i];
-    }
-    
-    // Opt-1: Sorting Network for n <= 16
-    if (n <= 16) {
-      robscale::small_sort(sorted_x, n);
-    } else {
-      optimized_sort(sorted_x, sorted_x + n);
-    }
-
     T inner_medians[SN_MAX_STACK];
     int32_t h = static_cast<int32_t>(n / 2);
     int32_t L = 0;
@@ -157,19 +138,9 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     return raw * CONST_SN * get_sn_factor(n);
   }
 
-  // Aligned Arena allocation: sorted_x(n*T) + inner_medians(n*T)
-  std::unique_ptr<T[]> sn_arena(new T[2 * n]);
-  T* sorted_x = sn_arena.get();
-  T* inner_medians = sorted_x + n;
-
-  for (size_t i = 0; i < n; ++i) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-    }
-    sorted_x[i] = x_ptr[i];
-  }
-
-  optimized_sort(sorted_x, sorted_x + n);
+  // Heap path: only inner_medians (n elements, not 2n — sorted_x provided by caller)
+  std::unique_ptr<T[]> inner_medians_buf(new T[n]);
+  T* inner_medians = inner_medians_buf.get();
 
   if (n < config.sn_parallel_threshold) {
     SnWorker<T> worker(sorted_x, n, inner_medians);
@@ -187,9 +158,60 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   return raw * CONST_SN * get_sn_factor(n);
 }
 
+template <typename T>
+double C_sn_impl(const T* x_ptr, size_t n) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
+    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 overflows 64-bit boundaries.");
+  }
+
+  auto &config = RuntimeConfig::get();
+  constexpr size_t SN_MAX_STACK = 2048;
+
+  if (n <= config.sn_stack_threshold) {
+    assert(config.sn_stack_threshold <= SN_MAX_STACK);
+    T sorted_x[SN_MAX_STACK];
+    for (size_t i = 0; i < n; ++i) {
+      if constexpr (std::is_floating_point_v<T>) {
+        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+      }
+      sorted_x[i] = x_ptr[i];
+    }
+    if (n <= 16) {
+      robscale::small_sort(sorted_x, n);
+    } else {
+      optimized_sort(sorted_x, sorted_x + n);
+    }
+    return sn_kernel(sorted_x, n);
+  }
+
+  // Heap path: copy + sort, then delegate to kernel
+  std::unique_ptr<T[]> sorted_buf(new T[n]);
+  T* sorted_x = sorted_buf.get();
+
+  for (size_t i = 0; i < n; ++i) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_x[i] = x_ptr[i];
+  }
+  optimized_sort(sorted_x, sorted_x + n);
+
+  return sn_kernel(sorted_x, n);
+}
+
+// Sorted variant: input MUST be sorted ascending. No copy, no sort, no NaN scan.
+template <typename T>
+double C_sn_impl_sorted(const T* sorted_x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  assert(std::is_sorted(sorted_x, sorted_x + n));
+  return sn_kernel(sorted_x, n);
+}
+
 // Explicit template instantiations
 template double C_sn_impl<double>(const double*, size_t);
 template double C_sn_impl<float>(const float*, size_t);
+template double C_sn_impl_sorted<double>(const double*, size_t);
 
 } // namespace robscale::qnsn
 
