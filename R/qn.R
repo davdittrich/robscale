@@ -71,10 +71,17 @@ qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE,
   n <- length(x)
   if (n < 2) return(NA_real_)
 
-  if (is.integer(x)) {
+  fast <- !ci && identical(constant, 2.2191) && finite.corr
+
+  if (is.double(x)) {
+    if (fast) return(.Call(`_robscale_C_qn_fast`, x))
+    res <- .Call(`_robscale_C_qn_fast`, x)
+  } else if (is.integer(x)) {
+    if (fast) return(.Call(`_robscale_C_qn_int_fast`, x))
     res <- .Call(`_robscale_C_qn_int_fast`, x)
   } else {
-    if (!is.double(x)) x <- as.double(x)
+    x <- as.double(x)
+    if (fast) return(.Call(`_robscale_C_qn_fast`, x))
     res <- .Call(`_robscale_C_qn_fast`, x)
   }
 
