@@ -1,5 +1,6 @@
 #include "robscale_config.h"
 #include "robust_core.h"
+#include "pdq_select.h"
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(BH)]]
@@ -134,7 +135,7 @@ double sn_kernel(const T* sorted_x, size_t n) {
       }
       inner_medians[i] = candidate;
     }
-    double raw = lowmedian_ptr(inner_medians, n);
+    double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
     return raw * CONST_SN * get_sn_factor(n);
   }
 
@@ -154,7 +155,7 @@ double sn_kernel(const T* sorted_x, size_t n) {
 #endif
   }
 
-  double raw = lowmedian_ptr(inner_medians, n);
+  double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
   return raw * CONST_SN * get_sn_factor(n);
 }
 
