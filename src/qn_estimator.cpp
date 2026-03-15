@@ -1,5 +1,6 @@
 #include "robscale_config.h"
 #include "robust_core.h"
+#include "pdq_select.h"
 #include <Rcpp.h>
 // [[Rcpp::depends(RcppParallel)]]
 // [[Rcpp::depends(BH)]]
@@ -435,7 +436,15 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
     }
   }
 
-  robscale::floyd_rivest_select(diffs.get(), diffs.get() + k_target - nL - 1, diffs.get() + nR - nL);
+  {
+    const size_t window = static_cast<size_t>(nR - nL);
+    double* sel_ptr = diffs.get();
+    const size_t k_off = static_cast<size_t>(k_target - nL - 1);
+    if (window <= robscale::qnsn::RuntimeConfig::get().pdq_qn_final_threshold)
+      robscale::floyd_rivest_select(sel_ptr, sel_ptr + k_off, sel_ptr + window);
+    else
+      miniselect::pdqselect(sel_ptr, sel_ptr + k_off, sel_ptr + window);
+  }
   double final_raw = diffs[k_target - nL - 1];
   return final_raw * CONST_QN * get_qn_factor(n);
 }
@@ -519,6 +528,9 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("sort_boost_threshold") = (int)config.sort_boost_threshold,
     Rcpp::Named("sort_tbb_threshold") = (int)config.sort_tbb_threshold,
     Rcpp::Named("pdq_median_threshold") = (int)config.pdq_median_threshold,
+    Rcpp::Named("pdq_robscale_threshold") = (int)config.pdq_robscale_threshold,
+    Rcpp::Named("pdq_lowmedian_threshold") = (int)config.pdq_lowmedian_threshold,
+    Rcpp::Named("pdq_qn_final_threshold") = (int)config.pdq_qn_final_threshold,
     Rcpp::Named("grain_size") = (int)config.grain_size,
     Rcpp::Named("l2_cache_size") = (int)config.hw.l2_cache_size,
     Rcpp::Named("l2_per_core") = (int)config.hw.l2_per_core,
