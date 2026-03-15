@@ -24,6 +24,9 @@ public:
   size_t sort_boost_threshold;
   size_t sort_tbb_threshold;
   size_t pdq_median_threshold;
+  size_t pdq_robscale_threshold;  // adaptive threshold for rob_scale.cpp
+  size_t pdq_lowmedian_threshold; // adaptive threshold for Sn lowmedian
+  size_t pdq_qn_final_threshold;  // adaptive threshold for Qn final selection
   size_t grain_size;
 
   // Dynamic grain size for very large samples to avoid scheduling overhead
@@ -69,10 +72,19 @@ private:
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
 
-    // --- MAD median-selection threshold ---
-    // Below this, FR-based median_select is faster (less overhead on medium n).
-    // Above this, pdqselect wins (better cache locality on large n).
-    pdq_median_threshold = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 5));
+    // --- Adaptive median-selection thresholds ---
+    // Below threshold: FR-based selection wins (lower overhead at medium n).
+    // Above threshold: pdqselect wins (better cache locality at large n).
+    //
+    // Divisor encodes the working-set pressure during selection:
+    //   divisor=5: MAD/IQR (2 arrays + constants, empirically tuned)
+    //   divisor=2: robScale median/MAD (1–2 warm arrays, lighter pressure)
+    //   divisor=2: Sn lowmedian (1 active + 1 residual sorted_x)
+    //   divisor=4: Qn final diff-window (1 active + sorted_x/work/bounds warm)
+    pdq_median_threshold    = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 5));
+    pdq_robscale_threshold  = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 2));
+    pdq_lowmedian_threshold = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 2));
+    pdq_qn_final_threshold  = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 4));
 
     // --- Grain size ---
     // Each grain block should fit in per-core L2
