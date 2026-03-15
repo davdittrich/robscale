@@ -31,12 +31,46 @@ ROBSCALE_INLINE double pdq_median_select(double* x, size_t n) {
   return (v1 + v2) * 0.5;
 }
 
-// Adaptive median selection: FR for medium n, pdqselect for large n.
-// Threshold is derived from per-core L2 cache size at startup.
-ROBSCALE_INLINE double adaptive_median_select(double* x, size_t n) {
-  if (n <= robscale::qnsn::RuntimeConfig::get().pdq_median_threshold)
+// Templated adaptive median: FR below threshold, pdqselect above.
+// ThreshField selects which RuntimeConfig threshold to compare against.
+// Template instantiation makes the member pointer a compile-time constant —
+// no runtime overhead vs a plain conditional on the field directly.
+template <size_t robscale::qnsn::RuntimeConfig::*ThreshField>
+ROBSCALE_INLINE double adaptive_median_select_t(double* x, size_t n) {
+  if (n <= robscale::qnsn::RuntimeConfig::get().*ThreshField)
     return median_select(x, n);
   return pdq_median_select(x, n);
+}
+
+// Adaptive median for IQR/MAD (pdq_median_threshold).
+ROBSCALE_INLINE double adaptive_median_select(double* x, size_t n) {
+  return adaptive_median_select_t<&robscale::qnsn::RuntimeConfig::pdq_median_threshold>(x, n);
+}
+
+// Adaptive median for robScale (pdq_robscale_threshold).
+// robScale working set: 1–2 warm arrays → lighter cache pressure than MAD.
+ROBSCALE_INLINE double adaptive_robscale_median_select(double* x, size_t n) {
+  return adaptive_median_select_t<&robscale::qnsn::RuntimeConfig::pdq_robscale_threshold>(x, n);
+}
+
+// Adaptive MAD for robScale: fill deviations then select median adaptively.
+ROBSCALE_INLINE double adaptive_mad_select(const double* x, int n, double med, double* dev) {
+  for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
+  return robscale::MAD_CONSISTENCY *
+         adaptive_robscale_median_select(dev, static_cast<size_t>(n));
+}
+
+// Adaptive low-median (no even-n averaging) for Sn inner_medians.
+// Templated to support both double and float inner_medians arrays.
+template <typename T>
+ROBSCALE_INLINE double adaptive_lowmedian_select(T* x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
+  size_t h = (n - 1) / 2;
+  if (n <= robscale::qnsn::RuntimeConfig::get().pdq_lowmedian_threshold)
+    robscale::floyd_rivest_select(x, x + h, x + n);
+  else
+    miniselect::pdqselect(x, x + h, x + n);
+  return static_cast<double>(x[h]);
 }
 
 // Type 7 quantile interpolation after selection.
