@@ -3,6 +3,7 @@
 
 #include "robscale_config.h"
 #include "robust_core.h"
+#include "pdq_select.h"
 #include <cstring>
 #include <cmath>
 
@@ -46,43 +47,35 @@ inline double gmd(double* buf, int n) {
 inline double mad_from_data(const double* x, double* buf, double* dev, int n) {
   if (n < 2) return 0.0;
   std::memcpy(buf, x, n * sizeof(double));
-  double med = robscale::median_select(buf, static_cast<size_t>(n));
+  double med = robscale::adaptive_median_select(buf, static_cast<size_t>(n));
   for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
-  return MAD_CONSISTENCY * robscale::median_select(dev, static_cast<size_t>(n));
+  return MAD_CONSISTENCY * robscale::adaptive_median_select(dev, static_cast<size_t>(n));
 }
 
-// IQR: dual selection, O(n)
-// Needs two buffers (selection is destructive)
+// IQR: incremental pdqselect, O(n)
+// Uses buf1 only; buf2 is unused (signature kept for call-site compatibility)
 inline double iqr(const double* x, double* buf1, double* buf2, int n) {
+  (void)buf2;
   if (n < 2) return 0.0;
 
-  // Q1
   std::memcpy(buf1, x, n * sizeof(double));
+
   double h1 = (n - 1.0) * 0.25;
   int lo1 = static_cast<int>(h1);
   double frac1 = h1 - lo1;
-  robscale::floyd_rivest_select(buf1, buf1 + lo1, buf1 + n);
-  double q1 = buf1[lo1];
-  if (frac1 > 0.0 && lo1 + 1 < n) {
-    double next_val = buf1[lo1 + 1];
-    for (int i = lo1 + 2; i < n; ++i)
-      if (buf1[i] < next_val) next_val = buf1[i];
-    q1 += frac1 * (next_val - q1);
-  }
 
-  // Q3
-  std::memcpy(buf2, x, n * sizeof(double));
   double h3 = (n - 1.0) * 0.75;
   int lo3 = static_cast<int>(h3);
   double frac3 = h3 - lo3;
-  robscale::floyd_rivest_select(buf2, buf2 + lo3, buf2 + n);
-  double q3 = buf2[lo3];
-  if (frac3 > 0.0 && lo3 + 1 < n) {
-    double next_val = buf2[lo3 + 1];
-    for (int i = lo3 + 2; i < n; ++i)
-      if (buf2[i] < next_val) next_val = buf2[i];
-    q3 += frac3 * (next_val - q3);
-  }
+
+  // Q1: select on full array
+  miniselect::pdqselect(buf1, buf1 + lo1, buf1 + n);
+  double q1 = robscale::interp_q7(buf1, n, lo1, frac1);
+
+  // Q3: select on buf1[lo1+1 .. n-1] (everything <= Q1 is irrelevant)
+  int start = lo1 + 1;
+  miniselect::pdqselect(buf1 + start, buf1 + lo3, buf1 + n);
+  double q3 = robscale::interp_q7(buf1, n, lo3, frac3);
 
   return (q3 - q1) * IQR_CONSISTENCY;
 }
