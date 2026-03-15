@@ -37,3 +37,33 @@ test_that("Qn/Sn correct across threshold boundaries", {
     expect_true(is.finite(sn(x)) && sn(x) > 0)
   }
 })
+
+test_that("pdq_robscale_threshold present and in valid range", {
+  cfg <- robscale:::get_qnsn_config()
+  expect_true("pdq_robscale_threshold" %in% names(cfg))
+  thr <- cfg$pdq_robscale_threshold
+  expect_gte(thr, 2048L)
+  expect_lte(thr, 500000L)
+  # Verify formula: max(2048, L2 / (sizeof(double) * 2)) == max(2048, L2 / 16)
+  expect_equal(thr, max(2048L, as.integer(cfg$l2_per_core / 16)))
+})
+
+test_that("pdq_lowmedian_threshold present and in valid range", {
+  cfg <- robscale:::get_qnsn_config()
+  expect_true("pdq_lowmedian_threshold" %in% names(cfg))
+  thr <- cfg$pdq_lowmedian_threshold
+  expect_gte(thr, 2048L)
+  expect_lte(thr, 500000L)
+  # Verify formula: max(2048, L2 / (sizeof(double) * 2)) == max(2048, L2 / 16)
+  expect_equal(thr, max(2048L, as.integer(cfg$l2_per_core / 16)))
+})
+
+test_that("pdq_qn_final_threshold present and in valid range", {
+  cfg <- robscale:::get_qnsn_config()
+  expect_true("pdq_qn_final_threshold" %in% names(cfg))
+  thr <- cfg$pdq_qn_final_threshold
+  expect_gte(thr, 2048L)
+  expect_lte(thr, 500000L)
+  # Verify formula: max(2048, L2 / (sizeof(double) * 4)) == max(2048, L2 / 32)
+  expect_equal(thr, max(2048L, as.integer(cfg$l2_per_core / 32)))
+})
