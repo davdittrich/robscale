@@ -5,7 +5,12 @@
 #
 # Gates:
 #   - no regression vs prior robscale sn at any n (speedup >= 0.95x)
-#   - improvement expected above pdq_lowmedian_threshold on Ryzen
+#
+# Note: Sn is inner_medians-dominated (O(n²) worker, parallelised above
+# sn_parallel_threshold). The final lowmedian selection is a small fraction
+# (~5%) of total wall time even at large n. The adaptive pdqselect dispatch
+# exercises the correct code path above threshold but does not provide
+# measurable end-to-end speedup. No 1.5x gate is appropriate here.
 #
 # Usage:
 #   Rscript benchmarks/sn_pdqselect_bench.R

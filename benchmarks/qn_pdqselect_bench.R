@@ -4,7 +4,11 @@
 # Also compares against robustbase::Qn as an external reference.
 #
 # Gate: no regression at any n (speedup >= 0.95x).
-# Improvement may be modest since final selection is a small fraction of Qn time.
+#
+# Note: Qn is refinement-loop-dominated (O(n log n) binary-search passes).
+# The final diff-window selection is a small fraction of total time.
+# A/B benchmarks confirm ~1.00x speedup at all n — the adaptive dispatch
+# exercises the correct code path but does not move the wall-clock needle.
 #
 # Usage:
 #   Rscript benchmarks/qn_pdqselect_bench.R
