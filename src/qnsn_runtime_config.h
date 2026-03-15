@@ -23,6 +23,7 @@ public:
   size_t qn_parallel_threshold;
   size_t sort_boost_threshold;
   size_t sort_tbb_threshold;
+  size_t pdq_median_threshold;
   size_t grain_size;
 
   // Dynamic grain size for very large samples to avoid scheduling overhead
@@ -67,6 +68,11 @@ private:
     // Sn: inner loop accesses sorted_x + writes inner_medians (2 arrays)
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
+
+    // --- MAD median-selection threshold ---
+    // Below this, FR-based median_select is faster (less overhead on medium n).
+    // Above this, pdqselect wins (better cache locality on large n).
+    pdq_median_threshold = (std::max)(size_t(2048), per_core_l2 / (sizeof(double) * 5));
 
     // --- Grain size ---
     // Each grain block should fit in per-core L2

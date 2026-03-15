@@ -31,7 +31,7 @@
 #'
 #' \strong{Computational Performance.}
 #' Unlike \code{\link[stats]{IQR}}, which requires a full sort, this
-#' implementation uses O(n) selection via the Floyd-Rivest algorithm for each
+#' implementation uses O(n) selection via the pdqselect algorithm for each
 #' quantile, providing a substantial speedup for large datasets.
 #'
 #' @return If \code{ci = FALSE} (default), a single numeric value: the scaled

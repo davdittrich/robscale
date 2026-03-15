@@ -1,60 +1,49 @@
 #include "robscale_config.h"
-#include "robust_core.h"
-#include "selection.h"
+#include "pdq_select.h"
 #include <Rcpp.h>
 #include <cstring>
 #include <memory>
-
-// Type 7 quantile via selection (R default)
-static ROBSCALE_INLINE double quantile7_select(double* buf, int n, double p) {
-  double h = (n - 1.0) * p;
-  int lo = static_cast<int>(h);
-  double frac = h - lo;
-
-  robscale::floyd_rivest_select(buf, buf + lo, buf + n);
-  double q = buf[lo];
-
-  if (frac > 0.0 && lo + 1 < n) {
-    // Find minimum of elements after lo (the next order statistic)
-    double next_val = buf[lo + 1];
-    for (int i = lo + 2; i < n; ++i) {
-      if (buf[i] < next_val) next_val = buf[i];
-    }
-    q += frac * (next_val - q);
-  }
-  return q;
-}
 
 // [[Rcpp::export]]
 double iqr_impl(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 2) return 0.0;
 
-  // Arena allocation: need two copies since selection is destructive
+  // Arena: single copy (incremental Q3 reuses Q1's partition)
   double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
-  constexpr int STACK_SIZE = 2048;
+  constexpr int STACK_SIZE = 4096;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* buf;
 
-  if (n <= ROBSCALE_MICRO_BUFFER_SIZE / 2) {
+  if (n <= ROBSCALE_MICRO_BUFFER_SIZE) {
     buf = buf_micro;
-  } else if (n <= STACK_SIZE / 2) {
+  } else if (n <= STACK_SIZE) {
     buf = buf_stack;
   } else {
-    heap.reset(new double[n * 2]);
+    heap.reset(new double[n]);
     buf = heap.get();
   }
 
-  double* buf2 = buf + n;
-
-  // Q1 on first copy
   std::memcpy(buf, x.begin(), n * sizeof(double));
-  double q1 = quantile7_select(buf, n, 0.25);
 
-  // Q3 on second copy (selection is destructive)
-  std::memcpy(buf2, x.begin(), n * sizeof(double));
-  double q3 = quantile7_select(buf2, n, 0.75);
+  // Q1/Q3 target indices (Type 7)
+  double h1 = (n - 1.0) * 0.25;
+  int lo1 = static_cast<int>(h1);
+  double frac1 = h1 - lo1;
+
+  double h3 = (n - 1.0) * 0.75;
+  int lo3 = static_cast<int>(h3);
+  double frac3 = h3 - lo3;
+
+  // Q1: select on full array
+  miniselect::pdqselect(buf, buf + lo1, buf + n);
+  double q1 = robscale::interp_q7(buf, n, lo1, frac1);
+
+  // Q3: select on buf[lo1+1 .. n-1] only (everything <= Q1 is irrelevant)
+  int start = lo1 + 1;
+  miniselect::pdqselect(buf + start, buf + lo3, buf + n);
+  double q3 = robscale::interp_q7(buf, n, lo3, frac3);
 
   return (q3 - q1) * constant;
 }

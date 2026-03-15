@@ -518,6 +518,7 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("sn_parallel_threshold") = (int)config.sn_parallel_threshold,
     Rcpp::Named("sort_boost_threshold") = (int)config.sort_boost_threshold,
     Rcpp::Named("sort_tbb_threshold") = (int)config.sort_tbb_threshold,
+    Rcpp::Named("pdq_median_threshold") = (int)config.pdq_median_threshold,
     Rcpp::Named("grain_size") = (int)config.grain_size,
     Rcpp::Named("l2_cache_size") = (int)config.hw.l2_cache_size,
     Rcpp::Named("l2_per_core") = (int)config.hw.l2_per_core,

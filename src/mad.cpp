@@ -1,5 +1,5 @@
 #include "robscale_config.h"
-#include "robust_core.h"
+#include "pdq_select.h"
 #include <Rcpp.h>
 #include <cstring>
 #include <memory>
@@ -32,13 +32,13 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   double* w = arena;
   double* dev = arena + n;
 
-  // Compute median via selection
+  // Compute median via pdqselect
   std::memcpy(w, xp, n * sizeof(double));
-  double med = robscale::median_select(w, n);
+  double med = robscale::adaptive_median_select(w, n);
 
-  // Compute MAD using existing kernel (uses constant from parameter)
+  // Compute MAD using pdqselect
   for (int i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - med);
-  double mad_raw = robscale::median_select(dev, static_cast<size_t>(n));
+  double mad_raw = robscale::adaptive_median_select(dev, static_cast<size_t>(n));
   return constant * mad_raw;
 }
 
@@ -67,6 +67,6 @@ double mad_impl_center(Rcpp::NumericVector x, double center, double constant) {
   }
 
   for (int i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - center);
-  double mad_raw = robscale::median_select(dev, static_cast<size_t>(n));
+  double mad_raw = robscale::adaptive_median_select(dev, static_cast<size_t>(n));
   return constant * mad_raw;
 }

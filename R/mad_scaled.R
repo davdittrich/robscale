@@ -30,8 +30,9 @@
 #'
 #' \strong{Computational Performance.}
 #' Unlike \code{\link[stats]{mad}}, this implementation uses O(n) selection
-#' (Floyd-Rivest algorithm with sorting networks for n \eqn{\le} 16) instead
-#' of full sorting, providing better asymptotic performance.
+#' with adaptive algorithm dispatch: Floyd-Rivest for moderate n, pdqselect
+#' for large n (threshold derived from per-core L2 cache size at startup),
+#' and sorting networks for n \eqn{\le} 16.
 #'
 #' @return If \code{ci = FALSE} (default), a single numeric value: the scaled
 #'   median absolute deviation. Returns \code{0} if \code{n = 1}; returns
