@@ -1,6 +1,7 @@
 #include "robscale_config.h"
 #include "robust_core.h"
 #include <Rcpp.h>
+#include <memory>
 
 /**
  * Portably optimized robLoc kernel.

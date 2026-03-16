@@ -9,6 +9,38 @@ adm_impl_auto <- function(x, constant) {
     .Call(`_robscale_adm_impl_auto`, x, constant)
 }
 
+cpp_scale_ensemble <- function(x, n_boot) {
+    .Call(`_robscale_cpp_scale_ensemble`, x, n_boot)
+}
+
+cpp_scale_ensemble_ci <- function(x, n_boot, level, method_code) {
+    .Call(`_robscale_cpp_scale_ensemble_ci`, x, n_boot, level, method_code)
+}
+
+C_sn_sorted <- function(x) {
+    .Call(`_robscale_C_sn_sorted`, x)
+}
+
+C_qn_sorted <- function(x) {
+    .Call(`_robscale_C_qn_sorted`, x)
+}
+
+gmd_impl <- function(x, constant) {
+    .Call(`_robscale_gmd_impl`, x, constant)
+}
+
+iqr_impl <- function(x, constant) {
+    .Call(`_robscale_iqr_impl`, x, constant)
+}
+
+mad_impl_auto <- function(x, constant) {
+    .Call(`_robscale_mad_impl_auto`, x, constant)
+}
+
+mad_impl_center <- function(x, center, constant) {
+    .Call(`_robscale_mad_impl_center`, x, center, constant)
+}
+
 C_qn_fast <- function(x) {
     .Call(`_robscale_C_qn_fast`, x)
 }
@@ -31,6 +63,10 @@ rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
 
 rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
     .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
+}
+
+sd_c4_impl <- function(x) {
+    .Call(`_robscale_sd_c4_impl`, x)
 }
 
 C_sn_fast <- function(x) {

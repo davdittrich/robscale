@@ -3,7 +3,7 @@ library(tarchetypes)
 
 # Set target options:
 tar_option_set(
-  packages = c("bench", "sessioninfo", "ggplot2", "dplyr", "tidyr", "withr", "robustbase", "revss", "boot", "purrr", "callr"),
+  packages = c("bench", "sessioninfo", "ggplot2", "dplyr", "tidyr", "withr", "robustbase", "revss", "boot", "purrr", "callr", "Hmisc", "GiniDistance", "collapse"),
   format = "rds"
 )
 
@@ -43,11 +43,35 @@ list(
   tar_target(speedup_figure_obj, plot_benchmarks(analyzed_results)),
   tar_target(speedup_figure, {
     path <- "benchmarks/speedup_fig.png"
-    ggsave(path, speedup_figure_obj, width = 12, height = 6)
+    ggsave(path, speedup_figure_obj, width = 18, height = 6)
     path
   }, format = "file"),
 
 
   # Render README.qmd
-  tar_quarto(readme, "README.qmd")
+  tar_quarto(readme_qmd, "README.qmd"),
+
+  # Post-process README.md for GitHub Mermaid and MathJax compatibility
+  tar_target(readme, {
+    # Ensure readme_qmd is built
+    force(readme_qmd)
+    path <- "README.md"
+    
+    # Read the content
+    content <- readLines(path)
+    
+    # Quarto's gfm writer often puts a space in ``` mermaid
+    # which GitHub doesn't recognize. We strip it here.
+    content <- gsub("``` mermaid", "```mermaid", content, fixed = TRUE)
+    
+    # Convert standard inline math $...$ to GitHub's protected $`...`$ form
+    # This prevents the Markdown parser from consuming underscores (e.g., in Q_n)
+    # The negative lookbehinds/aheads ensure we don't accidentally match block $$...$$
+    content <- gsub("(?<!\\$)\\$([^$]+)\\$(?!\\$)", "$`\\1`$", content, perl=TRUE)
+    
+    # Write back
+    writeLines(content, path)
+    
+    path
+  }, format = "file")
 )

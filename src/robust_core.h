@@ -3,8 +3,6 @@
 
 #include <cmath>
 #include <cstring>
-#include <memory>
-#include <vector>
 #include "selection.h"
 #include "sort_net.h"
 #include "robscale_config.h"
@@ -40,22 +38,22 @@ inline void bulk_tanh(double* inout, int n) {
   vvtanh(inout, inout, &n);
 #elif defined(ROBSCALE_HAS_SLEEF)
   int i = 0;
-  #if defined(__AVX2__)
-    for (; i + 4 <= n; i += 4) {
-      __m256d v = _mm256_loadu_pd(inout+i);
-      v = Sleef_tanhd4_u10avx2(v);
-      _mm256_storeu_pd(inout+i, v);
-    }
-  #elif defined(__AVX512F__)
+  #if defined(__AVX512F__)
     for (; i + 8 <= n; i += 8) {
       __m512d v = _mm512_loadu_pd(inout+i);
       v = Sleef_tanhd8_u10avx512f(v);
       _mm512_storeu_pd(inout+i, v);
     }
+  #elif defined(__AVX2__)
+    for (; i + 4 <= n; i += 4) {
+      __m256d v = _mm256_loadu_pd(inout+i);
+      v = Sleef_tanhd4_u10avx2(v);
+      _mm256_storeu_pd(inout+i, v);
+    }
   #endif
   for (; i < n; i++) inout[i] = std::tanh(inout[i]);
 #else
-  #ifdef _OPENMP
+  #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
     #pragma omp simd
   #endif
   for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
@@ -65,6 +63,9 @@ inline void bulk_tanh(double* inout, int n) {
 // ADM core: constant * mean(|x - center|)
 ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double constant) {
   double sum = 0.0;
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd reduction(+:sum)
+#endif
   for (int i = 0; i < n; ++i) {
     sum += std::abs(x[i] - center);
   }
@@ -118,14 +119,6 @@ ROBSCALE_INLINE double median_select(double* x, size_t n) {
 inline double lowmedian_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   size_t h = (n - 1) / 2;
-  robscale::floyd_rivest_select(x, x + h, x + n);
-  return x[h];
-}
-
-// High-median selection
-inline double highmedian_select(double* x, size_t n) {
-  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  size_t h = n / 2;
   robscale::floyd_rivest_select(x, x + h, x + n);
   return x[h];
 }
