@@ -1,5 +1,6 @@
 #include "robust_core.h"
 #include <Rcpp.h>
+#include <memory>
 #ifndef STACK_BUF_SIZE
 #define STACK_BUF_SIZE 1024
 #endif

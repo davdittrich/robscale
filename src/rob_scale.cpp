@@ -1,14 +1,17 @@
 #include "robscale_config.h"
 #include "robust_core.h"
+#include "pdq_select.h"
 #include <Rcpp.h>
+#include <memory>
 
 /**
  * Portably optimized robScale kernel.
+ * Non-static: also called by estimators_internal.h for the ensemble.
  */
-static ROBSCALE_INLINE double rob_scale_compute(const double* ROBSCALE_RESTRICT data, 
-                                                size_t n, double data_offset, double s, 
-                                                int maxit, double tol, 
-                                                double* ROBSCALE_RESTRICT tmp) {
+double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
+                         size_t n, double data_offset, double s,
+                         int maxit, double tol,
+                         double* ROBSCALE_RESTRICT tmp) {
   double inv_n = 1.0 / (double)n;
 
   for (int k = 0; k < maxit; ++k) {
@@ -60,11 +63,11 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     t = loc_val;
     // Calculate MAD around fixed loc
     for (size_t i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - t);
-    s_init = robscale::MAD_CONSISTENCY * robscale::median_select(dev, n);
+    s_init = robscale::MAD_CONSISTENCY * robscale::adaptive_robscale_median_select(dev, n);
   } else {
     std::memcpy(w, xp, n * sizeof(double));
-    t = robscale::median_select(w, n);
-    s_init = robscale::mad_select(xp, (int)n, t, dev);
+    t = robscale::adaptive_robscale_median_select(w, n);
+    s_init = robscale::adaptive_mad_select(xp, (int)n, t, dev);
   }
 
   // Small-sample fallback (matches original revss behavior)
@@ -75,8 +78,8 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
       if (has_loc) {
         // Re-check MAD around the data's own median (not the supplied loc)
         std::memcpy(w, xp, n * sizeof(double));
-        double med_orig = robscale::median_select(w, n);
-        double mad_orig = robscale::mad_select(xp, (int)n, med_orig, dev);
+        double med_orig = robscale::adaptive_robscale_median_select(w, n);
+        double mad_orig = robscale::adaptive_mad_select(xp, (int)n, med_orig, dev);
         return (mad_orig <= implbound)
           ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY)
           : mad_orig;
@@ -93,8 +96,5 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
   }
 
-  const double* data = xp; 
-  double data_offset = t;
-  
-  return rob_scale_compute(data, n, data_offset, s_init, maxit, tol, w);
+  return rob_scale_compute(xp, n, t, s_init, maxit, tol, w);
 }

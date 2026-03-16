@@ -2,6 +2,7 @@
 #define ROBSCALE_CONFIG_H
 
 #include <cstddef>
+#include <cmath>
 
 /**
  * robscale_config.h
@@ -72,8 +73,19 @@
 namespace robscale {
   constexpr double MAD_CONSISTENCY      = 1.482602218505602;
   constexpr double ADM_CONSISTENCY      = 1.2533141373155001; // sqrt(pi/2), matches adm() default
+  constexpr double GMD_CONSISTENCY      = 0.886226925452758;  // sqrt(pi)/2
+  constexpr double IQR_CONSISTENCY      = 0.741301109252801;  // 1/(Phi^-1(0.75) - Phi^-1(0.25))
   constexpr double RHO_SCALE_CONST      = 0.37394112142347236;
   constexpr double INV_RHO_SCALE_CONST  = 1.0 / 0.37394112142347236;
+
+  // c4(n) consistency constant for unbiased standard deviation
+  // Formula: sqrt(2/(n-1)) * Gamma(n/2) / Gamma((n-1)/2)
+  inline double c4_factor(int n) {
+    if (n < 2) return 1.0;
+    return std::exp(0.5 * std::log(2.0 / (n - 1.0))
+                    + std::lgamma(n / 2.0)
+                    - std::lgamma((n - 1.0) / 2.0));
+  }
 }
 
 

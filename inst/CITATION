@@ -1,9 +1,9 @@
 bibentry(
   bibtype  = "Manual",
-  title    = "robscale: Faster Robustness: Accelerated Estimation of Location and Scale",
+  title    = "robscale: Accelerated Estimation of Robust Location and Scale",
   author   = person("Dennis Alexis Valin", "Dittrich"),
   year     = "2026",
-  note     = "R package version 0.1.5",
+  note     = "R package version 0.2.0",
   url      = "https://github.com/davdittrich/robscale",
   doi      = "10.5281/zenodo.18828607"
 )
@@ -36,4 +36,13 @@ bibentry(
   number   = "424",
   pages    = "1273--1283",
   doi      = "10.1080/01621459.1993.10476408"
+)
+
+bibentry(
+  bibtype  = "Book",
+  title    = "Variabilita e mutabilita",
+  author   = person("Corrado", "Gini"),
+  year     = "1912",
+  address  = "Bologna",
+  publisher = "Tipografia di Paolo Cuppini"
 )
