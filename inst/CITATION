@@ -1,9 +1,9 @@
 bibentry(
   bibtype  = "Manual",
-  title    = "robscale: Faster Robustness: Accelerated Estimation of Location and Scale",
+  title    = "robscale: Accelerated Estimation of Robust Location and Scale",
   author   = person("Dennis Alexis Valin", "Dittrich"),
   year     = "2026",
-  note     = "R package version 0.1.5",
+  note     = "R package version 0.2.0",
   url      = "https://github.com/davdittrich/robscale",
   doi      = "10.5281/zenodo.18828607"
 )
