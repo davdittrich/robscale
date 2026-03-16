@@ -37,3 +37,12 @@ bibentry(
   pages    = "1273--1283",
   doi      = "10.1080/01621459.1993.10476408"
 )
+
+bibentry(
+  bibtype  = "Book",
+  title    = "Variabilita e mutabilita",
+  author   = person("Corrado", "Gini"),
+  year     = "1912",
+  address  = "Bologna",
+  publisher = "Tipografia di Paolo Cuppini"
+)
