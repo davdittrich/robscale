@@ -1,7 +1,7 @@
 Package: robscale
 Type: Package
 Title: Accelerated Estimation of Robust Location and Scale
-Version: 0.2.0
+Version: 0.2.1
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
