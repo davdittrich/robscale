@@ -158,8 +158,9 @@ $$
 $$
 
 where $x_{(1)} \le \ldots \le x_{(n)}$ are the order statistics and
-$C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort
-($(O(n \log n))$), with sorting networks applied for $n \le 16$.
+$C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort,
+an $O(n \log n)$ operation, with sorting networks applied for
+$n \le 16$.
 
 The GMD achieves **98% ARE** (Nair, 1936) with a **29.3% breakdown
 point**, making it the most statistically efficient robust alternative
@@ -246,7 +247,7 @@ fixed. Starting value: $S^{(0)} = \text{MAD}(x)$.
 **Degenerate input handling:** When the sample size falls below the
 minimum for iteration (4 for unknown location, 3 for known), the
 function returns the initial MAD-based scale directly if it is nonzero.
-When the MAD collapses to zero (i.e. MAD $\leq$ `implbound`), the
+When the MAD collapses to zero (i.e. MAD is $\leq$ `implbound`), the
 `fallback` argument controls the result:
 
 - `fallback = "adm"` (Default): returns `adm(x)`, maintaining a finite
@@ -255,10 +256,11 @@ When the MAD collapses to zero (i.e. MAD $\leq$ `implbound`), the
   profile of the `revss` package.
 
 Providing a known `loc` centers the data at that value and uses the
-median-distance-to-zero ($(1.4826 \cdot \text{median}(|x_i - \mu|))$) as
-the initial scale, lowering the minimum sample size from 4 to 3. The
-flowchart below illustrates the control flow, including the `fallback`
-logic and SIMD-accelerated loop.
+median-distance-to-zero, exactly
+$1.4826 \cdot \text{median}(|x_i - \mu|)$, as the initial scale,
+lowering the minimum sample size from 4 to 3. The flowchart below
+illustrates the control flow, including the `fallback` logic and
+SIMD-accelerated loop.
 
 ``` r
 robScale(c(1, 2, 3, 5, 7, 8))
@@ -415,8 +417,8 @@ deviation under normality. Supported `method` values: `"c4"`, `"gmd"`,
 
 When `n = NULL`, the function returns the asymptotic consistency
 constant. When `n` is supplied, it returns the finite-sample correction
-factor for that sample size—useful for small-sample bias (for $n$)
-correction.
+factor for that sample size—useful for small-sample bias for $n$
+observations.
 
 ``` r
 get_consistency_constant("mad")          # asymptotic: 1/qnorm(3/4)
@@ -439,9 +441,9 @@ $$
 $$
 
 `revss` evaluates this as `2 * plogis(u) - 1`, which calls R’s `plogis`
-(the logistic CDF $1/(1 + e^{-x})$). The computation requires one call
-to `exp()` followed by two arithmetic operations, plus the overhead of
-R’s vectorised dispatch, intermediate vector allocation, and
+(the logistic CDF), which is $1/(1 + e^{-x})$. The computation requires
+one call to `exp()` followed by two arithmetic operations, plus the
+overhead of R’s vectorised dispatch, intermediate vector allocation, and
 garbage-collection pressure.
 
 The algebraic identity
@@ -534,14 +536,15 @@ the data, and the median of the absolute deviations. `revss` uses R’s
 operation.
 
 `robscale` uses a tiered $O(n)$ median selection strategy. For even $n$,
-a single linear scan over the upper partition locates the $(k{+}1)$-th
-element needed for averaging.
+a single linear scan over the upper partition locates element $k + 1$
+needed for averaging.
 
 For $n \leq 16$—the core target regime—the selection step uses optimal
-sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4; Dobbelaere’s verified
-optimal networks for $n = 9$ to $16$). These are conditional
-compare-and-swap sequences—typically compiled to branchless machine code
-at `-O2`—with the minimum number of comparisons for each $n$:
+sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4, and Dobbelaere’s
+verified optimal networks for $n = 9$ to $n = 16$). These are
+conditional compare-and-swap sequences—typically compiled to branchless
+machine code at `-O2`—with the minimum number of comparisons for each
+$n$:
 
 | $n$ | Comparators |
 |----:|------------:|
@@ -560,7 +563,7 @@ at `-O2`—with the minimum number of comparisons for each $n$:
 |  15 |          56 |
 |  16 |          60 |
 
-Cross-platform benchmarking confirmed 2 to 4$\times$ speedups over
+Cross-platform benchmarking confirmed speedups of 2 to 4 $\times$ over
 `std::sort` for $n = 9$ to $16$ on both ARM64 (Apple Silicon) and x86_64
 (AMD Zen 3).
 
