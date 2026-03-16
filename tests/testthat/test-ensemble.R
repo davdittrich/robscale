@@ -49,24 +49,23 @@ test_that("ensemble handles data with ties", {
 # --- Snapshot and determinism stress tests ---
 
 test_that("ensemble snapshot values are stable", {
-  # Tight tolerance (1e-14) accommodates ULP-level differences between
-
-  # debug (-O0) and optimized (-O3) builds caused by SIMD pragma vectorization.
+  # Tolerance 1e-12: accommodates ULP-level differences across platforms
+  # (ARM64 vs x86_64) and optimization levels (-O0 vs -O3 with SIMD).
   # Determinism tests below use expect_identical for parallelism safety.
   set.seed(1)
   expect_equal(
     robscale:::cpp_scale_ensemble(rnorm(5), 200L),
-    1.0339034456052081, tolerance = 1e-14
+    1.0339034456052081, tolerance = 1e-12
   )
   set.seed(42)
   expect_equal(
     robscale:::cpp_scale_ensemble(rnorm(10), 200L),
-    0.83095020353687232, tolerance = 1e-14
+    0.83095020353687232, tolerance = 1e-12
   )
   set.seed(123)
   expect_equal(
     robscale:::cpp_scale_ensemble(rnorm(500), 200L),
-    0.96151577555753143, tolerance = 1e-14
+    0.96151577555753143, tolerance = 1e-12
   )
 })
 

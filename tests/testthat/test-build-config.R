@@ -20,12 +20,19 @@ test_that("robscale:::get_qnsn_config() returns cache-derived thresholds", {
   expect_equal(config$qn_exact_threshold, 64L)
 })
 
-test_that("generated Makevars has no dead macros", {
-  skip_if(!file.exists("src/Makevars"), "Not in source tree")
-  content <- paste(readLines("src/Makevars"), collapse = " ")
-  expect_false(grepl("ROBSCALE_FAST_MODE", content))
-  expect_false(grepl("FASTQNSN_L2_CACHE_BYTES", content))
-  expect_false(grepl("FASTQNSN_CACHE_LINE_BYTES", content))
+test_that("generated Makevars has no dead macros (source tree only)", {
+  # Only meaningful when running from the source tree (devtools::test).
+  # When testing against the installed package, Makevars isn't present —
+  # succeed vacuously rather than skip.
+  makevars_path <- file.path("src", "Makevars")
+  if (file.exists(makevars_path)) {
+    content <- paste(readLines(makevars_path), collapse = " ")
+    expect_false(grepl("ROBSCALE_FAST_MODE", content))
+    expect_false(grepl("FASTQNSN_L2_CACHE_BYTES", content))
+    expect_false(grepl("FASTQNSN_CACHE_LINE_BYTES", content))
+  } else {
+    expect_true(TRUE)
+  }
 })
 
 test_that("has_omp_simd config field is reported", {

@@ -143,55 +143,10 @@ struct QnCountWorker : public WorkerBase {
   }
 };
 
-template <typename T>
-struct QnCandidateWorker {
-  const T* sorted_x;
-  const size_t n;
-  const int32_t* left;
-  const int32_t* right;
-  size_t* offsets; // Pointer to shared offsets array
-  size_t grain;
-
-  QnCandidateWorker(const T* x, size_t n, const int32_t* l, const int32_t* r, size_t* off, size_t g)
-      : sorted_x(x), n(n), left(l), right(r), offsets(off), grain(g) {}
-
-  void operator()(const tbb::blocked_range<size_t>& range) const {
-    size_t block_idx = range.begin() / grain;
-    size_t count = 0;
-    for (size_t i = range.begin(); i < range.end(); ++i) {
-      if (i > 0 && left[i] <= right[i]) count++;
-    }
-    offsets[block_idx] = count;
-  }
-};
-
-template <typename T>
-struct QnCandidateFulfiller {
-  const T* sorted_x;
-  const int32_t* left;
-  const int32_t* right;
-  const size_t* prefix_offsets;
-  float* work;
-  int32_t* iweight;
-  size_t grain;
-
-  QnCandidateFulfiller(const T* x, const int32_t* l, const int32_t* r, const size_t* off, float* w, int32_t* iw, size_t g)
-      : sorted_x(x), left(l), right(r), prefix_offsets(off), work(w), iweight(iw), grain(g) {}
-
-  void operator()(const tbb::blocked_range<size_t>& range) const {
-    size_t block_idx = range.begin() / grain;
-    size_t out_idx = prefix_offsets[block_idx];
-    for (size_t i = range.begin(); i < range.end(); ++i) {
-      if (i > 0 && left[i] <= right[i]) {
-        int32_t w_val = right[i] - left[i] + 1;
-        int32_t jj = left[i] + w_val / 2;
-        work[out_idx] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
-        iweight[out_idx] = w_val;
-        out_idx++;
-      }
-    }
-  }
-};
+// QnCandidateWorker and QnCandidateFulfiller removed — the struct-based
+// blocked_range pattern used r.begin()/grain as a block index, which is
+// unsafe because TBB does not guarantee range splits at grain multiples.
+// Replaced with explicit block-index parallel_for in qn_refinement_kernel.
 
 template <typename T>
 struct QnRefineWorker : public WorkerBase {
@@ -305,23 +260,47 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
     size_t m = 0;
     if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
+      // Explicit block-index parallel_for: each block_idx maps to a fixed
+      // [begin, end) range, so count phase and fill phase see identical splits.
       size_t g = config.grain_size;
-      size_t num_blocks = (n + g - 1) / g + 1;
+      size_t num_blocks = (n - 1 + g - 1) / g;  // blocks covering [1, n)
       std::vector<size_t> block_offsets(num_blocks, 0);
 
-      QnCandidateWorker<T> worker(sorted_x, n, left, right, block_offsets.data(), g);
-      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), worker);
+      // Count: how many candidates per block
+      tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
+        size_t begin = 1 + block_idx * g;
+        size_t end = std::min(begin + g, n);
+        size_t count = 0;
+        for (size_t i = begin; i < end; ++i) {
+          if (left[i] <= right[i]) count++;
+        }
+        block_offsets[block_idx] = count;
+      });
 
+      // Prefix sum → write offsets
       size_t current = 0;
-      for (size_t i = 0; i < num_blocks; ++i) {
-        size_t block_count = block_offsets[i];
-        block_offsets[i] = current;
-        current += block_count;
+      for (size_t b = 0; b < num_blocks; ++b) {
+        size_t c = block_offsets[b];
+        block_offsets[b] = current;
+        current += c;
       }
       m = current;
 
-      QnCandidateFulfiller<T> fulfiller(sorted_x, left, right, block_offsets.data(), work, iweight, g);
-      tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), fulfiller);
+      // Fill: each block writes at its deterministic offset
+      tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
+        size_t begin = 1 + block_idx * g;
+        size_t end = std::min(begin + g, n);
+        size_t o = block_offsets[block_idx];
+        for (size_t i = begin; i < end; ++i) {
+          if (left[i] <= right[i]) {
+            int32_t w_val = right[i] - left[i] + 1;
+            int32_t jj = left[i] + w_val / 2;
+            work[o] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
+            iweight[o] = w_val;
+            o++;
+          }
+        }
+      });
 #else
       for (size_t i = 1; i < n; ++i) {
         if (left[i] <= right[i]) {
@@ -388,31 +367,37 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
 
   if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
+    // Explicit block-index parallel_for — same pattern as candidate generation.
     size_t g = config.get_dynamic_grain_size(n);
-    size_t num_blocks = (n + g - 1) / g + 1;
+    size_t num_blocks = (n - 1 + g - 1) / g;  // blocks covering [1, n)
     std::vector<size_t> block_offsets(num_blocks, 0);
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
-      size_t b_idx = r.begin() / g;
+    // Count: total diffs per block
+    tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
+      size_t begin = 1 + block_idx * g;
+      size_t end = std::min(begin + g, n);
       size_t count = 0;
-      for (size_t i = r.begin(); i < r.end(); ++i) {
-        if (i > 0 && left[i] <= right[i]) count += (right[i] - left[i] + 1);
+      for (size_t i = begin; i < end; ++i) {
+        if (left[i] <= right[i]) count += (right[i] - left[i] + 1);
       }
-      block_offsets[b_idx] = count;
+      block_offsets[block_idx] = count;
     });
 
+    // Prefix sum → write offsets
     size_t current = 0;
-    for (size_t i = 0; i < num_blocks; ++i) {
-      size_t b_c = block_offsets[i];
-      block_offsets[i] = current;
-      current += b_c;
+    for (size_t b = 0; b < num_blocks; ++b) {
+      size_t c = block_offsets[b];
+      block_offsets[b] = current;
+      current += c;
     }
 
-    tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), [&](const tbb::blocked_range<size_t>& r) {
-      size_t b_idx = r.begin() / g;
-      size_t o = block_offsets[b_idx];
-      for (size_t i = r.begin(); i < r.end(); ++i) {
-        if (i > 0 && left[i] <= right[i]) {
+    // Fill: each block writes diffs at its deterministic offset
+    tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
+      size_t begin = 1 + block_idx * g;
+      size_t end = std::min(begin + g, n);
+      size_t o = block_offsets[block_idx];
+      for (size_t i = begin; i < end; ++i) {
+        if (left[i] <= right[i]) {
           for (int32_t j = left[i]; j <= right[i]; ++j) {
             diffs[o++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
           }

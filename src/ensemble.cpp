@@ -6,7 +6,6 @@
 #include <memory>
 #include <algorithm>
 #include <vector>
-#include <chrono>
 
 #include <RcppParallel.h>
 #ifdef USE_DIRECT_TBB
@@ -604,11 +603,7 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
   );
 }
 
-// ============================================================================
-// Benchmark harness — temporary, guarded by ROBSCALE_BENCH_INTERNALS
-// ============================================================================
-#ifdef ROBSCALE_BENCH_INTERNALS
-
+// Sorted-input variants — thin wrappers, always available for testing.
 // [[Rcpp::export]]
 double C_sn_sorted_test(Rcpp::NumericVector x) {
   return robscale::qnsn::C_sn_impl_sorted<double>(x.begin(), static_cast<size_t>(x.size()));
@@ -619,161 +614,3 @@ double C_qn_sorted_test(Rcpp::NumericVector x) {
   return robscale::qnsn::C_qn_impl_sorted<double>(x.begin(), static_cast<size_t>(x.size()));
 }
 
-// [[Rcpp::export]]
-Rcpp::DataFrame bench_ensemble_internals(Rcpp::NumericVector x, int n_boot, int reps) {
-  using Clock = std::chrono::high_resolution_clock;
-  int n = x.size();
-  const double* xp = x.begin();
-
-  Rcpp::IntegerVector rep_col(reps);
-  Rcpp::NumericVector total_us_col(reps);
-
-  size_t ws_size = 3 * static_cast<size_t>(n);
-  std::unique_ptr<double[]> ws(new double[ws_size]);
-  std::unique_ptr<double[]> boot_mem(new double[static_cast<size_t>(n_boot) * N_ESTIMATORS]);
-
-  double* resample = ws.get();
-  double* work1 = resample + n;
-  double* work2 = work1 + n;
-  double* boot_results = boot_mem.get();
-
-  for (int rep = 0; rep < reps; ++rep) {
-    auto t0 = Clock::now();
-    for (int r = 0; r < n_boot; ++r) {
-      double* row = boot_results + static_cast<size_t>(r) * N_ESTIMATORS;
-      ensemble_one_replicate(xp, n, r, row, resample, work1, work2);
-    }
-    auto t1 = Clock::now();
-
-    rep_col[rep] = rep + 1;
-    total_us_col[rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-  }
-
-  return Rcpp::DataFrame::create(
-    Rcpp::Named("rep") = rep_col,
-    Rcpp::Named("total_us") = total_us_col,
-    Rcpp::Named("stringsAsFactors") = false
-  );
-}
-
-// [[Rcpp::export]]
-double bench_sort_cost_us(Rcpp::NumericVector x, int reps) {
-  using Clock = std::chrono::high_resolution_clock;
-  int n = x.size();
-  const double* xp = x.begin();
-
-  std::unique_ptr<double[]> buf(new double[n]);
-  std::vector<double> timings(reps);
-
-  for (int rep = 0; rep < reps; ++rep) {
-    std::memcpy(buf.get(), xp, n * sizeof(double));
-    auto t0 = Clock::now();
-    if (n <= 16) {
-      robscale::small_sort(buf.get(), n);
-    } else {
-      std::sort(buf.get(), buf.get() + n);
-    }
-    auto t1 = Clock::now();
-    timings[rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-  }
-
-  std::sort(timings.begin(), timings.end());
-  return timings[reps / 2]; // median
-}
-
-// [[Rcpp::export]]
-Rcpp::NumericVector bench_estimator_breakdown(Rcpp::NumericVector x, int reps) {
-  using Clock = std::chrono::high_resolution_clock;
-  int n = x.size();
-  const double* xp = x.begin();
-
-  // 7 estimators, reps timings each
-  std::vector<std::vector<double>> timings(N_ESTIMATORS, std::vector<double>(reps));
-
-  // Workspace: 5n
-  std::unique_ptr<double[]> ws(new double[5 * static_cast<size_t>(n)]);
-  double* resample = ws.get();
-  double* work1 = resample + n;
-  double* work2 = work1 + n;
-  double* work3 = work2 + n;
-  double* work4 = work3 + n;
-
-  double boot_row[N_ESTIMATORS];
-
-  for (int rep = 0; rep < reps; ++rep) {
-    // Generate a fresh resample for each rep
-    XorShift32 rng(static_cast<uint32_t>(rep + 99999));
-    for (int i = 0; i < n; ++i) {
-      resample[i] = xp[rng.next() % n];
-    }
-
-    // 0: sd_c4
-    {
-      auto t0 = Clock::now();
-      boot_row[0] = robscale::internal::sd_c4(resample, n);
-      auto t1 = Clock::now();
-      timings[0][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 1: gmd (needs sorted copy)
-    {
-      std::memcpy(work4, resample, n * sizeof(double));
-      auto t0 = Clock::now();
-      boot_row[1] = robscale::internal::gmd(work4, n);
-      auto t1 = Clock::now();
-      timings[1][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 2: mad
-    {
-      auto t0 = Clock::now();
-      boot_row[2] = robscale::internal::mad_from_data(resample, work1, work2, n);
-      auto t1 = Clock::now();
-      timings[2][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 3: iqr
-    {
-      auto t0 = Clock::now();
-      boot_row[3] = robscale::internal::iqr(resample, work1, work2, n);
-      auto t1 = Clock::now();
-      timings[3][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 4: sn
-    {
-      auto t0 = Clock::now();
-      boot_row[4] = robscale::internal::sn(resample, n);
-      auto t1 = Clock::now();
-      timings[4][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 5: qn
-    {
-      auto t0 = Clock::now();
-      boot_row[5] = robscale::internal::qn(resample, n);
-      auto t1 = Clock::now();
-      timings[5][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-
-    // 6: robScale
-    {
-      auto t0 = Clock::now();
-      boot_row[6] = robscale::internal::rob_scale(resample, work1, work2, n);
-      auto t1 = Clock::now();
-      timings[6][rep] = std::chrono::duration<double, std::micro>(t1 - t0).count();
-    }
-  }
-
-  // Compute medians
-  Rcpp::NumericVector result(N_ESTIMATORS);
-  Rcpp::CharacterVector names = {"sd_c4", "gmd", "mad", "iqr", "sn", "qn", "rob_scale"};
-  for (int j = 0; j < N_ESTIMATORS; ++j) {
-    std::sort(timings[j].begin(), timings[j].end());
-    result[j] = timings[j][reps / 2];
-  }
-  result.attr("names") = names;
-  return result;
-}
-
-#endif // ROBSCALE_BENCH_INTERNALS
