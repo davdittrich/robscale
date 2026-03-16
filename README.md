@@ -8,7 +8,7 @@
 Outliers compromise the reliability of classical estimators even in
 moderate samples. A single recording error can destroy the standard
 deviation, yet the most widely used robust implementations in R—`revss`
-for small-sample M-estimation and `robustbase` for the $Q\_n$ and $S\_n$
+for small-sample M-estimation and `robustbase` for the $Q_n$ and $S_n$
 scale estimators—carry significant computational overhead for
 time-critical applications.
 
@@ -25,16 +25,15 @@ confidence intervals via `ci = TRUE`.
 
 All estimators are implemented as C++17 kernels. The M-estimators use
 vectorized `tanh` evaluation (where batch sizes justify the overhead)
-and Newton–Raphson iteration; $Q\_n$ and $S\_n$ use parallelized
+and Newton–Raphson iteration; $Q_n$ and $S_n$ use parallelized
 $O(n \log n)$ algorithms via TBB. Against `revss`, the package achieves
 **10.3–30.0x** speedups for the small-sample M-estimators. Against
-`robustbase`, it achieves **1.9–10.1x** for $S\_n$ and **1.8–7.0x** for
-$Q\_n$—with gains peaking near **10.1x** at $n = 10^7$ as TBB
-parallelism reduces the computational bottleneck for massive datasets.
-The new estimators (`gmd`, `iqr_scaled`, `mad_scaled`) outperform their
-base R and CRAN counterparts by **2.6–16.3x** (GMD vs `Hmisc`),
-**3.0–26.4x** (IQR vs `stats::IQR`), and **2.8–19.1x** (MAD vs
-`stats::mad`).
+`robustbase`, it achieves **1.9–10.1x** for $S_n$ and **1.8–7.0x** for
+$Q_n$—with gains peaking near **10.1x** at $n = 10^7$ as TBB parallelism
+reduces the computational bottleneck for massive datasets. The new
+estimators (`gmd`, `iqr_scaled`, `mad_scaled`) outperform their base R
+and CRAN counterparts by **2.6–16.3x** (GMD vs `Hmisc`), **3.0–26.4x**
+(IQR vs `stats::IQR`), and **2.8–19.1x** (MAD vs `stats::mad`).
 
 ## Installation
 
@@ -93,8 +92,8 @@ Table 1
 | `sd_c4(x)` | Bias-corrected standard deviation | **100%** | 0% | $O(n)$ | Welford (1962) |
 | `gmd(x)` | Gini mean difference | **98%** | 29.3% | $O(n \log n)$ | Gini (1912); Nair (1936) |
 | `adm(x)` | Average deviation from median | **88.3%** | $1/n$ | $O(n)$ | Nair (1947) |
-| `qn(x)` | $Q\_n$ scale estimator | **82.3%** | 50% | $O(n \log n)$ | Rousseeuw & Croux (1993) |
-| `sn(x)` | $S\_n$ scale estimator | **58.2%** | 50% | $O(n \log n)$ | Rousseeuw & Croux (1993) |
+| `qn(x)` | $Q_n$ scale estimator | **82.3%** | 50% | $O(n \log n)$ | Rousseeuw & Croux (1993) |
+| `sn(x)` | $S_n$ scale estimator | **58.2%** | 50% | $O(n \log n)$ | Rousseeuw & Croux (1993) |
 | `robScale(x)` | M-estimate of scale | **55.0%** | 50% | $O(n)$ iters | Rousseeuw & Verboven (2002) |
 | `iqr_scaled(x)` | Scaled interquartile range | **37%** | 25% | $O(n)$ | Bickel & Lehmann (1976) |
 | `mad_scaled(x)` | Scaled median absolute deviation | **36.8%** | 50% | $O(n)$ | Rousseeuw & Croux (1993) |
@@ -158,9 +157,9 @@ $$
 \text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}
 $$
 
-where $x\_{(1)} \le \ldots \le x\_{(n)}$ are the order statistics and
+where $x_{(1)} \le \ldots \le x_{(n)}$ are the order statistics and
 $C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort
-($O(n \log n)$), with sorting networks applied for $n \le 16$.
+($(O(n \log n))$), with sorting networks applied for $n \le 16$.
 
 The GMD achieves **98% ARE** (Nair, 1936) with a **29.3% breakdown
 point**, making it the most statistically efficient robust alternative
@@ -247,7 +246,7 @@ fixed. Starting value: $S^{(0)} = \text{MAD}(x)$.
 **Degenerate input handling:** When the sample size falls below the
 minimum for iteration (4 for unknown location, 3 for known), the
 function returns the initial MAD-based scale directly if it is nonzero.
-When the MAD collapses to zero (i.e. $\text{MAD} \leq$ `implbound`), the
+When the MAD collapses to zero (i.e. MAD $\leq$ `implbound`), the
 `fallback` argument controls the result:
 
 - `fallback = "adm"` (Default): returns `adm(x)`, maintaining a finite
@@ -256,7 +255,7 @@ When the MAD collapses to zero (i.e. $\text{MAD} \leq$ `implbound`), the
   profile of the `revss` package.
 
 Providing a known `loc` centers the data at that value and uses the
-median-distance-to-zero ($1.4826 \cdot \text{median}(|x_i - \mu|)$) as
+median-distance-to-zero ($(1.4826 \cdot \text{median}(|x_i - \mu|))$) as
 the initial scale, lowering the minimum sample size from 4 to 3. The
 flowchart below illustrates the control flow, including the `fallback`
 logic and SIMD-accelerated loop.
@@ -416,7 +415,8 @@ deviation under normality. Supported `method` values: `"c4"`, `"gmd"`,
 
 When `n = NULL`, the function returns the asymptotic consistency
 constant. When `n` is supplied, it returns the finite-sample correction
-factor for that sample size—useful for small-$n$ bias correction.
+factor for that sample size—useful for small-sample bias (for $n$)
+correction.
 
 ``` r
 get_consistency_constant("mad")          # asymptotic: 1/qnorm(3/4)
@@ -439,7 +439,7 @@ $$
 $$
 
 `revss` evaluates this as `2 * plogis(u) - 1`, which calls R’s `plogis`
-(the logistic CDF, $1/(1 + e^{-x})$). The computation requires one call
+(the logistic CDF $1/(1 + e^{-x})$). The computation requires one call
 to `exp()` followed by two arithmetic operations, plus the overhead of
 R’s vectorised dispatch, intermediate vector allocation, and
 garbage-collection pressure.
@@ -451,7 +451,7 @@ $$
 $$
 
 is immediate from the definition of the hyperbolic tangent. `robscale`
-exploits this identity to reduce $\psi\_{\log}$ to a single `tanh` call.
+exploits this identity to reduce $\psi_{\log}$ to a single `tanh` call.
 The identity is not merely a cosmetic rewrite:
 
 - **Branch elimination.** A direct implementation of
@@ -488,12 +488,12 @@ $$
 T^{(k+1)} = T^{(k)} + S \cdot \frac{\frac{1}{n}\sum \psi_{\log}\!\left(\frac{x_i - T^{(k)}}{S}\right)}{\alpha}
 $$
 
-where $\alpha = \int \psi\_{\log}'(u)\,d\Phi(u) \approx 0.4132$ is the
+where $\alpha = \int \psi_{\log}'(u)\,d\Phi(u) \approx 0.4132$ is the
 normalization constant. This is a fixed-point iteration with *linear*
 convergence: each step reduces the error by a constant factor.
 
 `robscale` instead applies Newton–Raphson to the estimating equation
-$\sum \psi\_{\log}((x\_i - T)/S) = 0$, yielding:
+$\sum \psi_{\log}((x_i - T)/S) = 0$, yielding:
 
 $$
 T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}
@@ -502,7 +502,7 @@ $$
 
 where $\psi(\cdot) = \tanh(\cdot)$. The efficiency follows from
 observing that the derivative of the logistic psi satisfies
-$\psi\_{\log}'(x) = 1 - \psi\_{\log}^2(x) = 1 - \tanh^2(x/2)$. Since
+$\psi_{\log}'(x) = 1 - \psi_{\log}^2(x) = 1 - \tanh^2(x/2)$. Since
 $\tanh$ values have already been computed for the numerator, the
 denominator requires only squaring and subtraction—no additional
 transcendental function calls.
@@ -534,12 +534,12 @@ the data, and the median of the absolute deviations. `revss` uses R’s
 operation.
 
 `robscale` uses a tiered $O(n)$ median selection strategy. For even $n$,
-a single linear scan over the upper partition locates the $(k{+}1)$th
+a single linear scan over the upper partition locates the $(k{+}1)$-th
 element needed for averaging.
 
 For $n \leq 16$—the core target regime—the selection step uses optimal
 sorting networks (Knuth, TAOCP Vol. 3, Sec. 5.3.4; Dobbelaere’s verified
-optimal networks for $n = 9$–$16$). These are conditional
+optimal networks for $n = 9$ to $16$). These are conditional
 compare-and-swap sequences—typically compiled to branchless machine code
 at `-O2`—with the minimum number of comparisons for each $n$:
 
@@ -560,8 +560,8 @@ at `-O2`—with the minimum number of comparisons for each $n$:
 |  15 |          56 |
 |  16 |          60 |
 
-Cross-platform benchmarking confirmed 2–4$\times$ speedups over
-`std::sort` for $n = 9$–$16$ on both ARM64 (Apple Silicon) and x86_64
+Cross-platform benchmarking confirmed 2 to 4$\times$ speedups over
+`std::sort` for $n = 9$ to $16$ on both ARM64 (Apple Silicon) and x86_64
 (AMD Zen 3).
 
 For $17 \leq n < 600$, the code delegates to `std::nth_element`
@@ -637,7 +637,7 @@ $O(n \log n)$ per iteration, with parallelism scaling across all
 available cores for $n \geq$ `qn_parallel_threshold`.
 
 **$S_n$ — parallelized inner-median sweep.** The $S_n$ statistic is the
-low median of the vector $\{\text{med}\_j |x\_i - x\_j|\}\_{i=1}^n$.
+low median of the vector $\{\text{med}_j |x_i - x_j|\}_{i=1}^n$.
 `robscale` computes each inner median with an initial binary search
 seeding a sliding-window linear scan (exploiting sortedness) in
 amortized $O(1)$ per element, then dispatches the outer $n$ iterations
@@ -697,7 +697,7 @@ from the miniselect library.
 The `scale_robust()` ensemble operates in C++ (`cpp_scale_ensemble`) to
 avoid R-level overhead for the $n_{\text{boot}} \times 7$ estimator
 evaluations. For each bootstrap replicate
-$r = 1, \ldots, n\_{\text{boot}}$:
+$r = 1, \ldots, n_{\text{boot}}$:
 
 1.  A deterministic XorShift32 PRNG (Marsaglia, 2003) seeded with
     $r + 12345$ draws $n$ indices with replacement.
@@ -713,7 +713,7 @@ $$
 
 where $\hat\sigma_j^2$ is the sample variance of estimator $j$ across
 bootstrap replicates. The final estimate is
-$\hat\sigma = \sum\_j w\_j \cdot \hat\sigma\_j(x)$ evaluated on the
+$\hat\sigma = \sum_j w_j \cdot \hat\sigma_j(x)$ evaluated on the
 original data.
 
 <div id="tbl-qn-bench">
@@ -980,13 +980,12 @@ $$
 where $c = 0.37394112142347236$ is the constant that yields a 50%
 breakdown point.
 
-**$Q\_n$ and $S\_n$ statistics.**
-$Q\_n = c\_n \cdot d \cdot \{|x\_i - x\_j|; i < j\}\_{(k)}$ where
+**$Q_n$ and $S_n$ statistics.**
+$Q_n = c_n \cdot d \cdot \{|x_i - x_j|; i < j\}_{(k)}$ where
 $k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $d = 2.2191$
-(consistency constant for Gaussian data).
-$S\_n = c\_n' \cdot 1.1926 \cdot
-\text{lomed}\_i \{\text{himed}\_j |x\_i - x\_j|\}$, where $\text{lomed}$
-and $\text{himed}$ denote the low and high medians respectively.
+(consistency constant for Gaussian data). $S_n = c_n' \cdot 1.1926 \cdot
+\text{lomed}_i \{\text{himed}_j |x_i - x_j|\}$, where $\text{lomed}$ and
+$\text{himed}$ denote the low and high medians respectively.
 
 **$c_4(n)$ correction factor.** The expected value of the sample
 standard deviation under normality is $\sigma \cdot c_4(n)$ where:
@@ -1004,8 +1003,8 @@ $$
 $$
 
 is algebraically equivalent to the pairwise-difference definition
-$\frac{1}{\binom{n}{2}}\sum\_{i<j}|x\_i - x\_j|$ but avoids
-materializing $O(n^2)$ pairs.
+$\frac{1}{\binom{n}{2}}\sum_{i<j}|x_i - x_j|$ but avoids materializing
+$O(n^2)$ pairs.
 
 **Ensemble weighting formula.** Given $J$ estimators with bootstrap
 variances $\hat\sigma_j^2$, the inverse-variance weighted estimate is:
@@ -1018,7 +1017,7 @@ $$
 
 | Symbol | Value | Definition |
 |:---|:---|:---|
-| $\alpha$ | `0.413241928283814` | $\int \psi\_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
+| $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
 | $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
 | $C_{\text{MAD}}$ | `1.482602218505602` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
