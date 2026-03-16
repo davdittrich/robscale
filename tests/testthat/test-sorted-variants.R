@@ -1,15 +1,10 @@
 # Tests for C_sn_impl_sorted / C_qn_impl_sorted
-# These call thin R-exported wrappers guarded by ROBSCALE_BENCH_INTERNALS.
-
-has_sorted <- tryCatch(
-  { robscale:::C_sn_sorted_test(c(1, 2)); TRUE },
-  error = function(e) FALSE
-)
+# These call thin R-exported wrappers (always available).
 
 # --- Equivalence: C_sn_sorted_test(sort(x)) == sn(x) ---
 
 test_that("sn_sorted matches sn for various n", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   n_grid <- c(2, 3, 5, 10, 16, 17, 32, 64, 65, 100, 128, 256, 512)
   tol <- sqrt(.Machine$double.eps)
   for (nn in n_grid) {
@@ -25,7 +20,7 @@ test_that("sn_sorted matches sn for various n", {
 # --- Equivalence: C_qn_sorted_test(sort(x)) == qn(x) ---
 
 test_that("qn_sorted matches qn for various n", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   n_grid <- c(2, 3, 5, 10, 16, 17, 32, 64, 65, 100, 128, 256, 512)
   tol <- sqrt(.Machine$double.eps)
   for (nn in n_grid) {
@@ -41,13 +36,13 @@ test_that("qn_sorted matches qn for various n", {
 # --- Known values ---
 
 test_that("sn_sorted returns correct known value", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   x <- c(1, 2, 4, 8, 16) # already sorted
   expect_equal(robscale:::C_sn_sorted_test(x), sn(x, finite.corr = TRUE))
 })
 
 test_that("qn_sorted returns correct known value", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   x <- c(1, 2, 4, 8, 16)
   expect_equal(robscale:::C_qn_sorted_test(x), qn(x, finite.corr = TRUE))
 })
@@ -55,7 +50,7 @@ test_that("qn_sorted returns correct known value", {
 # --- Edge cases ---
 
 test_that("sn_sorted edge cases", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   # n=1 -> NA
   expect_true(is.na(robscale:::C_sn_sorted_test(1)))
   # n=2 -> valid positive
@@ -66,7 +61,7 @@ test_that("sn_sorted edge cases", {
 })
 
 test_that("qn_sorted edge cases", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   # n=1 -> NA
   expect_true(is.na(robscale:::C_qn_sorted_test(1)))
   # n=2 -> valid positive
@@ -79,7 +74,7 @@ test_that("qn_sorted edge cases", {
 # --- Integer input ---
 
 test_that("sn_sorted handles integer input (as double)", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   x_int <- c(1L, 2L, 4L, 8L, 16L)
   expect_equal(
     robscale:::C_sn_sorted_test(sort(as.double(x_int))),
@@ -88,7 +83,7 @@ test_that("sn_sorted handles integer input (as double)", {
 })
 
 test_that("qn_sorted handles integer input (as double)", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   x_int <- c(1L, 2L, 4L, 8L, 16L)
   expect_equal(
     robscale:::C_qn_sorted_test(sort(as.double(x_int))),
@@ -99,7 +94,7 @@ test_that("qn_sorted handles integer input (as double)", {
 # --- Determinism ---
 
 test_that("sn_sorted is deterministic (50 repeats, n=100)", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   set.seed(42)
   x <- sort(rnorm(100))
   ref <- robscale:::C_sn_sorted_test(x)
@@ -109,7 +104,7 @@ test_that("sn_sorted is deterministic (50 repeats, n=100)", {
 })
 
 test_that("qn_sorted is deterministic (50 repeats, n=100)", {
-  skip_if(!has_sorted, "ROBSCALE_BENCH_INTERNALS not enabled")
+
   set.seed(42)
   x <- sort(rnorm(100))
   ref <- robscale:::C_qn_sorted_test(x)

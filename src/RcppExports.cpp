@@ -61,7 +61,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-#ifdef ROBSCALE_BENCH_INTERNALS
 // C_sn_sorted_test
 double C_sn_sorted_test(Rcpp::NumericVector x);
 RcppExport SEXP _robscale_C_sn_sorted_test(SEXP xSEXP) {
@@ -84,44 +83,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// bench_ensemble_internals
-Rcpp::DataFrame bench_ensemble_internals(Rcpp::NumericVector x, int n_boot, int reps);
-RcppExport SEXP _robscale_bench_ensemble_internals(SEXP xSEXP, SEXP n_bootSEXP, SEXP repsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
-    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_ensemble_internals(x, n_boot, reps));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_sort_cost_us
-double bench_sort_cost_us(Rcpp::NumericVector x, int reps);
-RcppExport SEXP _robscale_bench_sort_cost_us(SEXP xSEXP, SEXP repsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_sort_cost_us(x, reps));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_estimator_breakdown
-Rcpp::NumericVector bench_estimator_breakdown(Rcpp::NumericVector x, int reps);
-RcppExport SEXP _robscale_bench_estimator_breakdown(SEXP xSEXP, SEXP repsSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_estimator_breakdown(x, reps));
-    return rcpp_result_gen;
-END_RCPP
-}
-#endif // ROBSCALE_BENCH_INTERNALS
 // gmd_impl
 double gmd_impl(Rcpp::NumericVector x, double constant);
 RcppExport SEXP _robscale_gmd_impl(SEXP xSEXP, SEXP constantSEXP) {
@@ -302,87 +263,14 @@ BEGIN_RCPP
 END_RCPP
 }
 
-// sel_fr_median
-double sel_fr_median(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_sel_fr_median(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_fr_median(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// sel_pdq_median
-double sel_pdq_median(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_sel_pdq_median(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_pdq_median(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// sel_fr_lowmedian
-double sel_fr_lowmedian(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_sel_fr_lowmedian(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_fr_lowmedian(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// sel_pdq_lowmedian
-double sel_pdq_lowmedian(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_sel_pdq_lowmedian(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_pdq_lowmedian(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// sel_fr_kth
-double sel_fr_kth(Rcpp::NumericVector x, int k);
-RcppExport SEXP _robscale_sel_fr_kth(SEXP xSEXP, SEXP kSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type k(kSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_fr_kth(x, k));
-    return rcpp_result_gen;
-END_RCPP
-}
-// sel_pdq_kth
-double sel_pdq_kth(Rcpp::NumericVector x, int k);
-RcppExport SEXP _robscale_sel_pdq_kth(SEXP xSEXP, SEXP kSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type k(kSEXP);
-    rcpp_result_gen = Rcpp::wrap(sel_pdq_kth(x, k));
-    return rcpp_result_gen;
-END_RCPP
-}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
     {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},
-#ifdef ROBSCALE_BENCH_INTERNALS
     {"_robscale_C_sn_sorted_test", (DL_FUNC) &_robscale_C_sn_sorted_test, 1},
     {"_robscale_C_qn_sorted_test", (DL_FUNC) &_robscale_C_qn_sorted_test, 1},
-    {"_robscale_bench_ensemble_internals", (DL_FUNC) &_robscale_bench_ensemble_internals, 3},
-    {"_robscale_bench_sort_cost_us", (DL_FUNC) &_robscale_bench_sort_cost_us, 2},
-    {"_robscale_bench_estimator_breakdown", (DL_FUNC) &_robscale_bench_estimator_breakdown, 2},
-#endif
     {"_robscale_gmd_impl", (DL_FUNC) &_robscale_gmd_impl, 2},
     {"_robscale_iqr_impl", (DL_FUNC) &_robscale_iqr_impl, 2},
     {"_robscale_mad_impl_auto", (DL_FUNC) &_robscale_mad_impl_auto, 2},
@@ -398,12 +286,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_C_sn_float", (DL_FUNC) &_robscale_C_sn_float, 1},
     {"_robscale_C_sn_int_fast", (DL_FUNC) &_robscale_C_sn_int_fast, 1},
     {"_robscale_C_get_sn_factor", (DL_FUNC) &_robscale_C_get_sn_factor, 1},
-    {"_robscale_sel_fr_median", (DL_FUNC) &_robscale_sel_fr_median, 1},
-    {"_robscale_sel_pdq_median", (DL_FUNC) &_robscale_sel_pdq_median, 1},
-    {"_robscale_sel_fr_lowmedian", (DL_FUNC) &_robscale_sel_fr_lowmedian, 1},
-    {"_robscale_sel_pdq_lowmedian", (DL_FUNC) &_robscale_sel_pdq_lowmedian, 1},
-    {"_robscale_sel_fr_kth", (DL_FUNC) &_robscale_sel_fr_kth, 2},
-    {"_robscale_sel_pdq_kth", (DL_FUNC) &_robscale_sel_pdq_kth, 2},
     {NULL, NULL, 0}
 };
 

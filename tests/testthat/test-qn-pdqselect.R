@@ -47,9 +47,6 @@ test_that("qn is deterministic (50 reps)", {
 })
 
 test_that("qn heap path works (n=100000)", {
-  cfg <- robscale:::get_qnsn_config()
-  skip_if(100000L >= cfg$qn_parallel_threshold,
-          "n=100000 above TBB parallel threshold — known non-determinism")
   set.seed(7)
   x <- rnorm(100000)
   val <- qn(x)
