@@ -32,13 +32,14 @@
 
 ## URL Checks
 
-`urlchecker` flags four DOI URLs as `403 Forbidden`. These have been manually
+`urlchecker` flags five DOI URLs as `403 Forbidden`. These have been manually
 verified to work correctly in a browser. The access denials are likely due to
 bot-protection on the part of the publishers (Taylor & Francis, ACM, and JSTOR).
 
 Affected DOI links:
 
 - [doi:10.1080/00401706.1962.10490022](https://doi.org/10.1080/00401706.1962.10490022)
+- [doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
 - [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
 - [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
 - [doi:10.2307/2333958](https://doi.org/10.2307/2333958)
