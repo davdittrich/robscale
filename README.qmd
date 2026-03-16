@@ -1190,10 +1190,21 @@ Code that uses `revss` can switch to `robscale` by changing only the `library()`
 For `qn()` and `sn()`, the function signatures match `robustbase::Qn()` and
 `robustbase::Sn()` (with lowercase names for consistency).
 
-The v0.2.0 additions---`gmd()`, `iqr_scaled()`, `sd_c4()`, `mad_scaled()`,
-`scale_robust()`, and `get_consistency_constant()`---have no direct counterpart
-in `revss` or `robustbase`. `mad_scaled()` is API-compatible with `stats::mad()`
-when `constant = 1`; similarly, `iqr_scaled(x, constant = 1)` matches
+For the v0.2.0 additions---`gmd()`, `iqr_scaled()`, `sd_c4()`, `mad_scaled()`,
+`scale_robust()`, and `get_consistency_constant()`---the benchmarks compare
+performance against counterparts from other R packages. By design, `robscale`
+estimators apply Fisher-consistency constants to return unbiased standard
+deviation estimates for normal data. Therefore, benchmarking against functions
+that return raw, unscaled statistics requires manual scaling for accurate 
+comparison. Specifically, we compare `gmd()` against `Hmisc::GiniMd(x) * 0.8862`
+(Harrell, 2026) and `GiniDistance::gmd(x) * 0.8862` (Nguyen and Dang, 2022); and
+`iqr_scaled()` against `stats::IQR(x) * 0.7413` and scaled arrays from
+`collapse::fquantile()` (Krantz, 2025). In contrast, base R's `stats::mad()`
+already applies the normal consistency factor ($1.4826$) by default.
+Consequently, we directly benchmark `mad_scaled()` against `stats::mad()`
+and an equivalent `collapse::fmedian()` implementation without additional
+scaling. Under the hood, `mad_scaled()` is API-compatible with `stats::mad()`
+when `constant = 1`; similarly, `iqr_scaled(x, constant = 1)` matches the raw
 `stats::IQR(x)`.
 
 Users who do not need compiled performance---or who prefer a dependency-free
@@ -1244,3 +1255,11 @@ Dennis Alexis Valin Dittrich
 ## License
 
 MIT. Copyright 2026 Dennis Alexis Valin Dittrich.
+Harrell Jr., F.E. (2026). *Hmisc: Harrell Miscellaneous*. R package version 5.2-5. 
+[doi:10.32614/CRAN.package.Hmisc](https://doi.org/10.32614/CRAN.package.Hmisc)
+
+Krantz, S. (2025). *collapse: Advanced and Fast Data Transformation in R*. R package version 2.1.6.
+[doi:10.5281/zenodo.8433090](https://doi.org/10.5281/zenodo.8433090)
+
+Nguyen, D. and Dang, X. (2022). *GiniDistance: A New Gini Correlation Between Quantitative and Qualitative Variables*. R package version 0.1.1.
+[doi:10.32614/CRAN.package.GiniDistance](https://doi.org/10.32614/CRAN.package.GiniDistance)
