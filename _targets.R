@@ -67,7 +67,7 @@ list(
     # Convert standard inline math $...$ to GitHub's protected $`...`$ form
     # This prevents the Markdown parser from consuming underscores (e.g., in Q_n)
     # The negative lookbehinds/aheads ensure we don't accidentally match block $$...$$
-    content <- gsub("(?<!\\$)\\$([^$]+)\\$(?!\\$)", "$\\\\`\\1\\\\`$", content, perl=TRUE)
+    content <- gsub("(?<!\\$)\\$([^$]+)\\$(?!\\$)", "$`\\1`$", content, perl=TRUE)
     
     # Write back
     writeLines(content, path)
