@@ -4,7 +4,14 @@
 \alias{mad_scaled}
 \title{Scaled Median Absolute Deviation}
 \usage{
-mad_scaled(x, center, constant = 1.4826022185056, na.rm = FALSE)
+mad_scaled(
+  x,
+  center,
+  constant = 1.4826022185056,
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95
+)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -19,11 +26,18 @@ Set to \code{1} for the raw median absolute deviation.}
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-A single numeric value: the scaled median absolute deviation.
-  Returns \code{0} if \code{n = 1}; returns \code{NA} if \code{x} has
-  length zero after removal of \code{NA}s.
+If \code{ci = FALSE} (default), a single numeric value: the scaled
+  median absolute deviation. Returns \code{0} if \code{n = 1}; returns
+  \code{NA} if \code{x} has length zero after removal of \code{NA}s.
+  If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 }
 \description{
 Computes the median absolute deviation from the median (or a user-supplied
@@ -42,8 +56,9 @@ half the data being contaminated. Its \bold{asymptotic relative efficiency
 
 \strong{Computational Performance.}
 Unlike \code{\link[stats]{mad}}, this implementation uses O(n) selection
-(Floyd-Rivest algorithm with sorting networks for n \eqn{\le} 16) instead
-of full sorting, providing better asymptotic performance.
+with adaptive algorithm dispatch: Floyd-Rivest for moderate n, pdqselect
+for large n (threshold derived from per-core L2 cache size at startup),
+and sorting networks for n \eqn{\le} 16.
 }
 \examples{
 mad_scaled(c(1:9))
@@ -54,6 +69,9 @@ mad_scaled(x, constant = 1)      # raw median absolute deviation
 
 # Supply a known center
 mad_scaled(x, center = 4.0)
+
+# Asymptotic confidence interval
+mad_scaled(x, ci = TRUE)
 
 }
 \seealso{

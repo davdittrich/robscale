@@ -24,7 +24,7 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
 
   # Bootstrap
   set.seed(42)
-  b <- boot::boot(boot_data, ratio_median, R = R, parallel = "multicore", ncpus = 8)
+  b <- boot::boot(boot_data, ratio_median, R = R, parallel = "no", ncpus = 1)
 
   # Try BCa
   ci <- tryCatch(
@@ -93,14 +93,22 @@ analyze_benchmarks <- function(rob, legacy) {
     if (is.null(df) || nrow(df) == 0) {
       return(NULL)
     }
-    df %>%
-      rowwise() %>%
-      mutate(
-        # In bench::mark, each entry in the 'time' list-column is a vector of timings.
-        analysis = list(compute_bca_speedup(as.numeric(.data[[target_col]]), as.numeric(.data[[ref_col]])))
-      ) %>%
-      unnest_wider(analysis) %>%
-      ungroup()
+
+    # Parallelize across rows using mclapply (base R parallel)
+    # This is more efficient for our row-wise structure than inner boot parallelism
+    n_cores <- parallel::detectCores(logical = FALSE)
+    
+    indices <- seq_len(nrow(df))
+    ll <- parallel::mclapply(indices, function(i) {
+      row <- df[i, ]
+      target_data <- as.numeric(row[[target_col]][[1]])
+      ref_data <- as.numeric(row[[ref_col]][[1]])
+      
+      analysis <- compute_bca_speedup(target_data, ref_data)
+      cbind(row, as.data.frame(analysis))
+    }, mc.cores = n_cores)
+    
+    bind_rows(ll)
   }
 
   # 3. New estimators: robscale vs existing R implementations

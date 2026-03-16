@@ -4,7 +4,7 @@
 \alias{gmd}
 \title{Gini Mean Difference}
 \usage{
-gmd(x, constant = 0.886226925452758, na.rm = FALSE)
+gmd(x, constant = 0.886226925452758, na.rm = FALSE, ci = FALSE, level = 0.95)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -16,11 +16,18 @@ Gaussian. Defaults to \eqn{\sqrt{\pi}/2 \approx 0.8862}{sqrt(pi)/2 ~
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-A single numeric value: the scaled Gini mean difference.
-  Returns \code{0} if \code{n < 2}; returns \code{NA} if \code{x} has
-  length zero after removal of \code{NA}s.
+If \code{ci = FALSE} (default), a single numeric value: the scaled
+  Gini mean difference. Returns \code{0} if \code{n < 2}; returns \code{NA}
+  if \code{x} has length zero after removal of \code{NA}s.
+  If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 }
 \description{
 Computes the Gini mean difference, scaled by a consistency constant for
@@ -49,6 +56,9 @@ gmd(c(1:9))
 x <- c(1, 2, 3, 5, 7, 8)
 gmd(x)                      # with consistency constant
 gmd(x, constant = 1)        # raw Gini mean difference
+
+# Asymptotic confidence interval
+gmd(x, ci = TRUE)
 
 }
 \references{

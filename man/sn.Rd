@@ -4,7 +4,14 @@
 \alias{sn}
 \title{Robust Estimator of Scale Sn}
 \usage{
-sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE)
+sn(
+  x,
+  constant = 1.1926,
+  finite.corr = TRUE,
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95
+)
 }
 \arguments{
 \item{x}{A numeric vector of observations.}
@@ -14,9 +21,16 @@ sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE)
 \item{finite.corr}{Logical; if \code{TRUE}, a finite-sample correction factor is applied.}
 
 \item{na.rm}{Logical; if \code{TRUE}, \code{NA} values are removed before computation.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-The \eqn{S_n} estimator of scale.
+If \code{ci = FALSE} (default), the \eqn{S_n} estimator of scale
+  (a scalar). If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 }
 \description{
 Computes the robust estimator of scale \eqn{S_n} proposed by Rousseeuw and Croux (1993).
@@ -54,6 +68,9 @@ The execution strategy is tiered for maximum efficiency:
 sn(c(1:9))
 x <- c(1, 2, 3, 5, 7, 8)
 sn(x)
+
+# Asymptotic confidence interval
+sn(x, ci = TRUE)
 
 }
 \references{
