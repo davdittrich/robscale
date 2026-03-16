@@ -832,8 +832,7 @@ stack-allocated arena avoids heap allocation entirely.
 ### 8. Welford's algorithm for numerical stability
 
 The `sd_c4()` estimator uses Welford's (1962) one-pass online algorithm for
-computing variance. The standard two-pass formula $s^2 = \frac{1}{n-1}\sum(x_i -
-\bar{x})^2$ suffers from catastrophic cancellation when $\sum x_i^2$ and
+computing variance. The standard two-pass formula $s^2 = \frac{1}{n-1}\sum(x_i - \bar{x})^2$ suffers from catastrophic cancellation when $\sum x_i^2$ and
 $n\bar{x}^2$ are close. Welford's algorithm incrementally updates mean and
 sum-of-squares-of-differences, maintaining full precision with a single pass:
 

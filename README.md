@@ -648,11 +648,10 @@ arena avoids heap allocation entirely.
 
 The `sd_c4()` estimator uses Welford’s (1962) one-pass online algorithm
 for computing variance. The standard two-pass formula
-$s^2 = \frac{1}{n-1}\sum(x_i -
-\bar{x})^2$` suffers from catastrophic cancellation when `$\sum x_i^2$ and
-$`n\bar{x}^2`$ are close. Welford’s algorithm incrementally updates mean
-and sum-of-squares-of-differences, maintaining full precision with a
-single pass:
+$`s^2 = \frac{1}{n-1}\sum(x_i - \bar{x})^2`$ suffers from catastrophic
+cancellation when $`\sum x_i^2`$ and $`n\bar{x}^2`$ are close. Welford’s
+algorithm incrementally updates mean and sum-of-squares-of-differences,
+maintaining full precision with a single pass:
 
 $$
 \delta_i = x_i - \bar{x}_{i-1}, \quad \bar{x}_i = \bar{x}_{i-1} + \delta_i / i, \quad M_{2,i} = M_{2,i-1} + \delta_i(x_i - \bar{x}_i)
