@@ -1053,10 +1053,12 @@ arrays from `collapse::fquantile()` (Krantz, 2025). In contrast, base
 R’s `stats::mad()` already applies the normal consistency factor
 ($`1.4826`$) by default. Consequently, we directly benchmark
 `mad_scaled()` against `stats::mad()` and an equivalent
-`collapse::fmedian()` implementation without additional scaling. Under
-the hood, `mad_scaled()` is API-compatible with `stats::mad()` when
-`constant = 1`; similarly, `iqr_scaled(x, constant = 1)` matches the raw
-`stats::IQR(x)`.
+`collapse::fmedian()` implementation without additional scaling. While
+`mad_scaled()` serves as a drop-in replacement for `stats::mad()`,
+`iqr_scaled()` extends the standard `stats::IQR()` by adding a
+`constant` argument to support automated scaling (defaulting to
+$`0.7413`$). Setting `constant = 1` in either `iqr_scaled()` or
+`mad_scaled()` returns the corresponding raw, unscaled statistic.
 
 Users who do not need compiled performance—or who prefer a
 dependency-free pure-R package—should use `revss` or `robustbase`
