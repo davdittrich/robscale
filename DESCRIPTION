@@ -1,19 +1,21 @@
 Package: robscale
 Type: Package
-Title: Faster Robustness: Accelerated Estimation of Location and Scale
+Title: Accelerated Estimation of Robust Location and Scale
 Version: 0.2.0
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
-Description: A comprehensive suite of high-performance robust scale and
-    location estimators. Provides logistic M-estimators, the 'Qn' and 'Sn'
-    scale estimators of Rousseeuw & Croux (1993), the Gini mean difference,
-    scaled MAD and IQR, unbiased standard deviation, and a variance-weighted
-    ensemble that adaptively combines all estimators. Leverages
-    platform-specific SIMD vectorization and Intel Threading Building Blocks
-    (TBB) parallelism for speedups of 2-39x over existing implementations.
-    A unified dispatcher ('scale_robust') automatically selects the optimal
-    estimator based on sample size. Replaces 'revss' with an 'Rcpp' backend.
+Description: Estimates robust location and scale parameters using
+    platform-specific Single Instruction, Multiple Data (SIMD) vectorization
+    and Intel Threading Building Blocks (TBB) for parallel processing.
+    Implements a novel variance-weighted ensemble estimator that adaptively
+    combines all available statistics. Included methods feature logistic
+    M-estimators, the estimators of Rousseeuw and Croux (1993), the Gini
+    mean difference, the scaled Median Absolute Deviation (MAD), the scaled
+    Interquartile Range (IQR), and unbiased standard deviations. Achieves
+    substantial speedups over existing implementations through an 'Rcpp'
+    backend and a unified dispatcher that automatically selects the optimal
+    estimator based on sample size.
 License: MIT + file LICENSE
 URL: https://github.com/davdittrich/robscale,
     https://doi.org/10.5281/zenodo.18828607
