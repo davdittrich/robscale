@@ -930,9 +930,8 @@ The test suite verifies `robscale` against reference implementations:
 
 **Legacy M-estimators** (`tests/testthat/test-cross-check.R`): compares
 `robscale` and `revss` across 5,400 randomly generated inputs
-($n = 3, 4,
-\ldots, 20$`; 100 replicates per `$n$; all three functions `adm`,
-`robLoc`, `robScale`). All 5,400 comparisons pass at tolerance
+($`n = 3, 4,\ldots, 20`$; 100 replicates per $`n`$; all three functions
+`adm`, `robLoc`, `robScale`). All 5,400 comparisons pass at tolerance
 $`\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}`$.
 
 **New estimators:**
@@ -982,9 +981,10 @@ breakdown point.
 **$`Q_n`$ and $`S_n`$ statistics.**
 $`Q_n = c_n \cdot d \cdot \{|x_i - x_j|; i < j\}_{(k)}`$ where
 $`k = \binom{h}{2}`$, $`h = \lfloor n/2 \rfloor + 1`$, and $`d = 2.2191`$
-(consistency constant for Gaussian data). $S_n = c_n' \cdot 1.1926 \cdot
-\text{lomed}_i \{\text{himed}_j |x_i - x_j|\}$`, where `$\text{lomed}$ and
-$`\text{himed}`$ denote the low and high medians respectively.
+(consistency constant for Gaussian data).
+$`S_n = c_n' \cdot 1.1926 \cdot \text{lomed}_i \{\text{himed}_j |x_i - x_j|\}`$,
+where $`\text{lomed}`$ and $`\text{himed}`$ denote the low and high medians
+respectively.
 
 **$`c_4(n)`$ correction factor.** The expected value of the sample
 standard deviation under normality is $`\sigma \cdot c_4(n)`$ where:
