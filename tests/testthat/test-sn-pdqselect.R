@@ -12,7 +12,7 @@ test_that("sn gives non-NA positive result across full size sweep", {
 })
 
 test_that("pdq_lowmedian_threshold exists and is in valid range", {
-  cfg <- get_qnsn_config()
+  cfg <- robscale:::get_qnsn_config()
   expect_true("pdq_lowmedian_threshold" %in% names(cfg))
   thr <- cfg$pdq_lowmedian_threshold
   expect_true(is.numeric(thr))
@@ -21,7 +21,7 @@ test_that("pdq_lowmedian_threshold exists and is in valid range", {
 })
 
 test_that("sn parity with current sn at threshold boundary", {
-  thr <- get_qnsn_config()$pdq_lowmedian_threshold
+  thr <- robscale:::get_qnsn_config()$pdq_lowmedian_threshold
   tol <- sqrt(.Machine$double.eps)
   for (n in c(thr - 1L, thr, thr + 1L)) {
     set.seed(55 + n)

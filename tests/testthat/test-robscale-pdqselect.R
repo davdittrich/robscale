@@ -42,7 +42,7 @@ test_that("robScale is deterministic (50 reps)", {
 })
 
 test_that("pdq_robscale_threshold exists and is in valid range", {
-  cfg <- get_qnsn_config()
+  cfg <- robscale:::get_qnsn_config()
   expect_true("pdq_robscale_threshold" %in% names(cfg))
   thr <- cfg$pdq_robscale_threshold
   expect_true(is.numeric(thr))
@@ -51,7 +51,7 @@ test_that("pdq_robscale_threshold exists and is in valid range", {
 })
 
 test_that("robScale correct at threshold boundary", {
-  thr <- get_qnsn_config()$pdq_robscale_threshold
+  thr <- robscale:::get_qnsn_config()$pdq_robscale_threshold
   tol <- sqrt(.Machine$double.eps)
   for (n in c(thr - 1L, thr, thr + 1L)) {
     set.seed(123 + n)

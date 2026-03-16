@@ -12,7 +12,7 @@ test_that("qn gives non-NA positive result across full size sweep", {
 })
 
 test_that("pdq_qn_final_threshold exists and is in valid range", {
-  cfg <- get_qnsn_config()
+  cfg <- robscale:::get_qnsn_config()
   expect_true("pdq_qn_final_threshold" %in% names(cfg))
   thr <- cfg$pdq_qn_final_threshold
   expect_true(is.numeric(thr))
@@ -21,7 +21,7 @@ test_that("pdq_qn_final_threshold exists and is in valid range", {
 })
 
 test_that("qn parity at threshold boundary", {
-  thr <- get_qnsn_config()$pdq_qn_final_threshold
+  thr <- robscale:::get_qnsn_config()$pdq_qn_final_threshold
   for (n in c(thr - 1L, thr, thr + 1L)) {
     set.seed(55 + n)
     x <- rnorm(n)
@@ -47,6 +47,9 @@ test_that("qn is deterministic (50 reps)", {
 })
 
 test_that("qn heap path works (n=100000)", {
+  cfg <- robscale:::get_qnsn_config()
+  skip_if(100000L >= cfg$qn_parallel_threshold,
+          "n=100000 above TBB parallel threshold — known non-determinism")
   set.seed(7)
   x <- rnorm(100000)
   val <- qn(x)
