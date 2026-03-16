@@ -178,8 +178,7 @@ Outliers compromise the reliability of classical estimators even in moderate
 samples. A single recording error can destroy the standard deviation, yet the
 most widely used robust implementations in R---`revss` for small-sample
 M-estimation and `robustbase` for the $Q_n$ and $S_n$ scale estimators---carry
-significant computational overhead that blocks real-time genomics pipelines,
-high-frequency finance, and other time-critical workflows.
+significant computational overhead for time-critical applications.
 
 `robscale` v0.2.0 provides 11 exported functions spanning the full
 robustness--efficiency spectrum: from the non-robust but
@@ -191,9 +190,10 @@ strategy---a variance-weighted bootstrap ensemble of all 7 estimators for small
 samples, with an automatic switch to the GMD for large samples. All scale
 estimators support analytical or bootstrap confidence intervals via `ci = TRUE`.
 
-All estimators are implemented as C++17 kernels with vectorized tanh evaluation
-where batch sizes justify the overhead, Newton--Raphson iteration, and parallelized
-$O(n \log n)$ algorithms. Against `revss`, the package achieves
+All estimators are implemented as C++17 kernels. The M-estimators use vectorized
+`tanh` evaluation (where batch sizes justify the overhead) and Newton--Raphson
+iteration; $Q_n$ and $S_n$ use parallelized $O(n \log n)$ algorithms via TBB.
+Against `revss`, the package achieves
 **`r m_speedup_min`--`r m_speedup_max`x** speedups for the small-sample
 M-estimators. Against `robustbase`, it achieves
 **`r sn_speedup_min`--`r sn_speedup_max`x** for $S_n$ and
@@ -298,6 +298,7 @@ api_data <- data.frame(
   ),
   ARE = c("**100%**", "**98%**", "**88.3%**", "**82.3%**", "**58.2%**", "**55.0%**", "**37%**", "**36.8%**"),
   Breakdown = c("0%", "29.3%", "$1/n$", "50%", "50%", "50%", "25%", "50%"),
+  Complexity = c("$O(n)$", "$O(n \\log n)$", "$O(n)$", "$O(n \\log n)$", "$O(n \\log n)$", "$O(n)$ iters", "$O(n)$", "$O(n)$"),
   Reference = c(
     "Welford (1962)",
     "Gini (1912); Nair (1936)",
@@ -312,6 +313,12 @@ api_data <- data.frame(
 )
 knitr::kable(api_data)
 ```
+
+At the top of this spectrum, `sd_c4` retains full efficiency but collapses under
+a single outlier. The `gmd` occupies the practical sweet spot: 98% efficiency
+with 29.3% breakdown---sufficient for most contamination levels. For adversarial
+settings where breakdown must be maximized, `qn` provides the best combination
+of high breakdown (50%) and high efficiency (82.3%).
 
 ```{r}
 #| label: tbl-api-dispatch
@@ -393,8 +400,8 @@ adm(c(1, 2, 3, 5, 7, 8), constant = 1)   # without consistency correction
 
 ### `robLoc(x, scale = NULL, na.rm = FALSE, maxit = 80L, tol = sqrt(.Machine$double.eps))`
 
-M-estimator for location using Newton--Raphson iteration with the logistic psi
-function (Rousseeuw & Verboven 2002, Eq. 21). Starting value:
+M-estimator for location defined by the logistic psi function (Rousseeuw &
+Verboven 2002, Eq. 21), solved via Newton--Raphson iteration. Starting value:
 $T^{(0)} = \text{median}(x)$. Auxiliary scale: $S = \text{MAD}(x)$ (or the
 user-supplied `scale`). See [Methodological enhancements](#methodological-enhancements)
 for the iteration formula.
@@ -521,8 +528,9 @@ $$\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})$$
 where $Q_p$ denotes the Type 7 quantile (R default) and
 $C = 1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25)) \approx 0.7413$ (Bickel & Lehmann,
 1976). Unlike `stats::IQR()`, which requires a full $O(n \log n)$ sort, this
-implementation uses dual $O(n)$ Floyd--Rivest selection---one call per
-quartile---providing a substantial speedup for large datasets. The IQR achieves
+implementation uses dual $O(n)$ pdqselect calls---one per quartile---and
+exploits the $Q_1$ partition to narrow the $Q_3$ search, providing a
+substantial speedup for large datasets. The IQR achieves
 **37% ARE** with a **25% breakdown point**.
 
 ```r
@@ -538,9 +546,10 @@ constant for asymptotic normality:
 $$\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|$$
 
 where $C = 1/\Phi^{-1}(3/4) \approx 1.4826$. Unlike `stats::mad()`, this
-implementation uses $O(n)$ Floyd--Rivest selection with sorting networks for
-$n \le 16$, avoiding a full sort. The MAD achieves **36.8% ARE** (Rousseeuw &
-Croux, 1993: "about 37%") with a **50% breakdown point**.
+implementation uses adaptive $O(n)$ selection (Floyd--Rivest below a
+cache-derived threshold, pdqselect above) with sorting networks for $n \le 16$,
+avoiding a full sort. The MAD achieves **36.8% ARE** (Rousseeuw & Croux, 1993:
+"about 37%") with a **50% breakdown point**.
 
 ```r
 mad_scaled(c(1, 2, 3, 5, 7, 8))
@@ -606,43 +615,6 @@ sample size---useful for small-$n$ bias correction.
 get_consistency_constant("mad")          # asymptotic: 1/qnorm(3/4)
 get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 ```
-
-### Estimator comparison: the robustness--efficiency frontier
-
-The 8 scale estimators in `robscale` occupy different points on the trade-off
-between statistical efficiency and robustness to outliers:
-
-```{r}
-#| label: tbl-frontier
-#| results: asis
-
-frontier_data <- data.frame(
-  Estimator = c("`sd_c4`", "`gmd`", "`adm`", "`qn`", "`sn`", "`robScale`", "`iqr_scaled`", "`mad_scaled`"),
-  `ARE (%)` = c("100", "98", "88.3", "82.3", "58.2", "55.0", "37", "36.8"),
-  `Breakdown (%)` = c("0", "29.3", "$1/n$", "50", "50", "50", "25", "50"),
-  Complexity = c("$O(n)$", "$O(n \\log n)$", "$O(n)$", "$O(n \\log n)$", "$O(n \\log n)$", "$O(n)$ iters", "$O(n)$", "$O(n)$"),
-  `Best for` = c(
-    "Efficiency anchor; clean data only",
-    "General-purpose; large samples",
-    "Fallback when MAD = 0",
-    "High efficiency + high breakdown",
-    "High breakdown, moderate efficiency",
-    "High breakdown, small samples",
-    "Quick robust estimate; quartile-based",
-    "Maximum breakdown; classical robust"
-  ),
-  check.names = FALSE
-)
-knitr::kable(frontier_data)
-```
-
-At the top of the frontier, `sd_c4` retains full efficiency but collapses under
-a single outlier. At the bottom, `mad_scaled` tolerates up to 50% contamination
-but wastes over 60% of the available information. The `gmd` occupies the sweet
-spot: 98% efficiency with 29.3% breakdown---sufficient for most practical
-contamination levels. For adversarial settings where breakdown must be maximized,
-`qn` provides the best combination of high breakdown (50%) and high efficiency
-(82.3%).
 
 ## Methodological enhancements
 
@@ -772,11 +744,9 @@ selection. For $n \geq 600$, the Floyd--Rivest algorithm (Floyd & Rivest,
 $O(n^{2/3})$ elements before partitioning---a constant-factor improvement that
 amortizes the overhead of its `log`/`exp`/`sqrt` computation only at scale.
 
-`iqr_scaled` and `mad_scaled` use a separate adaptive path (`adaptive_median_select`
-in `src/pdq_select.h`): Floyd-Rivest for $n \leq \max(2048, L_{2,\text{per-core}} /
-(\texttt{sizeof(double)} \times 5))$, and pdqselect (miniselect) above that
-threshold, where pattern-defeating selection reduces constant factors on structured
-inputs.
+Several estimators use an adaptive selection strategy that switches between
+Floyd--Rivest and pdqselect (miniselect) based on a runtime threshold derived
+from the per-core L2 cache size. Section 9 describes this dispatch in detail.
 
 ### 4. Arena allocation on the stack
 
@@ -850,30 +820,37 @@ sum-of-squares-of-differences, maintaining full precision with a single pass:
 
 $$\delta_i = x_i - \bar{x}_{i-1}, \quad \bar{x}_i = \bar{x}_{i-1} + \delta_i / i, \quad M_{2,i} = M_{2,i-1} + \delta_i(x_i - \bar{x}_i)$$
 
-### 9. Adaptive selection for IQR
+### 9. Adaptive selection dispatch
 
-The `iqr_scaled()` estimator requires two quantiles ($Q_{0.25}$ and $Q_{0.75}$).
-Rather than sorting the entire array, `robscale` performs two independent
-$O(n)$ selections---one per quartile---using the `adaptive_median_select`
-strategy from `src/pdq_select.h`. This two-tier dispatch chooses the algorithm
-based on a runtime threshold derived from the per-core L2 cache size:
+Several estimators require $O(n)$ selection (median, low-median, or arbitrary
+$k$th-order statistic). At moderate $n$, Floyd--Rivest's statistical narrowing
+step wins; at large $n$, pdqselect's pattern-defeating properties and cache
+locality dominate. The crossover depends on the number of warm arrays competing
+for L2 cache during selection, so each estimator uses its own runtime threshold
+derived from the per-core L2 cache size:
 
-- **Floyd-Rivest** (`median_select`): used when $n \leq$ `pdq_median_threshold`.
-  Introselect guarantees $O(n)$ worst-case selection with median-of-three pivot
-  selection.
-- **pdqselect** (`pdq_median_select`): used when $n >$ `pdq_median_threshold`,
-  where the pattern-defeating properties of pdqselect (from the miniselect
-  library) reduce constant-factor overhead on structured inputs.
+| Estimator | Dispatch | Threshold formula | Divisor |
+| :--- | :--- | :--- | ---: |
+| `iqr_scaled` | Always pdqselect | --- | --- |
+| `mad_scaled` | `adaptive_median_select` | $\max(2048,\; L_2 / (8 \times 5))$ | 5 |
+| `robScale` | `adaptive_robscale_median_select` | $\max(2048,\; L_2 / (8 \times 2))$ | 2 |
+| $S_n$ | `adaptive_lowmedian_select` | $\max(2048,\; L_2 / (8 \times 2))$ | 2 |
+| $Q_n$ (final) | Inline threshold check | $\max(2048,\; L_2 / (8 \times 4))$ | 4 |
 
-The threshold is computed at runtime as
-$\max(2048,\; L_{2,\text{per-core}} / (\texttt{sizeof(double)} \times 5))$,
-so it adapts to the host machine's cache hierarchy without requiring recompilation.
+The divisor encodes working-set pressure: `mad_scaled` keeps two arrays plus
+constants warm (divisor 5), `robScale` keeps one to two (divisor 2), and $Q_n$'s
+final diff-window selection contends with sorted data, work arrays, and bounds
+(divisor 4). `iqr_scaled` uses pdqselect unconditionally because its
+dual-quartile strategy---selecting $Q_1$ first, then narrowing the search space
+for $Q_3$ to the upper partition---benefits from pdqselect's partitioning
+guarantees at all sizes. Both quartile selections use Type 7 interpolation (the
+R default), locating the floor index and scanning for the next order statistic
+to handle the fractional part.
 
-Each selection call uses the Type 7 quantile interpolation (the R default),
-locating the floor index and then finding the next-smallest element via a linear
-scan for the fractional interpolation. This gives $O(n)$ total complexity vs
-the $O(n \log n)$ full sort used by `stats::IQR`. The MAD estimator uses the
-same `adaptive_median_select` path for its two median computations.
+Below each threshold, the adaptive functions delegate to `median_select`
+(sorting networks for $n \leq 16$, introselect for $17 \leq n < 600$,
+Floyd--Rivest for $n \geq 600$). Above the threshold, they use pdqselect from
+the miniselect library.
 
 ### 10. Variance-weighted ensemble bootstrap
 
@@ -958,21 +935,21 @@ graph TD
     end
 
     BOOT --> SD & GMD & MAD & IQR & SN & QN & RS
-    SINGLE --> SD & GMD & ADM & QN & SN & RS & IQR & MAD
+    SINGLE --> SD & GMD & QN & SN & RS & IQR & MAD
     GMD_FAST --> GMD
 
     subgraph "Algorithm Tiers"
         T1["n <= 16: Sorting networks"]
         T2["17 <= n < L2 threshold: Optimized scalar C++"]
         T3["n >= L2 threshold: Parallel TBB kernels"]
-        T4["IQR/MAD: adaptive_median_select\n(Floyd-Rivest <= pdq_threshold, pdqselect above)"]
+        T4["Adaptive selection dispatch\n(pdqselect or Floyd-Rivest\nper runtime L2 threshold)"]
     end
 
     QN & SN --> T1 & T2 & T3
-    IQR & MAD --> T4
+    IQR & MAD & RS --> T4
 
     subgraph "Hardware Acceleration"
-        G[AVX2 / NEON (AVX512 with -mavx512f)]
+        G[AVX2 (AVX-512 with -mavx512f)]
         H[Apple Accelerate]
         I[SLEEF Library]
     end
@@ -1065,16 +1042,16 @@ sorting networks and the consistency-constant integration.
 
 **IQR** (`robscale::iqr_scaled` vs `stats::IQR`): **`r iqr_stats_min`--`r iqr_stats_max`x** speedup.
 `stats::IQR` performs a full $O(n \log n)$ sort via `quantile()`. `robscale`
-uses dual $O(n)$ Floyd--Rivest selection, which dominates at large $n$. Against
+uses dual $O(n)$ pdqselect calls, which dominate at large $n$. Against
 `collapse::fquantile` (a C-backed quantile implementation), the speedup is
 **`r iqr_collapse_min`--`r iqr_collapse_max`x**---a more informative comparison
-since both are compiled, revealing whether Floyd--Rivest selection outpaces
-`collapse`'s C implementation.
+since both are compiled, revealing whether pdqselect outpaces `collapse`'s C
+implementation.
 
 **MAD** (`robscale::mad_scaled` vs `stats::mad`): **`r mad_stats_min`--`r mad_stats_max`x** speedup.
 `stats::mad` performs a full sort for the median step. Against a custom fast MAD (using `collapse::fmedian`), the speedup is
 **`r mad_collapse_min`--`r mad_collapse_max`x**---the key comparison since both
-are compiled; `robscale`'s advantage comes from $O(n)$ Floyd--Rivest selection
+are compiled; `robscale`'s advantage comes from adaptive $O(n)$ selection
 vs `collapse`'s sorting-based approach.
 
 > [!NOTE]
