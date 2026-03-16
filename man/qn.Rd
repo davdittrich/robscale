@@ -4,7 +4,14 @@
 \alias{qn}
 \title{Robust Estimator of Scale Qn}
 \usage{
-qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE)
+qn(
+  x,
+  constant = 2.2191,
+  finite.corr = TRUE,
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95
+)
 }
 \arguments{
 \item{x}{A numeric vector of observations.}
@@ -14,9 +21,16 @@ qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE)
 \item{finite.corr}{Logical; if \code{TRUE}, a finite-sample correction factor is applied.}
 
 \item{na.rm}{Logical; if \code{TRUE}, \code{NA} values are removed before computation.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-The \eqn{Q_n} estimator of scale.
+If \code{ci = FALSE} (default), the \eqn{Q_n} estimator of scale
+  (a scalar). If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 }
 \description{
 Computes the robust estimator of scale \eqn{Q_n} proposed by Rousseeuw and Croux (1993).
@@ -55,6 +69,9 @@ The package utilizes a tiered execution strategy:
 qn(c(1:9))
 x <- c(1, 2, 3, 5, 7, 8)
 qn(x)
+
+# Asymptotic confidence interval
+qn(x, ci = TRUE)
 
 }
 \references{

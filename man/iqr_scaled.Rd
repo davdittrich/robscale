@@ -4,7 +4,13 @@
 \alias{iqr_scaled}
 \title{Scaled Interquartile Range}
 \usage{
-iqr_scaled(x, constant = 0.741301109252801, na.rm = FALSE)
+iqr_scaled(
+  x,
+  constant = 0.741301109252801,
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95
+)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -17,11 +23,18 @@ Set to \code{1} for the raw interquartile range.}
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-A single numeric value: the scaled interquartile range.
-  Returns \code{0} if \code{n < 2}; returns \code{NA} if \code{x} has
-  length zero after removal of \code{NA}s.
+If \code{ci = FALSE} (default), a single numeric value: the scaled
+  interquartile range. Returns \code{0} if \code{n < 2}; returns \code{NA}
+  if \code{x} has length zero after removal of \code{NA}s.
+  If \code{ci = TRUE}, an object of class \code{"robscale_ci"}.
 }
 \description{
 Computes the interquartile range, scaled by a consistency constant for
@@ -42,7 +55,7 @@ model. The IQR achieves an \bold{asymptotic relative efficiency (ARE) of
 
 \strong{Computational Performance.}
 Unlike \code{\link[stats]{IQR}}, which requires a full sort, this
-implementation uses O(n) selection via the Floyd-Rivest algorithm for each
+implementation uses O(n) selection via the pdqselect algorithm for each
 quantile, providing a substantial speedup for large datasets.
 }
 \examples{
@@ -51,6 +64,9 @@ iqr_scaled(c(1:9))
 x <- c(1, 2, 3, 5, 7, 8)
 iqr_scaled(x)                 # with consistency constant
 iqr_scaled(x, constant = 1)   # raw IQR
+
+# Asymptotic confidence interval
+iqr_scaled(x, ci = TRUE)
 
 }
 \seealso{

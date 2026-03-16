@@ -1,3 +1,4 @@
+#' @importFrom stats qnorm qchisq
 # Internal helpers for analytical confidence intervals
 # Not exported; called by individual estimator functions when ci = TRUE
 

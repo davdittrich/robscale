@@ -10,7 +10,10 @@ scale_robust(
   auto_switch = TRUE,
   threshold = 20L,
   n_boot = 200L,
-  na.rm = FALSE
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95,
+  boot_method = c("auto", "bca", "percentile", "parametric")
 )
 }
 \arguments{
@@ -31,10 +34,26 @@ weighting. Default: 200.}
 
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. Default: \code{FALSE}.}
+
+\item{ci}{Logical. If \code{TRUE}, return confidence intervals alongside
+the point estimate. Single methods yield a \code{"robscale_ci"} object
+with analytical CIs; the ensemble yields a \code{"robscale_ensemble_ci"}
+object with both analytical and bootstrap CIs. Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
+
+\item{boot_method}{Bootstrap CI method for the ensemble. \code{"auto"}
+(default) selects BCa for n \eqn{\le} 200, percentile for
+n \eqn{\le} 5000, and parametric otherwise. Override with \code{"bca"},
+\code{"percentile"}, or \code{"parametric"}.}
 }
 \value{
-A single numeric value: the scale estimate.
-  Returns \code{NA} if \code{n < 2}.
+If \code{ci = FALSE} (default), a single numeric value: the scale
+  estimate (\code{NA} when \code{n < 2}). If \code{ci = TRUE} with a single
+  method, a \code{"robscale_ci"} object. If \code{ci = TRUE} with
+  \code{method = "ensemble"}, a \code{"robscale_ensemble_ci"} object
+  containing the ensemble estimate, bootstrap CI, and a table of
+  per-estimator results.
 }
 \description{
 Unified dispatcher for robust scale estimation. Automatically selects
@@ -80,6 +99,12 @@ set.seed(42)
 y <- rnorm(50)
 scale_robust(y)                          # auto-switches to GMD (n >= 20)
 scale_robust(y, auto_switch = FALSE)     # forces ensemble
+
+# Ensemble with bootstrap CIs
+scale_robust(x, ci = TRUE)
+
+# Single-method analytical CI
+scale_robust(x, method = "sn", ci = TRUE)
 
 }
 \seealso{

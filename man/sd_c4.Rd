@@ -4,7 +4,7 @@
 \alias{sd_c4}
 \title{Unbiased Standard Deviation}
 \usage{
-sd_c4(x, na.rm = FALSE)
+sd_c4(x, na.rm = FALSE, ci = FALSE, level = 0.95)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -12,10 +12,18 @@ sd_c4(x, na.rm = FALSE)
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and exact chi-squared confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
-A single numeric value: the bias-corrected standard deviation.
-  Returns \code{NA} if \code{n < 2}.
+If \code{ci = FALSE} (default), a single numeric value: the
+  bias-corrected standard deviation. Returns \code{NA} if \code{n < 2}.
+  If \code{ci = TRUE}, an object of class \code{"robscale_ci"} with an
+  exact chi-squared confidence interval.
 }
 \description{
 Computes the sample standard deviation corrected by the \eqn{c_4(n)}{c4(n)}
@@ -47,6 +55,9 @@ sd_c4(c(1:9))
 # Compare with base sd() --- difference is small for large n
 x <- rnorm(1000)
 c(sd_c4 = sd_c4(x), sd = sd(x))
+
+# Exact chi-squared confidence interval
+sd_c4(c(1:9), ci = TRUE)
 
 }
 \seealso{

@@ -69,6 +69,11 @@ list(
     # The negative lookbehinds/aheads ensure we don't accidentally match block $$...$$
     content <- gsub("(?<!\\$)\\$([^$]+)\\$(?!\\$)", "$`\\1`$", content, perl=TRUE)
     
+    # Convert relative image paths to absolute GitHub URLs for CRAN/GitHub rendering
+    content <- gsub("!\\s*\\[\\]\\(benchmarks/speedup_fig\\.png\\)", 
+                    "![](https://github.com/davdittrich/robscale/raw/main/benchmarks/speedup_fig.png)", 
+                    content, perl = TRUE)
+
     # Write back
     writeLines(content, path)
     

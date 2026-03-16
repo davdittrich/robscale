@@ -1,64 +1,47 @@
-# CRAN submission comments for robscale 0.1.5
+# CRAN submission comments for robscale 0.2.0
 
-## Changes in 0.1.5
+## Changes in 0.2.0
 
-- Resolved the "pragmas suppressing diagnostics" NOTE by removing 
-  `#pragma GCC diagnostic ignored "-Wdeprecated-volatile"` from 
-  `src/qn_estimator.cpp`, `src/sn_estimator.cpp`, and `src/qnsn_sort_utils.h`.
-- Added `configure.win` and `cleanup.win` to suppress win-builder's
-  "this package has a configure script / It probably needs manual configuration"
-  warning.
-- Added GitHub Actions CI workflow with a multi-platform matrix including
-  Windows (R-release and R-devel), macOS, and Ubuntu.
-- Fixed uninitialized NEON vector register in `qnsn_kernels.h` that
-  Clang 17 promoted to a compilation WARNING (blocking `R CMD check`).
-- Switched `RcppParallel::LdFlags()` to the canonical
-  `RcppParallel::RcppParallelLibs()` in `Makevars.win` and `Makevars.in`.
-
-## Win-builder incoming_pretest note
-
-The **Windows** incoming_pretest for 0.1.4 failed with an installation error.
-The root cause is a toolchain mismatch on the pretest server: R was compiled with
-MinGW g++ (GCC 14.3.0), but the build invokes Cygwin's g++ (GCC 15.2.0). When
-Cygwin's g++ resolves standard headers via MinGW's `_mingw_stdarg.h`, that
-header raises `#error Only Win32 target is supported!`. The error occurs at the
-very first `#include <Rcpp.h>` before any package-specific code is reached — no
-source-level change can fix this.
-
-The **Debian/Clang** incoming_pretest passed cleanly (0 errors, 0 warnings,
-2 NOTEs).
-
-As independent evidence that robscale compiles and passes `R CMD check` on
-Windows, we now include a GitHub Actions CI workflow that tests on
-`windows-latest` with both R-release and R-devel (proper Rtools45/MinGW
-toolchain). Results are visible at:
-https://github.com/davdittrich/robscale/actions
+- New feature: `scale_robust()` unified dispatcher with variance-weighted
+  ensemble and automatic switching to GMD for n >= 20.
+- New estimators: `gmd()`, `iqr_scaled()`, `mad_scaled()`, and `sd_c4()` added
+  to exported functions.
+- Statistical inference: Added analytical and bootstrap confidence intervals
+  to all scale estimators via a new `ci = TRUE` argument.
+- Optimization: `mad_scaled()` and `iqr_scaled()` now leverage the `pdqselect`
+  algorithm for O(n) selection, outperforming base R's O(n log n) sorting.
+- Citations: Synchronized `inst/CITATION` and documentation with the new
+  metadata and foundational references (Gini, 1912).
 
 ## Test environments
 
-- Arch Linux (x86_64), R 4.5.2, GCC 15.2.1
+- Arch Linux (x86_64), R 4.5.3, GCC 15.2.1
 - GitHub Actions: Windows Server 2022 (x86_64), R-release + R-devel
 - GitHub Actions: macOS (ARM64), R-release
 - GitHub Actions: Ubuntu 24.04 (x86_64), R-release + R-devel
 
 ## R CMD check results
 
-0 errors | 0 warnings | 2 notes
+0 errors | 0 warnings | 3 notes
 
 - **CRAN incoming feasibility**: New submission; maintainer address confirmed.
 - **Compilation flags used**: NOTE regarding non-portable flags (`-march=x86-64`,
   etc.) provided by the R core build environment for performance and security.
+- **HTML math rendering**: NOTE regarding V8 unavailability on the test system;
+  docs render correctly where V8 is present.
 
 ## URL Checks
 
-`urlchecker` flags three DOI URLs as `403 Forbidden`. These have been manually
+`urlchecker` flags four DOI URLs as `403 Forbidden`. These have been manually
 verified to work correctly in a browser. The access denials are likely due to
 bot-protection on the part of the publishers (Taylor & Francis, ACM, and JSTOR).
 
 Affected DOI links:
-- [doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
+
+- [doi:10.1080/00401706.1962.10490022](https://doi.org/10.1080/00401706.1962.10490022)
 - [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
 - [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
+- [doi:10.2307/2333958](https://doi.org/10.2307/2333958)
 
 ## Notes
 

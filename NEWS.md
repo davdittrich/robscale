@@ -1,3 +1,21 @@
+# robscale 0.2.0
+
+* New feature: `scale_robust()` provides a unified dispatcher that automatically
+  selects between a variance-weighted ensemble of 7 estimators (for small
+  samples) and the Gini Mean Difference (GMD) for larger samples (n >= 20).
+* New estimators: Added `gmd()`, `iqr_scaled()`, `mad_scaled()`, and `sd_c4()`
+  to the public API.
+* Confidence Intervals: Added `ci = TRUE` to all scale estimators, providing
+  analytical intervals (GMD, MAD, Sn, Qn, bias-corrected SD) or bootstrap-based
+  intervals (ensemble).
+* Performance: Replaced `stats::mad()` and `stats::IQR()` with optimized C++
+  implementations (`mad_scaled()`, `iqr_scaled()`) using O(n) selection via the
+  pdqselect algorithm.
+* Documentation: Expanded README with detailed benchmarking vs. `robustbase`,
+  `Hmisc`, `GiniDistance`, and `collapse`.
+* Citations: Consolidated and updated all package citations in `inst/CITATION`
+  and documentation.
+
 # robscale 0.1.6
 
 * Performance: Extended optimal sorting networks from n <= 8 to n <= 16 using
