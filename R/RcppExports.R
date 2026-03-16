@@ -97,3 +97,27 @@ C_get_sn_factor <- function(n) {
     .Call(`_robscale_C_get_sn_factor`, n)
 }
 
+sel_fr_median <- function(x) {
+    .Call(`_robscale_sel_fr_median`, x)
+}
+
+sel_pdq_median <- function(x) {
+    .Call(`_robscale_sel_pdq_median`, x)
+}
+
+sel_fr_lowmedian <- function(x) {
+    .Call(`_robscale_sel_fr_lowmedian`, x)
+}
+
+sel_pdq_lowmedian <- function(x) {
+    .Call(`_robscale_sel_pdq_lowmedian`, x)
+}
+
+sel_fr_kth <- function(x, k) {
+    .Call(`_robscale_sel_fr_kth`, x, k)
+}
+
+sel_pdq_kth <- function(x, k) {
+    .Call(`_robscale_sel_pdq_kth`, x, k)
+}
+
