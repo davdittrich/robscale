@@ -89,4 +89,17 @@ namespace robscale {
 }
 
 
+// --- Runtime SIMD dispatch ---
+// Per-function target attributes: the compiler emits AVX2/FMA instructions
+// for annotated functions without requiring -mavx2 globally.  This produces
+// a portable binary that activates AVX2 at runtime on capable hardware.
+// Supported by GCC 4.9+, all Clang, all Rtools MinGW-w64 GCC.
+#if (defined(__x86_64__) || defined(_M_X64)) && \
+    (defined(__GNUC__) || defined(__clang__))
+  #define ROBSCALE_TARGET_AVX2  __attribute__((target("avx2,fma")))
+  #define ROBSCALE_HAS_AVX2_DISPATCH 1
+#else
+  #define ROBSCALE_TARGET_AVX2
+#endif
+
 #endif // ROBSCALE_CONFIG_H

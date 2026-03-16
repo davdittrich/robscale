@@ -26,8 +26,9 @@ void qn_brute_force_scalar(const T * ROBSCALE_RESTRICT sorted_x, size_t n, doubl
   }
 }
 
-#if defined(__AVX2__)
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
 template <typename T>
+ROBSCALE_TARGET_AVX2
 void qn_brute_force_avx2(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double * ROBSCALE_RESTRICT diffs) {
   size_t k = 0;
   for (size_t i = 1; i < n; ++i) {
@@ -59,7 +60,7 @@ void qn_brute_force_avx2(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double 
     }
   }
 }
-#endif
+#endif // ROBSCALE_HAS_AVX2_DISPATCH
 
 #if defined(__ARM_NEON)
 template <typename T>

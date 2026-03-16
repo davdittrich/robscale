@@ -497,6 +497,12 @@ Rcpp::List get_qnsn_config() {
     Rcpp::Named("num_logical_cores") = (int)config.hw.num_logical_cores,
     Rcpp::Named("num_physical_cores") = (int)config.hw.num_physical_cores,
     Rcpp::Named("has_tuned_sort_thresholds") = false,
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+    Rcpp::Named("has_avx2") =
+        (config.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2),
+#else
+    Rcpp::Named("has_avx2") = false,
+#endif
 #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
     Rcpp::Named("has_omp_simd") = true
 #else
