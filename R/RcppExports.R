@@ -17,14 +17,13 @@ cpp_scale_ensemble_ci <- function(x, n_boot, level, method_code) {
     .Call(`_robscale_cpp_scale_ensemble_ci`, x, n_boot, level, method_code)
 }
 
-C_sn_sorted_test <- function(x) {
-    .Call(`_robscale_C_sn_sorted_test`, x)
+C_sn_sorted <- function(x) {
+    .Call(`_robscale_C_sn_sorted`, x)
 }
 
-C_qn_sorted_test <- function(x) {
-    .Call(`_robscale_C_qn_sorted_test`, x)
+C_qn_sorted <- function(x) {
+    .Call(`_robscale_C_qn_sorted`, x)
 }
-
 
 gmd_impl <- function(x, constant) {
     .Call(`_robscale_gmd_impl`, x, constant)
@@ -85,5 +84,4 @@ C_sn_int_fast <- function(x) {
 C_get_sn_factor <- function(n) {
     .Call(`_robscale_C_get_sn_factor`, n)
 }
-
 

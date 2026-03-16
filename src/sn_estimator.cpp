@@ -17,14 +17,8 @@
 #endif
 #include <algorithm>
 #include <memory>
-#include <new>
 #include <type_traits>
 #include <cassert>
-#include <cstdlib>
-
-#ifndef R_NaReal
-#define R_NaReal R_NaReal
-#endif
 
 #ifdef USE_DIRECT_TBB
 struct WorkerBase {};
@@ -36,16 +30,7 @@ using SplitType = RcppParallel::Split;
 
 namespace robscale::qnsn {
 
-// --- UTILITIES ---
-
-// Low-median via O(n) selection
-template <typename T>
-inline double lowmedian_ptr(T* arr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  size_t h = (n - 1) / 2;
-  robscale::floyd_rivest_select(arr, arr + h, arr + n);
-  return static_cast<double>(arr[h]);
-}
+constexpr size_t SN_MAX_STACK = ROBSCALE_SN_STACK_THRESHOLD;
 
 // --- SN ESTIMATOR WORKER ---
 
@@ -114,8 +99,7 @@ struct SnWorker : public WorkerBase {
 // Post-sort kernel: sorted_x is read-only, allocates its own inner_medians.
 template <typename T>
 double sn_kernel(const T* sorted_x, size_t n) {
-  auto &config = RuntimeConfig::get();
-  constexpr size_t SN_MAX_STACK = 2048;
+  const auto& config = RuntimeConfig::get();
 
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);
@@ -166,8 +150,7 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 overflows 64-bit boundaries.");
   }
 
-  auto &config = RuntimeConfig::get();
-  constexpr size_t SN_MAX_STACK = 2048;
+  const auto& config = RuntimeConfig::get();
 
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);

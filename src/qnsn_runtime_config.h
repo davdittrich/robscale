@@ -4,7 +4,6 @@
 #include "robscale_config.h"
 #include "qnsn_hardware_info.h"
 #include <cmath>
-#include <mutex>
 #include <algorithm>
 
 namespace robscale::qnsn {

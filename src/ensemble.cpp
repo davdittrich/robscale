@@ -605,12 +605,12 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
 
 // Sorted-input variants — thin wrappers, always available for testing.
 // [[Rcpp::export]]
-double C_sn_sorted_test(Rcpp::NumericVector x) {
+double C_sn_sorted(Rcpp::NumericVector x) {
   return robscale::qnsn::C_sn_impl_sorted<double>(x.begin(), static_cast<size_t>(x.size()));
 }
 
 // [[Rcpp::export]]
-double C_qn_sorted_test(Rcpp::NumericVector x) {
+double C_qn_sorted(Rcpp::NumericVector x) {
   return robscale::qnsn::C_qn_impl_sorted<double>(x.begin(), static_cast<size_t>(x.size()));
 }
 

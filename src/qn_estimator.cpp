@@ -20,15 +20,9 @@
 #endif
 #include <algorithm>
 #include <memory>
-#include <new>
 #include <type_traits>
 #include <cassert>
-#include <cstdlib>
 #include <vector>
-
-#ifndef R_NaReal
-#define R_NaReal R_NaReal
-#endif
 
 #ifdef USE_DIRECT_TBB
 struct WorkerBase {};
@@ -39,14 +33,6 @@ using SplitType = RcppParallel::Split;
 #endif
 
 namespace robscale::qnsn {
-
-// --- UTILITIES ---
-
-// Low-median via O(n) selection
-template <typename T>
-inline double lowmedian_ptr(T* arr, size_t n) {
-  return lowmedian_select(arr, n);
-}
 
 // --- QN ESTIMATOR HELPERS ---
 
@@ -96,8 +82,6 @@ inline T whimed_cpp(T* a, int32_t* iw, size_t n, int64_t target) {
   }
   return a[l];
 }
-
-// whimed_cpp and other performance helpers
 
 template <typename T>
 struct QnCountWorker : public WorkerBase {
@@ -189,8 +173,6 @@ struct QnRefineWorker : public WorkerBase {
   }
 };
 
-// End of performance critical section
-
 // Post-sort brute-force kernel: sorted_x is read-only, n <= 64.
 template <typename T>
 double qn_brute_force_kernel(const T* sorted_x, size_t n) {
@@ -198,7 +180,9 @@ double qn_brute_force_kernel(const T* sorted_x, size_t n) {
   size_t h_qn = n / 2 + 1;
   size_t k_target = h_qn * (h_qn - 1) / 2;
 
-  double diffs_buf[2048]; // 64*63/2 = 2016
+  constexpr size_t QN_MAX_PAIRS =
+      ROBSCALE_QN_EXACT_THRESHOLD * (ROBSCALE_QN_EXACT_THRESHOLD - 1) / 2;
+  double diffs_buf[QN_MAX_PAIRS];
 
   const auto& config = RuntimeConfig::get();
   if (n > 16) {
@@ -232,7 +216,7 @@ double qn_brute_force_exact(const T* x_ptr, size_t n) {
 // Post-sort refinement kernel: sorted_x is read-only, n > qn_exact_threshold.
 template <typename T>
 double qn_refinement_kernel(const T* sorted_x, size_t n) {
-  auto &config = RuntimeConfig::get();
+  const auto& config = RuntimeConfig::get();
 
   std::unique_ptr<float[]> work_buf;
   std::unique_ptr<int32_t[]> bounds_buf;
@@ -257,9 +241,11 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
   uint64_t nR = static_cast<uint64_t>(n) * (n - 1) / 2;
 
   while (nR - nL > n) {
+    // --- Candidate generation: collect weighted medians ---
     size_t m = 0;
-    if (n > config.qn_parallel_threshold) {
+    bool used_parallel = false;
 #ifdef USE_DIRECT_TBB
+    if (n > config.qn_parallel_threshold) {
       // Explicit block-index parallel_for: each block_idx maps to a fixed
       // [begin, end) range, so count phase and fill phase see identical splits.
       size_t g = config.grain_size;
@@ -277,7 +263,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
         block_offsets[block_idx] = count;
       });
 
-      // Prefix sum → write offsets
+      // Prefix sum -> write offsets
       size_t current = 0;
       for (size_t b = 0; b < num_blocks; ++b) {
         size_t c = block_offsets[b];
@@ -301,18 +287,10 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
           }
         }
       });
-#else
-      for (size_t i = 1; i < n; ++i) {
-        if (left[i] <= right[i]) {
-          int32_t w_val = right[i] - left[i] + 1;
-          int32_t jj = left[i] + w_val / 2;
-          work[m] = static_cast<float>(static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - jj]));
-          iweight[m] = w_val;
-          m += 1;
-        }
-      }
+      used_parallel = true;
+    }
 #endif
-    } else {
+    if (!used_parallel) {
       for (size_t i = 1; i < n; ++i) {
         if (left[i] <= right[i]) {
           int32_t w_val = right[i] - left[i] + 1;
@@ -326,6 +304,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
 
     double trial = whimed_cpp(work, iweight, m, static_cast<int64_t>((nR - nL) / 2));
 
+    // --- Count P/Q sums ---
     QnCountWorker<T> countWorker(sorted_x, n, trial);
     if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
@@ -337,6 +316,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
       countWorker(1, n);
     }
 
+    // --- Refine bounds ---
     if (k_target <= countWorker.sumP) {
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, true, right);
       if (n > config.qn_parallel_threshold) {
@@ -363,10 +343,12 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
     }
   }
 
+  // --- Final selection on surviving diffs ---
   std::unique_ptr<double[]> diffs(new double[nR - nL]);
 
-  if (n > config.qn_parallel_threshold) {
+  bool filled_parallel = false;
 #ifdef USE_DIRECT_TBB
+  if (n > config.qn_parallel_threshold) {
     // Explicit block-index parallel_for — same pattern as candidate generation.
     size_t g = config.get_dynamic_grain_size(n);
     size_t num_blocks = (n - 1 + g - 1) / g;  // blocks covering [1, n)
@@ -383,7 +365,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
       block_offsets[block_idx] = count;
     });
 
-    // Prefix sum → write offsets
+    // Prefix sum -> write offsets
     size_t current = 0;
     for (size_t b = 0; b < num_blocks; ++b) {
       size_t c = block_offsets[b];
@@ -404,19 +386,14 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
         }
       }
     });
-#else
-    size_t id_x = 0;
-    for (size_t i = 1; i < n; ++i) {
-      for (int32_t j = left[i]; j <= right[i]; ++j) {
-        diffs[id_x++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
-      }
-    }
+    filled_parallel = true;
+  }
 #endif
-  } else {
-    size_t id_x = 0;
+  if (!filled_parallel) {
+    size_t offset = 0;
     for (size_t i = 1; i < n; ++i) {
       for (int32_t j = left[i]; j <= right[i]; ++j) {
-        diffs[id_x++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
+        diffs[offset++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
       }
     }
   }
@@ -425,7 +402,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
     const size_t window = static_cast<size_t>(nR - nL);
     double* sel_ptr = diffs.get();
     const size_t k_off = static_cast<size_t>(k_target - nL - 1);
-    if (window <= robscale::qnsn::RuntimeConfig::get().pdq_qn_final_threshold)
+    if (window <= config.pdq_qn_final_threshold)
       robscale::floyd_rivest_select(sel_ptr, sel_ptr + k_off, sel_ptr + window);
     else
       miniselect::pdqselect(sel_ptr, sel_ptr + k_off, sel_ptr + window);
@@ -441,7 +418,7 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
   }
 
-  auto &config = RuntimeConfig::get();
+  const auto& config = RuntimeConfig::get();
 
   if (n <= config.qn_exact_threshold) {
     return qn_brute_force_exact(x_ptr, n);
@@ -473,7 +450,7 @@ double C_qn_impl_sorted(const T* sorted_x, size_t n) {
   if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
   assert(std::is_sorted(sorted_x, sorted_x + n));
 
-  auto &config = RuntimeConfig::get();
+  const auto& config = RuntimeConfig::get();
   if (n <= config.qn_exact_threshold) {
     return qn_brute_force_kernel(sorted_x, n);
   }
@@ -489,8 +466,6 @@ template double C_qn_impl<int>(const int*, size_t);
 
 // --- R EXPORTS ---
 
-
-
 // [[Rcpp::export]]
 double C_qn_fast(Rcpp::NumericVector x) { 
   return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size())); 
@@ -503,7 +478,7 @@ double C_qn_int_fast(Rcpp::IntegerVector x) {
 
 // [[Rcpp::export]]
 Rcpp::List get_qnsn_config() {
-  auto &config = robscale::qnsn::RuntimeConfig::get();
+  const auto& config = robscale::qnsn::RuntimeConfig::get();
   return Rcpp::List::create(
     Rcpp::Named("simd_level") = (int)config.hw.simd_level,
     Rcpp::Named("qn_exact_threshold") = (int)config.qn_exact_threshold,
@@ -529,8 +504,6 @@ Rcpp::List get_qnsn_config() {
 #endif
   );
 }
-
-
 
 // [[Rcpp::export]]
 double C_get_qn_factor(int n) {
