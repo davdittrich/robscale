@@ -44,22 +44,6 @@ else
   echo "  SLEEF not detected, falling back to Accelerate/OpenMP"
 fi
 
-# Detect CPU SIMD capabilities for optimal codegen
-SIMD_FLAGS=""
-case "$(uname -m)" in
-  x86_64)
-    echo "int main(){return 0;}" > conftest_simd.cpp
-    if ${CXX:-c++} -mavx2 -mfma -c conftest_simd.cpp -o conftest_simd.o 2>/dev/null; then
-      SIMD_FLAGS="-mavx2 -mfma"
-      echo "  x86_64: AVX2/FMA compiler support detected"
-    fi
-    rm -f conftest_simd.cpp conftest_simd.o
-    ;;
-  arm64|aarch64)
-    echo "  ARM64: NEON is standard"
-    ;;
-esac
-
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
 ACCELERATE_LIBS=""
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -76,7 +60,6 @@ sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
     -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
     -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
-    -e "s|@SIMD_FLAGS@|${SIMD_FLAGS}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"
