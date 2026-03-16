@@ -180,7 +180,7 @@ most widely used robust implementations in R---`revss` for small-sample
 M-estimation and `robustbase` for the $Q_n$ and $S_n$ scale estimators---carry
 significant computational overhead for time-critical applications.
 
-`robscale` v0.2.0 provides 11 exported functions spanning the full
+`robscale` v0.2.1 provides 11 exported functions spanning the full
 robustness--efficiency spectrum: from the non-robust but
 maximally efficient bias-corrected standard deviation (`sd_c4`, 100% ARE) through
 the Gini mean difference (`gmd`, 98% ARE, 29.3% breakdown), to
@@ -1189,7 +1189,7 @@ Code that uses `revss` can switch to `robscale` by changing only the `library()`
 For `qn()` and `sn()`, the function signatures match `robustbase::Qn()` and
 `robustbase::Sn()` (with lowercase names for consistency).
 
-For the v0.2.0 additions---`gmd()`, `iqr_scaled()`, `sd_c4()`, `mad_scaled()`,
+For the v0.2.1 additions---`gmd()`, `iqr_scaled()`, `sd_c4()`, `mad_scaled()`,
 `scale_robust()`, and `get_consistency_constant()`---the benchmarks compare
 performance against counterparts from other R packages. By design, `robscale`
 estimators apply Fisher-consistency constants to return unbiased standard
