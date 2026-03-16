@@ -1025,11 +1025,9 @@ $$
 
 ## Relation to revss and robustbase
 
-This package re-implements the M-estimators from the
-[revss](https://CRAN.R-project.org/package=revss) package (Avraham
-Adler) and the $`Q_n`$ and $`S_n`$ estimators from
-[robustbase](https://CRAN.R-project.org/package=robustbase) (Maechler et
-al.).
+This package re-implements the M-estimators from the ‘revss’ package
+(Adler, 2020) and the $`Q_n`$ and $`S_n`$ estimators from ‘robustbase’
+(Maechler et al., 2026).
 
 The API for the M-estimators is intentionally identical to `revss`:
 `adm()`, `robLoc()`, and `robScale()` accept the same arguments and
@@ -1066,6 +1064,10 @@ directly. Both are mature, well-tested, and widely available.
 
 ## References
 
+Adler, A. (2020). *revss: Robust Estimation in Very Small Samples*. R
+package version 2.0.0.
+[doi:10.32614/CRAN.package.revss](https://doi.org/10.32614/CRAN.package.revss)
+
 Bickel, P.J. and Lehmann, E.L. (1976). Descriptive Statistics for
 Nonparametric Models III. Dispersion. *Annals of Statistics*, **4**(6),
 1139–1158.
@@ -1078,6 +1080,19 @@ Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
 Gini, C. (1912). *Variabilita e mutabilita*. Bologna: Tipografia di
 Paolo Cuppini.
 
+Harrell Jr., F.E. (2026). *Hmisc: Harrell Miscellaneous*. R package
+version 5.2-5.
+[doi:10.32614/CRAN.package.Hmisc](https://doi.org/10.32614/CRAN.package.Hmisc)
+
+Krantz, S. (2025). *collapse: Advanced and Fast Data Transformation in
+R*. R package version 2.1.6.
+[doi:10.5281/zenodo.8433090](https://doi.org/10.5281/zenodo.8433090)
+
+Maechler, M., Rousseeuw, P., Croux, C., Todorov, V., Ruckstuhl, A.,
+Salibian-Barrera, M., Verbeke, T., Koller, M., Conceicao, E.L.T., and di
+Palma, M.A. (2026). *robustbase: Basic Robust Statistics*. R package
+version 0.99-7. <http://robustbase.r-forge.r-project.org/>
+
 Marsaglia, G. (2003). Xorshift RNGs. *Journal of Statistical Software*,
 **8**(14), 1–6.
 [doi:10.18637/jss.v008.i14](https://doi.org/10.18637/jss.v008.i14)
@@ -1088,6 +1103,11 @@ Nair, K.R. (1936). On the Mean Deviation. *Biometrika*, **28**(3/4),
 Nair, K.R. (1947). A Note on the Mean Deviation from the Median.
 *Biometrika*, **34**(3/4), 360–362.
 [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
+
+Nguyen, D. and Dang, X. (2022). *GiniDistance: A New Gini Correlation
+Between Quantitative and Qualitative Variables*. R package version
+0.1.1.
+[doi:10.32614/CRAN.package.GiniDistance](https://doi.org/10.32614/CRAN.package.GiniDistance)
 
 Rousseeuw, P.J. and Croux, C. (1993). Alternatives to the Median
 Absolute Deviation. *Journal of the American Statistical Association*,
@@ -1109,15 +1129,4 @@ Dennis Alexis Valin Dittrich
 
 ## License
 
-MIT. Copyright 2026 Dennis Alexis Valin Dittrich. Harrell Jr., F.E.
-(2026). *Hmisc: Harrell Miscellaneous*. R package version 5.2-5.
-[doi:10.32614/CRAN.package.Hmisc](https://doi.org/10.32614/CRAN.package.Hmisc)
-
-Krantz, S. (2025). *collapse: Advanced and Fast Data Transformation in
-R*. R package version 2.1.6.
-[doi:10.5281/zenodo.8433090](https://doi.org/10.5281/zenodo.8433090)
-
-Nguyen, D. and Dang, X. (2022). *GiniDistance: A New Gini Correlation
-Between Quantitative and Qualitative Variables*. R package version
-0.1.1.
-[doi:10.32614/CRAN.package.GiniDistance](https://doi.org/10.32614/CRAN.package.GiniDistance)
+MIT. Copyright 2026 Dennis Alexis Valin Dittrich.
