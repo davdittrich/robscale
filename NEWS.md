@@ -1,5 +1,7 @@
-# robscale 0.2.0
+# robscale 0.2.1
 
+* Performance: Refined runtime SIMD dispatch for `qn()` and `sn()` kernels,
+  achieving optimal vectorization across x86_64 (AVX2/FMA) and ARM64 (NEON).
 * New feature: `scale_robust()` provides a unified dispatcher that automatically
   selects between a variance-weighted ensemble of 7 estimators (for small
   samples) and the Gini Mean Difference (GMD) for larger samples (n >= 20).

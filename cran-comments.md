@@ -1,7 +1,9 @@
-# CRAN submission comments for robscale 0.2.0
+# CRAN submission comments for robscale 0.2.1
 
-## Changes in 0.2.0
+## Changes in 0.2.1
 
+- Performance: Refined runtime SIMD dispatch for `qn()` and `sn()` kernels,
+  addressing platform-specific vectorization bottlenecks.
 - New feature: `scale_robust()` unified dispatcher with variance-weighted
   ensemble and automatic switching to GMD for n >= 20.
 - New estimators: `gmd()`, `iqr_scaled()`, `mad_scaled()`, and `sd_c4()` added
