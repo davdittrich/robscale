@@ -10,12 +10,11 @@ Description: Estimates robust location and scale parameters using
     and Intel Threading Building Blocks (TBB) for parallel processing.
     Implements a novel variance-weighted ensemble estimator that adaptively
     combines all available statistics. Included methods feature logistic
-    M-estimators, the estimators of Rousseeuw and Croux (1993)
-    <doi:10.1080/01621459.1993.10476408>, the Gini mean difference, the
-    scaled Median Absolute Deviation (MAD), the scaled Interquartile
-    Range (IQR), and unbiased standard deviations. Achieves substantial
-    speedups over existing implementations through an 'Rcpp' backend and
-    a unified dispatcher that automatically selects the optimal
+    M-estimators, the estimators of Rousseeuw and Croux (1993), the Gini 
+    mean difference, the scaled Median Absolute Deviation (MAD), the scaled
+    Interquartile Range (IQR), and unbiased standard deviations. Achieves 
+    substantial speedups over existing implementations through an 'Rcpp' 
+    backend and a unified dispatcher that automatically selects the optimal
     estimator based on sample size.
 License: MIT + file LICENSE
 URL: https://github.com/davdittrich/robscale,
