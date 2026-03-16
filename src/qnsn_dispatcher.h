@@ -14,9 +14,16 @@ public:
       qn_brute_force_scalar(sorted_x, n, diffs);
       return;
     }
-#if defined(__AVX2__)
-    qn_brute_force_avx2(sorted_x, n, diffs);
-#elif defined(__ARM_NEON)
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+    // Runtime dispatch: use AVX2 kernel if hardware supports it.
+    // config.hw.simd_level is populated once at package load via
+    // __builtin_cpu_supports("avx2") — no per-call CPUID overhead.
+    if (config.hw.simd_level >= SIMDLevel::AVX2) {
+      qn_brute_force_avx2(sorted_x, n, diffs);
+      return;
+    }
+#endif
+#if defined(__ARM_NEON)
     qn_brute_force_neon(sorted_x, n, diffs);
 #else
     qn_brute_force_scalar(sorted_x, n, diffs);
