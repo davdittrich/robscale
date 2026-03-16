@@ -61,25 +61,25 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// C_sn_sorted_test
-double C_sn_sorted_test(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_C_sn_sorted_test(SEXP xSEXP) {
+// C_sn_sorted
+double C_sn_sorted(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_sn_sorted(SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(C_sn_sorted_test(x));
+    rcpp_result_gen = Rcpp::wrap(C_sn_sorted(x));
     return rcpp_result_gen;
 END_RCPP
 }
-// C_qn_sorted_test
-double C_qn_sorted_test(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_C_qn_sorted_test(SEXP xSEXP) {
+// C_qn_sorted
+double C_qn_sorted(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_qn_sorted(SEXP xSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(C_qn_sorted_test(x));
+    rcpp_result_gen = Rcpp::wrap(C_qn_sorted(x));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -263,14 +263,13 @@ BEGIN_RCPP
 END_RCPP
 }
 
-
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
     {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},
-    {"_robscale_C_sn_sorted_test", (DL_FUNC) &_robscale_C_sn_sorted_test, 1},
-    {"_robscale_C_qn_sorted_test", (DL_FUNC) &_robscale_C_qn_sorted_test, 1},
+    {"_robscale_C_sn_sorted", (DL_FUNC) &_robscale_C_sn_sorted, 1},
+    {"_robscale_C_qn_sorted", (DL_FUNC) &_robscale_C_qn_sorted, 1},
     {"_robscale_gmd_impl", (DL_FUNC) &_robscale_gmd_impl, 2},
     {"_robscale_iqr_impl", (DL_FUNC) &_robscale_iqr_impl, 2},
     {"_robscale_mad_impl_auto", (DL_FUNC) &_robscale_mad_impl_auto, 2},

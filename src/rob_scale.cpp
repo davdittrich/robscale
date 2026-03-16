@@ -2,6 +2,7 @@
 #include "robust_core.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
+#include <memory>
 
 /**
  * Portably optimized robScale kernel.
@@ -95,8 +96,5 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
     return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
   }
 
-  const double* data = xp; 
-  double data_offset = t;
-  
-  return rob_scale_compute(data, n, data_offset, s_init, maxit, tol, w);
+  return rob_scale_compute(xp, n, t, s_init, maxit, tol, w);
 }
