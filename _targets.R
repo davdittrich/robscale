@@ -49,5 +49,16 @@ list(
 
 
   # Render README.qmd
-  tar_quarto(readme, "README.qmd")
+  tar_quarto(readme_qmd, "README.qmd"),
+
+  # Post-process README.md for GitHub Mermaid compatibility
+  tar_target(readme, {
+    # Ensure readme_qmd is built
+    force(readme_qmd)
+    path <- "README.md"
+    # Quarto's gfm writer often puts a space in ``` mermaid
+    # which GitHub doesn't recognize. We strip it here.
+    system2("sed", c("-i", "'s/``` mermaid/```mermaid/g'", path))
+    path
+  }, format = "file")
 )

@@ -134,7 +134,9 @@ confidence intervals.
 Computes the sample standard deviation corrected by $c_4(n)$ to remove
 the small-sample bias of the square-root estimator:
 
-$$\hat\sigma = \frac{s}{c_4(n)} = \frac{s}{\sqrt{2/(n{-}1)} \cdot \Gamma(n/2) / \Gamma((n{-}1)/2)}$$
+$$
+\hat\sigma = \frac{s}{c_4(n)} = \frac{s}{\sqrt{2/(n{-}1)} \cdot \Gamma(n/2) / \Gamma((n{-}1)/2)}
+$$
 
 where $s$ is the usual sample standard deviation. Uses Welford’s online
 algorithm for numerically stable variance computation, avoiding
@@ -151,7 +153,9 @@ sd_c4(c(1, 2, 3, 5, 7, 8))
 Computes the Gini mean difference (Gini, 1912), scaled by a consistency
 constant for asymptotic normality under the Gaussian model:
 
-$$\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}$$
+$$
+\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}
+$$
 
 where $x_{(1)} \le \ldots \le x_{(n)}$ are the order statistics and
 $C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort
@@ -172,7 +176,9 @@ gmd(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw (unscaled)
 Computes the mean absolute deviation from the median, scaled by a
 consistency constant for asymptotic normality under the Gaussian model:
 
-$$\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|$$
+$$
+\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|
+$$
 
 where $C = \sqrt{\pi/2} \approx 1.2533$ (Nair, 1947). When `center` is
 supplied, it replaces the median. The ADM achieves **88.3% ARE** but
@@ -204,7 +210,7 @@ robLoc(c(1, 2, 3, 5, 7, 8))
 robLoc(c(1, 2, 3), scale = 1.5)   # known scale enables n = 3
 ```
 
-``` mermaid
+```mermaid
 flowchart TD
     A[Set minobs: 3 if scale known, 4 if unknown] --> B[med = median x]
     B --> C{n < minobs?}
@@ -230,7 +236,9 @@ M-estimator for scale using multiplicative iteration with the rho
 function—the square of the logistic psi (Rousseeuw & Verboven 2002, Eq.
 27):
 
-$$S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\frac{x_i - T}{c \cdot S^{(k-1)}}\right)}$$
+$$
+S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\frac{x_i - T}{c \cdot S^{(k-1)}}\right)}
+$$
 
 where $c = 0.37394112142347236$ and $T = \text{median}(x)$ is held
 fixed. Starting value: $S^{(0)} = \text{MAD}(x)$.
@@ -257,7 +265,7 @@ robScale(c(1, 2, 3, 5, 7, 8))
 robScale(c(5, 5, 5, 5, 6), fallback = "na")   # returns NA (revss compatibility)
 ```
 
-``` mermaid
+```mermaid
 flowchart TD
     A{Location known?}
     A -- Yes --> B1[w = x - loc]
@@ -315,7 +323,9 @@ sn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 Computes the interquartile range scaled by a consistency constant for
 asymptotic normality under the Gaussian model:
 
-$$\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})$$
+$$
+\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})
+$$
 
 where $Q_p$ denotes the Type 7 quantile (R default) and
 $C = 1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25)) \approx 0.7413$ (Bickel &
@@ -335,7 +345,9 @@ iqr_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw IQR
 Computes the median absolute deviation from the median, scaled by a
 consistency constant for asymptotic normality:
 
-$$\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|$$
+$$
+\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|
+$$
 
 where $C = 1/\Phi^{-1}(3/4) \approx 1.4826$. Unlike `stats::mad()`, this
 implementation uses adaptive $O(n)$ selection (Floyd–Rivest below a
@@ -372,7 +384,7 @@ scale_robust(rnorm(50), method = "qn")        # explicit Qn
 scale_robust(c(1, 2, 3, 5, 7, 8), ci = TRUE) # ensemble + bootstrap CI
 ```
 
-``` mermaid
+```mermaid
 flowchart TD
     A["scale_robust(x, method, auto_switch, threshold, n_boot)"] --> B{n < 2?}
     B -- Yes --> C([Return NA])
@@ -421,7 +433,9 @@ significantly cut run times across all sample sizes.
 
 The logistic psi function central to both M-estimators is:
 
-$$\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1}$$
+$$
+\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1}
+$$
 
 `revss` evaluates this as `2 * plogis(u) - 1`, which calls R’s `plogis`
 (the logistic CDF, $1/(1 + e^{-x})$). The computation requires one call
@@ -431,7 +445,9 @@ garbage-collection pressure.
 
 The algebraic identity
 
-$$\psi_{\log}(x) = \tanh(x/2)$$
+$$
+\psi_{\log}(x) = \tanh(x/2)
+$$
 
 is immediate from the definition of the hyperbolic tangent. `robscale`
 exploits this identity to reduce $\psi_{\log}$ to a single `tanh` call.
@@ -467,7 +483,9 @@ $n \leq 20$).
 `revss` iterates the location estimator using the scoring fixed-point
 iteration (Rousseeuw & Verboven 2002, Eq. 21):
 
-$$T^{(k+1)} = T^{(k)} + S \cdot \frac{\frac{1}{n}\sum \psi_{\log}\!\left(\frac{x_i - T^{(k)}}{S}\right)}{\alpha}$$
+$$
+T^{(k+1)} = T^{(k)} + S \cdot \frac{\frac{1}{n}\sum \psi_{\log}\!\left(\frac{x_i - T^{(k)}}{S}\right)}{\alpha}
+$$
 
 where $\alpha = \int \psi_{\log}'(u)\,d\Phi(u) \approx 0.4132$ is the
 normalization constant. This is a fixed-point iteration with *linear*
@@ -476,8 +494,10 @@ convergence: each step reduces the error by a constant factor.
 `robscale` instead applies Newton–Raphson to the estimating equation
 $\sum \psi_{\log}((x_i - T)/S) = 0$, yielding:
 
-$$T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}
-{\sum \left[1 - \psi^2\!\left(\frac{x_i - T^{(k)}}{2S}\right)\right]}$$
+$$
+T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}
+{\sum \left[1 - \psi^2\!\left(\frac{x_i - T^{(k)}}{2S}\right)\right]}
+$$
 
 where $\psi(\cdot) = \tanh(\cdot)$. The efficiency follows from
 observing that the derivative of the logistic psi satisfies
@@ -633,7 +653,9 @@ $n\bar{x}^2$ are close. Welford’s algorithm incrementally updates mean
 and sum-of-squares-of-differences, maintaining full precision with a
 single pass:
 
-$$\delta_i = x_i - \bar{x}_{i-1}, \quad \bar{x}_i = \bar{x}_{i-1} + \delta_i / i, \quad M_{2,i} = M_{2,i-1} + \delta_i(x_i - \bar{x}_i)$$
+$$
+\delta_i = x_i - \bar{x}_{i-1}, \quad \bar{x}_i = \bar{x}_{i-1} + \delta_i / i, \quad M_{2,i} = M_{2,i-1} + \delta_i(x_i - \bar{x}_i)
+$$
 
 ### 9. Adaptive selection dispatch
 
@@ -684,7 +706,9 @@ $r = 1, \ldots, n_{\text{boot}}$:
 After bootstrapping, the inverse-variance weight for each estimator $j$
 is:
 
-$$w_j = \frac{1/\hat\sigma_j^2}{\sum_{k=1}^{7} 1/\hat\sigma_k^2}$$
+$$
+w_j = \frac{1/\hat\sigma_j^2}{\sum_{k=1}^{7} 1/\hat\sigma_k^2}
+$$
 
 where $\hat\sigma_j^2$ is the sample variance of estimator $j$ across
 bootstrap replicates. The final estimate is
@@ -726,7 +750,7 @@ Table 4
 `robscale` uses a tiered dispatch architecture to select the most
 efficient algorithm based on sample size and hardware capabilities:
 
-``` mermaid
+```mermaid
 graph TD
     SR["scale_robust() dispatcher"] --> ENS{Ensemble or single?}
     ENS -- "n < threshold" --> BOOT["Bootstrap ensemble kernel<br/>(7 estimators x n_boot resamples)"]
@@ -933,7 +957,9 @@ definitions:
 
 **Logistic psi function** (Eq. 23):
 
-$$\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1} = \tanh(x/2)$$
+$$
+\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1} = \tanh(x/2)
+$$
 
 Bounded in $(-1, 1)$, smooth ($C^\infty$), strictly monotone.
 Boundedness provides robustness; smoothness avoids the corner artifacts
@@ -946,7 +972,9 @@ fixes location at $\text{median}(x)$.
 
 **Rho function for scale** (Eq. 26):
 
-$$\rho_{\log}(x) = \psi_{\log}^2(x / c)$$
+$$
+\rho_{\log}(x) = \psi_{\log}^2(x / c)
+$$
 
 where $c = 0.37394112142347236$ is the constant that yields a 50%
 breakdown point.
@@ -961,13 +989,17 @@ $\text{himed}$ denote the low and high medians respectively.
 **$c_4(n)$ correction factor.** The expected value of the sample
 standard deviation under normality is $\sigma \cdot c_4(n)$ where:
 
-$$c_4(n) = \sqrt{\frac{2}{n{-}1}} \cdot \frac{\Gamma(n/2)}{\Gamma((n{-}1)/2)}$$
+$$
+c_4(n) = \sqrt{\frac{2}{n{-}1}} \cdot \frac{\Gamma(n/2)}{\Gamma((n{-}1)/2)}
+$$
 
 Dividing $s$ by $c_4(n)$ yields an unbiased estimator of $\sigma$.
 
 **Gini mean difference.** The order-statistics form:
 
-$$\text{GMD}(x) = C_{\text{GMD}} \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}$$
+$$
+\text{GMD}(x) = C_{\text{GMD}} \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}
+$$
 
 is algebraically equivalent to the pairwise-difference definition
 $\frac{1}{\binom{n}{2}}\sum_{i<j}|x_i - x_j|$ but avoids materializing
@@ -976,7 +1008,9 @@ $O(n^2)$ pairs.
 **Ensemble weighting formula.** Given $J$ estimators with bootstrap
 variances $\hat\sigma_j^2$, the inverse-variance weighted estimate is:
 
-$$\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{J} 1/\hat\sigma_j^2}$$
+$$
+\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{J} 1/\hat\sigma_j^2}
+$$
 
 **Key constants** (full double precision):
 
