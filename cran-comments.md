@@ -1,54 +1,29 @@
-# CRAN submission comments for robscale 0.2.1
+# CRAN submission comments for robscale 0.2.2
 
-## Changes in 0.2.1
+## Changes in 0.2.2
 
-- Performance: Refined runtime SIMD dispatch for `qn()` and `sn()` kernels,
-  addressing platform-specific vectorization bottlenecks.
-- New feature: `scale_robust()` unified dispatcher with variance-weighted
-  ensemble and automatic switching to GMD for n >= 20.
-- New estimators: `gmd()`, `iqr_scaled()`, `mad_scaled()`, and `sd_c4()` added
-  to exported functions.
-- Statistical inference: Added analytical and bootstrap confidence intervals
-  to all scale estimators via a new `ci = TRUE` argument.
-- Optimization: `mad_scaled()` and `iqr_scaled()` now leverage the `pdqselect`
-  algorithm for O(n) selection, outperforming base R's O(n log n) sorting.
-- Citations: Synchronized `inst/CITATION` and documentation with the new
-  metadata and foundational references (Gini, 1912).
+This patch fixes ERROR-level check failures on r-devel-linux-x86_64-fedora-clang,
+r-devel-linux-x86_64-fedora-gcc, and r-oldrel-windows-x86_64 caused by
+`revss` v3.0.0 changing the defaults of `robScale()` and `robLoc()` to use
+bias-corrected "AA" constants.
+
+- Tests: Skip `robScale()` and `robLoc()` cross-validation against `revss`
+  when `revss >= 3.0.0` (breaking upstream change). The `adm()` cross-check
+  remains active for all versions.
+- Tests: Added frozen golden reference tests (90 values each) for `robScale()`
+  and `robLoc()`, verified against `revss` v2.0.0. These catch regressions in
+  our own algorithm independent of upstream version changes.
+- No changes to the robscale algorithm or any source code.
 
 ## Test environments
 
-- Arch Linux (x86_64), R 4.5.3, GCC 15.2.1
-- GitHub Actions: Windows Server 2022 (x86_64), R-release + R-devel
-- GitHub Actions: macOS (ARM64), R-release
-- GitHub Actions: Ubuntu 24.04 (x86_64), R-release + R-devel
+- macOS (ARM64), R 4.5.3, Apple Clang
+- Fedora Linux (x86_64), R-devel, GCC 15.2.1
+- Fedora Linux (x86_64), R-devel, GCC 15.2.1 (Intel)
 
 ## R CMD check results
 
-0 errors | 0 warnings | 3 notes
+0 errors | 0 warnings | 1 note
 
-- **CRAN incoming feasibility**: New submission; maintainer address confirmed.
-- **Compilation flags used**: NOTE regarding non-portable flags (`-march=x86-64`,
-  etc.) provided by the R core build environment for performance and security.
-- **HTML math rendering**: NOTE regarding V8 unavailability on the test system;
-  docs render correctly where V8 is present.
-
-## URL Checks
-
-`urlchecker` flags five DOI URLs as `403 Forbidden`. These have been manually
-verified to work correctly in a browser. The access denials are likely due to
-bot-protection on the part of the publishers (Taylor & Francis, ACM, and JSTOR).
-
-Affected DOI links:
-
-- [doi:10.1080/00401706.1962.10490022](https://doi.org/10.1080/00401706.1962.10490022)
-- [doi:10.1080/01621459.1993.10476408](https://doi.org/10.1080/01621459.1993.10476408)
-- [doi:10.1145/360680.360691](https://doi.org/10.1145/360680.360691)
-- [doi:10.2307/2332448](https://doi.org/10.2307/2332448)
-- [doi:10.2307/2333958](https://doi.org/10.2307/2333958)
-
-## Notes
-
-- The package reimplements and extends the robust estimators from the CRAN
-  packages `revss` and `robustbase` (both listed in Suggests) in C++17 via Rcpp.
-- Numerical equivalence with `revss` is verified by 5,400 cross-comparisons in
-  the test suite.
+- **GNU make**: `SystemRequirements` field lists GNU make (needed for
+  `$(shell)` in Makevars). Already declared in DESCRIPTION.

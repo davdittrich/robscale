@@ -1,3 +1,12 @@
+# robscale 0.2.2
+
+* Tests: Adapted cross-validation tests for compatibility with `revss` v3.0.0,
+  which changed `robScale()` and `robLoc()` defaults to use bias-corrected "AA"
+  constants. The `adm()` cross-check remains active for all `revss` versions.
+* Tests: Added frozen golden reference tests for `robScale()` and `robLoc()`,
+  decoupled from upstream `revss`. Catches regressions in our own algorithm
+  independent of `revss` version changes.
+
 # robscale 0.2.1
 
 * Performance: Refined runtime SIMD dispatch for `qn()` and `sn()` kernels,
