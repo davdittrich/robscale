@@ -42,14 +42,15 @@ inline double gmd(double* buf, int n) {
   return GMD_CONSISTENCY * 2.0 * sum / (static_cast<double>(n) * (n - 1));
 }
 
-// MAD from original data: computes median, then MAD
-// Needs two buffers: buf (for median selection), dev (for deviations)
-inline double mad_from_data(const double* x, double* buf, double* dev, int n) {
+// MAD from original data: fused single-buffer approach.
+// After median selection, buf is a permutation of x. Deviations computed
+// in-place produce the same multiset as |x[i] - med|.
+inline double mad_from_data(const double* x, double* buf, int n) {
   if (n < 2) return 0.0;
   std::memcpy(buf, x, n * sizeof(double));
   double med = robscale::adaptive_median_select(buf, static_cast<size_t>(n));
-  for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
-  return MAD_CONSISTENCY * robscale::adaptive_median_select(dev, static_cast<size_t>(n));
+  for (int i = 0; i < n; ++i) buf[i] = std::abs(buf[i] - med);
+  return MAD_CONSISTENCY * robscale::adaptive_median_select(buf, static_cast<size_t>(n));
 }
 
 // IQR: incremental pdqselect, O(n)
@@ -119,25 +120,25 @@ inline double qn_sorted(const double* sorted_x, int n) {
   return robscale::qnsn::C_qn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
 }
 
-// robScale (M-scale): Newton-Raphson iteration
-// Needs two buffers: buf (for median/scratch), dev (for MAD deviations)
-inline double rob_scale(const double* x, double* buf, double* dev, int n) {
+// robScale (M-scale): fused single-buffer approach.
+// Median → in-place deviations → MAD → iteration, all on one buffer.
+inline double rob_scale(const double* x, double* buf, int n) {
   if (n < 4) return 0.0; // minimum for robScale without known location
 
-  // Compute median
+  // Compute median (destroys ordering of buf)
   std::memcpy(buf, x, n * sizeof(double));
   double t = robscale::median_select(buf, static_cast<size_t>(n));
 
-  // Compute MAD as initial scale
-  for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - t);
-  double s_init = MAD_CONSISTENCY * robscale::median_select(dev, static_cast<size_t>(n));
+  // Compute MAD in-place: deviations on the permuted buf
+  for (int i = 0; i < n; ++i) buf[i] = std::abs(buf[i] - t);
+  double s_init = MAD_CONSISTENCY * robscale::median_select(buf, static_cast<size_t>(n));
 
   // MAD implosion: return ADM fallback
   if (s_init <= 1e-4) {
     return robscale::adm_core(x, n, t, ADM_CONSISTENCY);
   }
 
-  // Newton-Raphson iteration via promoted rob_scale_compute
+  // Newton-Raphson iteration: buf is reused as scratch (written before read)
   return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, buf);
 }
 

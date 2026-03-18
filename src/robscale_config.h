@@ -59,6 +59,17 @@
  */
 #define ROBSCALE_MICRO_BUFFER_SIZE 128
 
+/**
+ * Prevent inlining so small-n paths get their own minimal stack frame.
+ */
+#if defined(_MSC_VER)
+  #define ROBSCALE_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+  #define ROBSCALE_NOINLINE __attribute__((noinline))
+#else
+  #define ROBSCALE_NOINLINE
+#endif
+
 
 // --- Common Statistical Constants ---
 
