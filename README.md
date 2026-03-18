@@ -27,13 +27,13 @@ All estimators are implemented as C++17 kernels. The M-estimators use
 vectorized `tanh` evaluation (where batch sizes justify the overhead)
 and Newton–Raphson iteration; $`Q_n`$ and $`S_n`$ use parallelized
 $`O(n \log n)`$ algorithms via TBB. Against `revss`, the package achieves
-**9.9–27.9x** speedups for the small-sample M-estimators. Against
-`robustbase`, it achieves **1.9–7.8x** for $`S_n`$ and **1.7–5.5x** for
-$`Q_n`$—with gains peaking near **7.8x** at $`n = 10^7`$ as TBB parallelism
+**10.1–28.6x** speedups for the small-sample M-estimators. Against
+`robustbase`, it achieves **1.9–9.4x** for $`S_n`$ and **1.7–6.7x** for
+$`Q_n`$—with gains peaking near **9.4x** at $`n = 10^7`$ as TBB parallelism
 reduces the computational bottleneck for massive datasets. The new
 estimators (`gmd`, `iqr_scaled`, `mad_scaled`) outperform their base R
-and CRAN counterparts by **2.5–15.5x** (GMD vs `Hmisc`), **3.0–25.9x**
-(IQR vs `stats::IQR`), and **2.8–17.9x** (MAD vs `stats::mad`).
+and CRAN counterparts by **2.5–16.0x** (GMD vs `Hmisc`), **2.9–26.1x**
+(IQR vs `stats::IQR`), and **5.8–18.5x** (MAD vs `stats::mad`).
 
 ## Installation
 
@@ -426,9 +426,11 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 ## Methodological enhancements
 
 `robscale` implements the estimators defined by Rousseeuw & Verboven
-(2002) and Rousseeuw & Croux (1993). It produces identical numerical
-results to `revss` and `robustbase`, but its computational strategies
-significantly cut run times across all sample sizes.
+(2002) and Rousseeuw & Croux (1993). While it maintains the same core
+algorithmic foundations, the newest version of `revss` uses updated bias
+correction factors, meaning results may not be numerically identical.
+`robscale` focus remains on computational efficiency, where it continues
+to cut run times significantly across all sample sizes.
 
 ### 1. The tanh identity for the logistic psi function
 
@@ -577,7 +579,7 @@ between Floyd–Rivest and pdqselect (miniselect) based on a runtime
 threshold derived from the per-core L2 cache size. Section 9 describes
 this dispatch in detail.
 
-### 4. Arena allocation on the stack
+### 4. Arena allocation and fused single-buffer algorithms
 
 Each estimator requires working arrays: a copy of the input (for
 destructive selection), absolute deviations (for MAD), and a temporary
@@ -585,12 +587,24 @@ buffer (for bulk `tanh` arguments). `revss` allocates these as R
 vectors, incurring R’s SEXPREC header overhead and adding
 garbage-collection pressure.
 
-`robscale` uses a tiered stack-allocated arena: a 128-double
-micro-buffer for $`n \leq 64`$ and a 2,048-double buffer per array for
-$`n \leq 2{,}048`$ (the MAD and M-estimator paths)—which covers the target
-regime and far beyond—with zero heap allocation. For $`n > 2{,}048`$, the
-code falls back to `new[]`/`delete[]`. IQR uses a larger 4,096-element
-stack owing to its single working array and wider operational range.
+`robscale` uses a tiered stack-allocated arena: a 64-double micro-buffer
+for $`n \leq 64`$ and a 2,048-double buffer for $`n \leq 2{,}048`$, with
+zero heap allocation. For $`n > 2{,}048`$, the code falls back to
+`new[]`/`delete[]`.
+
+**Fused median-then-MAD.** The `mad_scaled()` and `robScale()`
+estimators compute the median and MAD on a single working buffer. After
+the selection algorithm positions the median, the buffer contains a
+permutation of the original input. Because MAD is order-invariant—it is
+the median of absolute deviations, and the multiset $`\{|w_i - m|\}`$
+equals $`\{|x_i - m|\}`$ for any permutation $`w`$ of $`x`$—the deviations can
+be computed in-place, eliminating the second scratch array. This halves
+memory from $`2n`$ to $`n`$ doubles per estimator and reduces cache pressure
+in the ensemble, where multiple estimators share working memory.
+
+The `robLoc()` and `robScale()` entry points separate the small-$`n`$ path
+($`n \leq 64`$) into `ROBSCALE_NOINLINE` helpers with a 1 KB stack frame,
+so that the 32 KB large-$`n`$ buffer does not penalize small calls.
 
 ### 5. Compile-time reciprocal constants
 
@@ -675,12 +689,16 @@ the per-core L2 cache size:
 | $`S_n`$ | `adaptive_lowmedian_select` | $`\max(2048,\; L_2 / (8 \times 2))`$ | 2 |
 | $`Q_n`$ (final) | Inline threshold check | $`\max(2048,\; L_2 / (8 \times 4))`$ | 4 |
 
-The divisor encodes working-set pressure: `mad_scaled` keeps two arrays
-plus constants warm (divisor 5), `robScale` keeps one to two (divisor
-2), and $`Q_n`$’s final diff-window selection contends with sorted data,
-work arrays, and bounds (divisor 4). `iqr_scaled` uses pdqselect
-unconditionally because its dual-quartile strategy—selecting $`Q_1`$
-first, then narrowing the search space for $`Q_3`$ to the upper
+The divisor encodes working-set pressure during selection. Since v0.3.0,
+`mad_scaled` uses a fused single-buffer algorithm (one array plus
+constants warm), but the threshold retains the conservative divisor 5
+from the two-buffer era because the second median selection (on
+deviations) reuses the same buffer and contends with residual cache
+lines from the first selection. `robScale` keeps one to two warm arrays
+(divisor 2), and $`Q_n`$’s final diff-window selection contends with
+sorted data, work arrays, and bounds (divisor 4). `iqr_scaled` uses
+pdqselect unconditionally because its dual-quartile strategy—selecting
+$`Q_1`$ first, then narrowing the search space for $`Q_3`$ to the upper
 partition—benefits from pdqselect’s partitioning guarantees at all
 sizes. Both quartile selections use Type 7 interpolation (the R
 default), locating the floor index and scanning for the next order
@@ -700,8 +718,8 @@ $`r = 1, \ldots, n_{\text{boot}}`$:
 
 1.  A deterministic XorShift32 PRNG (Marsaglia, 2003) seeded with
     $`r + 12345`$ draws $`n`$ indices with replacement.
-2.  All 7 estimators are evaluated on the resampled data, sharing
-    pre-allocated work buffers.
+2.  All 7 estimators are evaluated on the resampled data, sharing two
+    pre-allocated work buffers of $`n`$ doubles each ($`2n`$ total).
 
 After bootstrapping, the inverse-variance weight for each estimator $`j`$
 is:
@@ -721,12 +739,12 @@ Table 3
 
 |      $`n`$ | `robustbase::Qn` | `robscale::qn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 9.2 µs           | 1.9 µs         | **4.8x** |
-|       16 | 10.3 µs          | 2.0 µs         | **5.2x** |
+|        8 | 9.2 µs           | 1.8 µs         | **5.0x** |
+|       16 | 10.3 µs          | 1.9 µs         | **5.3x** |
 |       64 | 14.3 µs          | 7.4 µs         | **1.9x** |
-|     1024 | 461.9 µs         | 218.3 µs       | **2.1x** |
-|    65536 | 59630.9 µs       | 12174.8 µs     | **4.9x** |
-| 10000000 | 10.4 s           | 2.0 s          | **5.1x** |
+|     1024 | 461.9 µs         | 215.6 µs       | **2.1x** |
+|    65536 | 59630.9 µs       | 10591.2 µs     | **5.6x** |
+| 10000000 | 10.4 s           | 1.8 s          | **5.6x** |
 
 </div>
 
@@ -736,12 +754,12 @@ Table 4
 
 |      $`n`$ | `robustbase::Sn` | `robscale::sn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 4.0 µs           | 2.0 µs         | **2.0x** |
-|       16 | 4.6 µs           | 1.9 µs         | **2.4x** |
+|        8 | 4.0 µs           | 1.8 µs         | **2.2x** |
+|       16 | 4.6 µs           | 1.8 µs         | **2.5x** |
 |       64 | 5.5 µs           | 2.4 µs         | **2.3x** |
 |     1024 | 35.0 µs          | 18.7 µs        | **1.9x** |
-|    65536 | 6617.7 µs        | 972.5 µs       | **6.9x** |
-| 10000000 | 1.4 s            | 0.2 s          | **7.0x** |
+|    65536 | 6617.7 µs        | 908.0 µs       | **7.3x** |
+| 10000000 | 1.4 s            | 0.2 s          | **9.0x** |
 
 </div>
 
@@ -822,14 +840,14 @@ compares `qn` and `sn` against `robustbase`; Panel C compares `gmd`,
 - **CPU Governor:** powersave
 - **OS:** Arch Linux
 - **R version:** R version 4.5.3 (2026-03-11)
-- **Package version:** 0.2.1
+- **Package version:** 0.3.0
 - **SLEEF (Optimized Build):** Detected
-- **Date:** 2026-03-16
+- **Date:** 2026-03-19
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
 In the target regime ($`n \le 20`$), `robscale` outperforms `revss` by
-**9.9–27.9x**. Drivers include:
+**10.1–28.6x**. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton–Raphson (3 iterations vs
@@ -837,7 +855,7 @@ In the target regime ($`n \le 20`$), `robscale` outperforms `revss` by
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $`n \le 16`$.
 
-Even at $`n = 16{,}384`$, the gains remain **3.2–6.9x** because the
+Even at $`n = 16{,}384`$, the gains remain **3.3–7.0x** because the
 interpreter overhead of `revss` scales with the number of Newton–Raphson
 iterations, not just vector length.
 
@@ -847,15 +865,15 @@ For $`Q_n`$ and $`S_n`$, the performance story follows two regimes separated
 by the parallelism threshold:
 
 **Small to medium samples ($`n \le 10^3`$).** `robscale` leads by
-**1.7–5.5x**. The gain comes primarily from the avoidance of R dispatch
+**1.7–6.7x**. The gain comes primarily from the avoidance of R dispatch
 overhead and the use of stack memory. For $`Q_n`$ at $`n = 8`$, the
-brute-force exact algorithm completes in 1.9 µs vs. 9.2 µs for
-`robustbase` — a **4.8x** edge.
+brute-force exact algorithm completes in 1.8 µs vs. 9.2 µs for
+`robustbase` — a **5.0x** edge.
 
-**Large samples ($`n \ge 10^4`$).** The advantage grows to **1.8–7.8x** as
-TBB parallelism engages. At $`n = 10^7`$, `qn` runs in 2.0 s vs. 10.4 s
-for `robustbase::Qn` (**5.1x**), and `sn` runs in 0.2 s vs. 1.4 s
-(**7.0x**). Parallel efficiency is bounded by Amdahl’s Law and memory
+**Large samples ($`n \ge 10^4`$).** The advantage grows to **1.9–9.4x** as
+TBB parallelism engages. At $`n = 10^7`$, `qn` runs in 1.8 s vs. 10.4 s
+for `robustbase::Qn` (**5.6x**), and `sn` runs in 0.2 s vs. 1.4 s
+(**9.0x**). Parallel efficiency is bounded by Amdahl’s Law and memory
 bandwidth; while the multi-threaded kernels provide substantial gains
 for massive datasets, speedups do not scale linearly with thread count.
 
@@ -867,52 +885,52 @@ Table 5
 
 |      $`n`$ | Comparison             | Speedup   |
 |---------:|:-----------------------|:----------|
-|       64 | gmd vs GiniDistance    | **9.8x**  |
-|       64 | gmd vs Hmisc           | **14.8x** |
-|       64 | iqr_scaled vs collapse | **3.2x**  |
-|       64 | iqr_scaled vs stats    | **22.7x** |
-|       64 | mad_scaled vs collapse | **4.2x**  |
-|       64 | mad_scaled vs stats    | **17.4x** |
-|     1024 | gmd vs GiniDistance    | **3.2x**  |
-|     1024 | gmd vs Hmisc           | **4.6x**  |
+|       64 | gmd vs GiniDistance    | **9.6x**  |
+|       64 | gmd vs Hmisc           | **14.5x** |
+|       64 | iqr_scaled vs collapse | **3.1x**  |
+|       64 | iqr_scaled vs stats    | **22.0x** |
+|       64 | mad_scaled vs collapse | **4.1x**  |
+|       64 | mad_scaled vs stats    | **17.1x** |
+|     1024 | gmd vs GiniDistance    | **3.3x**  |
+|     1024 | gmd vs Hmisc           | **4.8x**  |
 |     1024 | iqr_scaled vs collapse | **1.8x**  |
 |     1024 | iqr_scaled vs stats    | **10.1x** |
-|     1024 | mad_scaled vs collapse | **2.6x**  |
-|     1024 | mad_scaled vs stats    | **8.8x**  |
-|    65536 | gmd vs GiniDistance    | **2.9x**  |
+|     1024 | mad_scaled vs collapse | **2.4x**  |
+|     1024 | mad_scaled vs stats    | **8.2x**  |
+|    65536 | gmd vs GiniDistance    | **3.0x**  |
 |    65536 | gmd vs Hmisc           | **3.8x**  |
-|    65536 | iqr_scaled vs collapse | **4.3x**  |
-|    65536 | iqr_scaled vs stats    | **4.8x**  |
-|    65536 | mad_scaled vs collapse | **5.2x**  |
-|    65536 | mad_scaled vs stats    | **6.0x**  |
-| 10000000 | gmd vs GiniDistance    | **4.3x**  |
-| 10000000 | gmd vs Hmisc           | **6.2x**  |
-| 10000000 | iqr_scaled vs collapse | **2.7x**  |
-| 10000000 | iqr_scaled vs stats    | **3.0x**  |
-| 10000000 | mad_scaled vs collapse | **3.4x**  |
-| 10000000 | mad_scaled vs stats    | **4.9x**  |
+|    65536 | iqr_scaled vs collapse | **4.6x**  |
+|    65536 | iqr_scaled vs stats    | **5.2x**  |
+|    65536 | mad_scaled vs collapse | **5.6x**  |
+|    65536 | mad_scaled vs stats    | **6.4x**  |
+| 10000000 | gmd vs GiniDistance    | **3.1x**  |
+| 10000000 | gmd vs Hmisc           | **4.5x**  |
+| 10000000 | iqr_scaled vs collapse | **2.6x**  |
+| 10000000 | iqr_scaled vs stats    | **2.9x**  |
+| 10000000 | mad_scaled vs collapse | **4.0x**  |
+| 10000000 | mad_scaled vs stats    | **5.8x**  |
 
 </div>
 
-**GMD** (`robscale::gmd` vs `Hmisc::GiniMd`): **2.5–15.5x** speedup.
+**GMD** (`robscale::gmd` vs `Hmisc::GiniMd`): **2.5–16.0x** speedup.
 `Hmisc::GiniMd` is a pure R implementation using the same $`O(n \log n)`$
 order-statistics formula. The speedup comes from C++ compilation and
 sorting networks for small $`n`$. Against `GiniDistance::gmd` (an
-Rcpp-backed C++ implementation), the comparison is **2.0–10.0x**—a
+Rcpp-backed C++ implementation), the comparison is **2.0–10.6x**—a
 tighter race since both are compiled, with `robscale`’s advantage coming
 from sorting networks and the consistency-constant integration.
 
-**IQR** (`robscale::iqr_scaled` vs `stats::IQR`): **3.0–25.9x** speedup.
+**IQR** (`robscale::iqr_scaled` vs `stats::IQR`): **2.9–26.1x** speedup.
 `stats::IQR` performs a full $`O(n \log n)`$ sort via `quantile()`.
 `robscale` uses dual $`O(n)`$ pdqselect calls, which dominate at large
 $`n`$. Against `collapse::fquantile` (a C-backed quantile implementation),
-the speedup is **1.3–5.0x**—a more informative comparison since both are
+the speedup is **1.2–4.8x**—a more informative comparison since both are
 compiled, revealing whether pdqselect outpaces `collapse`’s C
 implementation.
 
-**MAD** (`robscale::mad_scaled` vs `stats::mad`): **2.8–17.9x** speedup.
+**MAD** (`robscale::mad_scaled` vs `stats::mad`): **5.8–18.5x** speedup.
 `stats::mad` performs a full sort for the median step. Against a custom
-fast MAD (using `collapse::fmedian`), the speedup is **1.4–6.0x**—the
+fast MAD (using `collapse::fmedian`), the speedup is **1.8–6.2x**—the
 key comparison since both are compiled; `robscale`’s advantage comes
 from adaptive $`O(n)`$ selection vs `collapse`’s sorting-based approach.
 
@@ -928,11 +946,16 @@ from adaptive $`O(n)`$ selection vs `collapse`’s sorting-based approach.
 
 The test suite verifies `robscale` against reference implementations:
 
-**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): compares
-`robscale` and `revss` across 5,400 randomly generated inputs
-($`n = 3, 4,\ldots, 20`$; 100 replicates per $`n`$; all three functions
-`adm`, `robLoc`, `robScale`). All 5,400 comparisons pass at tolerance
-$`\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}`$.
+**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): Comparing
+`robscale` against the original `revss` algorithm (up to v2.0.0) across
+5,400 randomly generated inputs ($`n = 3, 4, \ldots, 20`$; 100 replicates
+per $`n`$; all three functions `adm`, `robLoc`, `robScale`) yields a 100%
+pass rate at tolerance
+$`\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}`$. While
+`robscale` maintains this numerical consistency with the established
+reference, `revss` v3.1.0 has since updated its bias correction factors;
+`robscale` continues to follow the original Rousseeuw & Verboven (2002)
+definitions.
 
 **New estimators:**
 
