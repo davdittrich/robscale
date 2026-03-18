@@ -1014,13 +1014,13 @@ knitr::include_graphics(tar_read(speedup_figure))
 
 **Benchmark environment:**
 
-- **Machine:** `r hw_cpu`
-- **CPU Governor:** `r sys_gov`
-- **OS:** `r sys_os`
-- **R version:** `r sys_r`
-- **Package version:** `r pkg_version`
-- **SLEEF (Optimized Build):** `r ifelse(isTRUE(benchmark_report$fast$has_sleef), "Detected", "Not Detected")`
-- **Date:** `r sys_date`
+- **Machine:** AMD Ryzen 9 5900HX with Radeon Graphics
+- **CPU Governor:** powersave
+- **OS:** Arch Linux
+- **R version:** R version 4.5.3 (2026-03-11)
+- **Package version:** 0.3.0 (baseline comparisons against `robustbase` 0.99.7, `revss` 3.1.0, `Hmisc` 5.2.5, `GiniDistance` 0.1.1, and `collapse` 2.1.6)
+- **SLEEF (Optimized Build):** Detected
+- **Date:** 2026-03-19
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
