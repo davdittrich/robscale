@@ -4,7 +4,10 @@
 #include <cstring>
 #include <memory>
 
-// MAD with auto-median: uses existing mad_select() infrastructure
+// MAD with auto-median: fused single-buffer approach.
+// After median selection, w is a permutation of x. Compute deviations
+// in-place: {|w[i] - med|} == {|x[i] - med|} as multisets, and MAD
+// is order-invariant. This halves memory from 2n to n doubles.
 // [[Rcpp::export]]
 double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
@@ -13,32 +16,31 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
 
   const double* xp = x.begin();
 
-  // Arena: need space for median copy + deviation buffer
-  double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
+  // Single buffer of size n (was 2n)
+  double buf_micro[64];
   constexpr int STACK_SIZE = 2048;
-  double buf_stack[STACK_SIZE * 2];
+  double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
-  double* arena;
+  double* w;
 
   if (n <= 64) {
-    arena = buf_micro;
+    w = buf_micro;
   } else if (n <= STACK_SIZE) {
-    arena = buf_stack;
+    w = buf_stack;
   } else {
-    heap.reset(new double[n * 2]);
-    arena = heap.get();
+    heap.reset(new double[n]);
+    w = heap.get();
   }
 
-  double* w = arena;
-  double* dev = arena + n;
-
-  // Compute median via pdqselect
+  // Step 1: copy and select median (destroys ordering of w)
   std::memcpy(w, xp, n * sizeof(double));
   double med = robscale::adaptive_median_select(w, n);
 
-  // Compute MAD using pdqselect
-  for (int i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - med);
-  double mad_raw = robscale::adaptive_median_select(dev, static_cast<size_t>(n));
+  // Step 2: compute absolute deviations in-place
+  for (int i = 0; i < n; ++i) w[i] = std::abs(w[i] - med);
+
+  // Step 3: select median of deviations
+  double mad_raw = robscale::adaptive_median_select(w, static_cast<size_t>(n));
   return constant * mad_raw;
 }
 

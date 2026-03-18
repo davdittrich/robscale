@@ -1,3 +1,31 @@
+# robscale 0.3.0
+
+## Performance
+
+* **Fused median-then-MAD**: `mad_scaled()` now computes absolute deviations
+  in-place on the median selection buffer, eliminating the second scratch array.
+  Memory drops from $2n$ to $n$ doubles. The same fusion applies to `robScale()`
+  and the ensemble's internal MAD and M-scale paths, reducing total ensemble
+  workspace from $3n$ to $2n$ doubles. Benchmarks show 7--15% speedup at medium
+  $n$ on x86\_64, with no regressions on ARM64 or at small $n$.
+
+* **Noinline small-$n$ dispatch for `robScale()` and `robLoc()`**: extracted
+  shared core logic (`rob_scale_core`, `rob_loc_core`) and separated the
+  small-$n$ path ($n \leq 64$) into `ROBSCALE_NOINLINE` helpers with a 1 KB
+  stack frame. The large-$n$ path retains its 32 KB buffer independently.
+  Benchmarks showed no measurable timing improvement (the R-to-C++ `.Call()`
+  boundary dominates at small $n$), but the refactoring clarifies the code
+  structure and prevents the compiler from penalizing small calls with the
+  large-$n$ stack reservation.
+
+## Internal
+
+* Added `ROBSCALE_NOINLINE` portability macro to `robscale_config.h`
+  (`__attribute__((noinline))` on GCC/Clang, `__declspec(noinline)` on MSVC).
+* `estimators_internal.h`: `mad_from_data()` and `rob_scale()` signatures
+  reduced from three to two buffer arguments.
+* `ensemble.cpp`: workspace allocation reduced from $3n$ to $2n$ doubles.
+
 # robscale 0.2.2
 
 * Tests: Adapted cross-validation tests for compatibility with `revss` v3.0.0,

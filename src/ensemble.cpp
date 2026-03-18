@@ -201,10 +201,11 @@ double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   }
 
   // Final estimates on original data (fresh workspace)
-  std::unique_ptr<double[]> final_ws(new double[3 * static_cast<size_t>(n)]);
+  // Fused MAD and robScale need only 1 buffer each (was 2).
+  // Layout: work1 (n) for mad/iqr/robscale, work_gmd (n) for gmd.
+  std::unique_ptr<double[]> final_ws(new double[2 * static_cast<size_t>(n)]);
   double* work1 = final_ws.get();
-  double* work2 = work1 + n;
-  double* work_gmd = work2 + n;
+  double* work_gmd = work1 + n;
 
   double estimates[N_ESTIMATORS];
   estimates[0] = robscale::internal::sd_c4(xp, n);
@@ -212,11 +213,11 @@ double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   std::memcpy(work_gmd, xp, n * sizeof(double));
   estimates[1] = robscale::internal::gmd(work_gmd, n);
 
-  estimates[2] = robscale::internal::mad_from_data(xp, work1, work2, n);
-  estimates[3] = robscale::internal::iqr(xp, work1, work2, n);
+  estimates[2] = robscale::internal::mad_from_data(xp, work1, n);
+  estimates[3] = robscale::internal::iqr(xp, work1, work_gmd, n);
   estimates[4] = robscale::internal::sn(xp, n);
   estimates[5] = robscale::internal::qn(xp, n);
-  estimates[6] = robscale::internal::rob_scale(xp, work1, work2, n);
+  estimates[6] = robscale::internal::rob_scale(xp, work1, n);
 
   // Weighted combination
   double result = 0.0;
@@ -238,11 +239,11 @@ static void compute_all_estimators(const double* x, int n, double* results,
   std::memcpy(work1, x, n * sizeof(double));
   results[1] = robscale::internal::gmd(work1, n);
 
-  results[2] = robscale::internal::mad_from_data(x, work1, work2, n);
+  results[2] = robscale::internal::mad_from_data(x, work1, n);
   results[3] = robscale::internal::iqr(x, work1, work2, n);
   results[4] = robscale::internal::sn(x, n);
   results[5] = robscale::internal::qn(x, n);
-  results[6] = robscale::internal::rob_scale(x, work1, work2, n);
+  results[6] = robscale::internal::rob_scale(x, work1, n);
 }
 
 // [[Rcpp::export]]
@@ -342,18 +343,17 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
   // --- Point estimates on original data ---
   double estimates[N_ESTIMATORS];
   {
-    std::unique_ptr<double[]> final_ws(new double[3 * static_cast<size_t>(n)]);
+    std::unique_ptr<double[]> final_ws(new double[2 * static_cast<size_t>(n)]);
     double* w1 = final_ws.get();
     double* w2 = w1 + n;
-    double* w3 = w2 + n;
     estimates[0] = robscale::internal::sd_c4(xp, n);
-    std::memcpy(w3, xp, n * sizeof(double));
-    estimates[1] = robscale::internal::gmd(w3, n);
-    estimates[2] = robscale::internal::mad_from_data(xp, w1, w2, n);
+    std::memcpy(w2, xp, n * sizeof(double));
+    estimates[1] = robscale::internal::gmd(w2, n);
+    estimates[2] = robscale::internal::mad_from_data(xp, w1, n);
     estimates[3] = robscale::internal::iqr(xp, w1, w2, n);
     estimates[4] = robscale::internal::sn(xp, n);
     estimates[5] = robscale::internal::qn(xp, n);
-    estimates[6] = robscale::internal::rob_scale(xp, w1, w2, n);
+    estimates[6] = robscale::internal::rob_scale(xp, w1, n);
   }
 
   // Ensemble point estimate

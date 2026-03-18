@@ -767,19 +767,30 @@ Several estimators use an adaptive selection strategy that switches between
 Floyd--Rivest and pdqselect (miniselect) based on a runtime threshold derived
 from the per-core L2 cache size. Section 9 describes this dispatch in detail.
 
-### 4. Arena allocation on the stack
+### 4. Arena allocation and fused single-buffer algorithms
 
 Each estimator requires working arrays: a copy of the input (for destructive
 selection), absolute deviations (for MAD), and a temporary buffer (for bulk
 `tanh` arguments). `revss` allocates these as R vectors, incurring R's SEXPREC
 header overhead and adding garbage-collection pressure.
 
-`robscale` uses a tiered stack-allocated arena: a 128-double micro-buffer
-for $n \leq 64$ and a 2,048-double buffer per array for $n \leq 2{,}048$
-(the MAD and M-estimator paths)---which covers the target regime and far
-beyond---with zero heap allocation. For $n > 2{,}048$, the code falls back to
-`new[]`/`delete[]`. IQR uses a larger 4,096-element stack owing to its single
-working array and wider operational range.
+`robscale` uses a tiered stack-allocated arena: a 64-double micro-buffer
+for $n \leq 64$ and a 2,048-double buffer for $n \leq 2{,}048$, with zero
+heap allocation. For $n > 2{,}048$, the code falls back to `new[]`/`delete[]`.
+
+**Fused median-then-MAD.** The `mad_scaled()` and `robScale()` estimators
+compute the median and MAD on a single working buffer. After the selection
+algorithm positions the median, the buffer contains a permutation of the
+original input. Because MAD is order-invariant---it is the median of absolute
+deviations, and the multiset $\{|w_i - m|\}$ equals $\{|x_i - m|\}$ for any
+permutation $w$ of $x$---the deviations can be computed in-place, eliminating
+the second scratch array. This halves memory from $2n$ to $n$ doubles per
+estimator and reduces cache pressure in the ensemble, where multiple estimators
+share working memory.
+
+The `robLoc()` and `robScale()` entry points separate the small-$n$ path
+($n \leq 64$) into `ROBSCALE_NOINLINE` helpers with a 1 KB stack frame,
+so that the 32 KB large-$n$ buffer does not penalize small calls.
 
 ### 5. Compile-time reciprocal constants
 
@@ -857,10 +868,14 @@ derived from the per-core L2 cache size:
 | $S_n$ | `adaptive_lowmedian_select` | $\max(2048,\; L_2 / (8 \times 2))$ | 2 |
 | $Q_n$ (final) | Inline threshold check | $\max(2048,\; L_2 / (8 \times 4))$ | 4 |
 
-The divisor encodes working-set pressure: `mad_scaled` keeps two arrays plus
-constants warm (divisor 5), `robScale` keeps one to two (divisor 2), and $Q_n$'s
-final diff-window selection contends with sorted data, work arrays, and bounds
-(divisor 4). `iqr_scaled` uses pdqselect unconditionally because its
+The divisor encodes working-set pressure during selection. Since v0.3.0,
+`mad_scaled` uses a fused single-buffer algorithm (one array plus constants
+warm), but the threshold retains the conservative divisor 5 from the two-buffer
+era because the second median selection (on deviations) reuses the same buffer
+and contends with residual cache lines from the first selection. `robScale`
+keeps one to two warm arrays (divisor 2), and $Q_n$'s final diff-window
+selection contends with sorted data, work arrays, and bounds (divisor 4).
+`iqr_scaled` uses pdqselect unconditionally because its
 dual-quartile strategy---selecting $Q_1$ first, then narrowing the search space
 for $Q_3$ to the upper partition---benefits from pdqselect's partitioning
 guarantees at all sizes. Both quartile selections use Type 7 interpolation (the
@@ -880,8 +895,8 @@ each bootstrap replicate $r = 1, \ldots, n_{\text{boot}}$:
 
 1. A deterministic XorShift32 PRNG (Marsaglia, 2003) seeded with $r + 12345$
    draws $n$ indices with replacement.
-2. All 7 estimators are evaluated on the resampled data, sharing pre-allocated
-   work buffers.
+2. All 7 estimators are evaluated on the resampled data, sharing two
+   pre-allocated work buffers of $n$ doubles each ($2n$ total).
 
 After bootstrapping, the inverse-variance weight for each estimator $j$ is:
 
