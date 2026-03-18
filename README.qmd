@@ -631,8 +631,10 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 ## Methodological enhancements
 
 `robscale` implements the estimators defined by Rousseeuw & Verboven (2002) and
-Rousseeuw & Croux (1993). It produces identical numerical results to `revss`
-and `robustbase`, but its computational strategies significantly cut run times
+Rousseeuw & Croux (1993). While it maintains the same core algorithmic
+foundations, the newest version of `revss` uses updated bias correction factors,
+meaning results may not be numerically identical. `robscale` focus remains
+on computational efficiency, where it continues to cut run times significantly
 across all sample sizes.
 
 ### 1. The tanh identity for the logistic psi function
@@ -1102,11 +1104,7 @@ vs `collapse`'s sorting-based approach.
 
 The test suite verifies `robscale` against reference implementations:
 
-**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): compares
-`robscale` and `revss` across 5,400 randomly generated inputs 
-($n = 3, 4,\ldots, 20$; 100 replicates per $n$; all three functions `adm`, `robLoc`,
-`robScale`). All 5,400 comparisons pass at tolerance
-$\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$.
+**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): Comparing `robscale` against the original `revss` algorithm (up to v2.0.0) across 5,400 randomly generated inputs ($n = 3, 4, \ldots, 20$; 100 replicates per $n$; all three functions `adm`, `robLoc`, `robScale`) yields a 100% pass rate at tolerance $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$. While `robscale` maintains this numerical consistency with the established reference, `revss` v3.1.0 has since updated its bias correction factors; `robscale` continues to follow the original Rousseeuw & Verboven (2002) definitions.
 
 **New estimators:**
 
