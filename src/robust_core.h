@@ -117,19 +117,18 @@ ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
 // Selection based median
 ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= 16) {
+  if (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD) {
     robscale::small_sort(x, n);
     return median_sorted(x, n);
   }
   size_t h = (n - 1) / 2;
   robscale::floyd_rivest_select(x, x + h, x + n);
   if (n & 1) return x[h];
-  
+
   double v1 = x[h];
-  double v2 = x[h + 1];
-  for (size_t i = h + 2; i < n; ++i) {
-    if (x[i] < v2) v2 = x[i];
-  }
+  // After floyd_rivest_select, x[h+1..n-1] are all >= x[h].
+  // min_element vectorises to MINPD and has no loop-carried branch dependency.
+  double v2 = *std::min_element(x + h + 1, x + n);
   return (v1 + v2) * 0.5;
 }
 

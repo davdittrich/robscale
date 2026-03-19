@@ -79,7 +79,7 @@
 #'
 #' @keywords univar robust
 #' @export
-adm <- function(x, center, constant = 1.2533141373155001, na.rm = FALSE) {
+adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE) {
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -88,9 +88,9 @@ adm <- function(x, center, constant = 1.2533141373155001, na.rm = FALSE) {
     }
   }
   if (length(x) == 0L) return(NA_real_)
-  if (missing(center)) {
-    adm_impl_auto(x, constant)
+  if (is.null(center)) {
+    .Call(`_robscale_adm_impl_auto`, x, constant)
   } else {
-    adm_impl(x, center, constant)
+    .Call(`_robscale_adm_impl`, x, center, constant)
   }
 }

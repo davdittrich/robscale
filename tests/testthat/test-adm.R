@@ -31,6 +31,13 @@ test_that("adm handles explicit center and edge cases", {
   expect_equal(adm(c(5, 5, 5, 5)), 0)
 })
 
+test_that("center = NULL is equivalent to omitting center", {
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(42)
+  x <- rnorm(9)
+  expect_equal(adm(x, center = NULL), adm(x), tolerance = tol)
+})
+
 test_that("sorting networks work for adm", {
   tol <- sqrt(.Machine$double.eps)
   for (n in 2:8) {
@@ -39,5 +46,35 @@ test_that("sorting networks work for adm", {
                  mean(abs(x_rev - median(x_rev))),
                  tolerance = tol,
                  label = paste0("sort_net reverse n=", n))
+  }
+})
+
+test_that("median_select is correct for n = 17..64 (odd and even)", {
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(99)
+  for (n in 17:64) {
+    x <- rnorm(n)
+    expect_equal(adm(x, constant = 1),
+                 mean(abs(x - median(x))),
+                 tolerance = tol,
+                 label = paste0("n=", n))
+  }
+})
+
+test_that("adm is correct for n = 65..200 (AVX2 path)", {
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(77)
+  for (n in c(65, 66, 67, 68, 100, 128, 200)) {
+    x <- rnorm(n)
+    expect_equal(adm(x, constant = 1),
+                 mean(abs(x - median(x))),
+                 tolerance = tol,
+                 label = paste0("n=", n))
+    # Also with explicit center
+    ctr <- median(x)
+    expect_equal(adm(x, center = ctr, constant = 1),
+                 mean(abs(x - ctr)),
+                 tolerance = tol,
+                 label = paste0("n=", n, " known center"))
   }
 })

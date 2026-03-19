@@ -33,6 +33,17 @@
 #define ROBSCALE_SN_STACK_THRESHOLD    2048
 #define ROBSCALE_SORT_BOOST_THRESHOLD  512
 
+/**
+ * Threshold for median_select: use small_sort (NBIS) for n <= this value,
+ * floyd_rivest_select for n > this value. Empirically calibrated: NBIS
+ * (branchless O(n²)) beats floyd_rivest_select for small n because NBIS has
+ * zero branch mispredictions and full L1 residency. Set conservatively at 32;
+ * raise after benchmarking Phase 3+4 of the optimization plan.
+ */
+#ifndef ROBSCALE_SORT_MEDIAN_THRESHOLD
+#define ROBSCALE_SORT_MEDIAN_THRESHOLD 64
+#endif
+
 
 // --- Portability & Optimization Macros ---
 

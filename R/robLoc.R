@@ -113,5 +113,5 @@ robLoc <- function(x, scale = NULL, na.rm = FALSE, maxit = 80L,
   if (length(x) == 0L) return(NA_real_)
   has_scale <- !is.null(scale)
   scale_val <- if (has_scale) scale else 0.0
-  rob_loc_impl(x, has_scale, scale_val, maxit, tol)
+  .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
