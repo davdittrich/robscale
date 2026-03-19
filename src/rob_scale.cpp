@@ -120,15 +120,30 @@ static double rob_scale_core(const double* xp, size_t n,
                              bool has_loc, double loc_val,
                              double implbound, int maxit,
                              double tol, int fallback) {
+  // For n <= ROBSCALE_SORT_MEDIAN_THRESHOLD (64), median_net is always the
+  // right path.  Calling it directly avoids: RuntimeConfig::get() (TLS),
+  // the pdq_robscale_threshold comparison, and two function frames — ~3 ns
+  // per call, ~6 ns total (median + MAD), on a ~50–200 ns small-n call.
+  const bool is_small = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
+
   double t, s_init;
   if (has_loc) {
     t = loc_val;
     for (size_t i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - t);
-    s_init = robscale::MAD_CONSISTENCY * robscale::adaptive_robscale_median_select(dev, n);
+    s_init = robscale::MAD_CONSISTENCY *
+        (is_small ? robscale::median_net(dev, n)
+                  : robscale::adaptive_robscale_median_select(dev, n));
   } else {
     std::memcpy(w, xp, n * sizeof(double));
-    t = robscale::adaptive_robscale_median_select(w, n);
-    s_init = robscale::adaptive_mad_select(xp, (int)n, t, dev);
+    t = is_small ? robscale::median_net(w, n)
+                 : robscale::adaptive_robscale_median_select(w, n);
+    // After median selection, w[] is permuted but holds the same multiset as
+    // xp[].  Reading deviations from warm w[] instead of cold xp[] avoids an
+    // extra scan of the original data; MAD is permutation-invariant.
+    for (size_t i = 0; i < n; ++i) dev[i] = std::abs(w[i] - t);
+    s_init = robscale::MAD_CONSISTENCY *
+        (is_small ? robscale::median_net(dev, n)
+                  : robscale::adaptive_robscale_median_select(dev, n));
   }
 
   int minobs = has_loc ? 3 : 4;
