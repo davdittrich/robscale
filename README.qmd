@@ -1016,9 +1016,10 @@ knitr::include_graphics(tar_read(speedup_figure))
 
 - **Machine:** AMD Ryzen 9 5900HX with Radeon Graphics
 - **CPU Governor:** powersave
-- **OS:** Arch Linux
+- **OS:** Arch Linux (Kernel 6.13.5-arch1-1)
 - **R version:** R version 4.5.3 (2026-03-11)
 - **Package version:** 0.3.0 (baseline comparisons against `robustbase` 0.99.7, `revss` 3.1.0, `Hmisc` 5.2.5, `GiniDistance` 0.1.1, and `collapse` 2.1.6)
+- **Compile flags:** `-march=native -mtune=native -O3 -fno-math-errno -pipe -fPIC -fopenmp -DROBSCALE_HAS_OMP_SIMD -DROBSCALE_HAS_SLEEF -DUSE_DIRECT_TBB -DROBSCALE_HAS_OMP_PARALLEL`
 - **SLEEF (Optimized Build):** Detected
 - **Date:** 2026-03-19
 
