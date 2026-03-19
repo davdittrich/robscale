@@ -118,8 +118,7 @@ ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
 ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD) {
-    robscale::small_sort(x, n);
-    return median_sorted(x, n);
+    return robscale::median_net(x, n);
   }
   size_t h = (n - 1) / 2;
   robscale::floyd_rivest_select(x, x + h, x + n);
