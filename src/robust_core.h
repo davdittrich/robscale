@@ -53,8 +53,10 @@ namespace robscale {
 #endif
 
 // Bulk tanh: vectorized via Accelerate (macOS), SLEEF (Linux), or OpenMP SIMD
+// Scalar fallback only for n<8: at n<8 SIMD setup overhead exceeds the gain
+// (fewer than 2 full AVX2 vectors). For n>=8, use SIMD path.
 inline void bulk_tanh(double* inout, int n) {
-  if (n <= 64) {
+  if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
     return;
   }
