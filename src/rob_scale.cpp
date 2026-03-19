@@ -3,6 +3,13 @@
 #include "pdq_select.h"
 #include <Rcpp.h>
 #include <memory>
+#if defined(ROBSCALE_HAS_SYSTEM_TBB)
+#  include <oneapi/tbb/parallel_reduce.h>
+#  include <oneapi/tbb/blocked_range.h>
+#elif defined(USE_DIRECT_TBB)
+#  include <tbb/parallel_reduce.h>
+#  include <tbb/blocked_range.h>
+#endif
 
 // ---------------------------------------------------------------------------
 // Phase 2: Fused per-iteration kernel
@@ -61,6 +68,86 @@ static double rob_scale_fused_sum_avx2(const double* ROBSCALE_RESTRICT data,
   return sum_rho;
 }
 #endif // ROBSCALE_HAS_SLEEF && ROBSCALE_HAS_AVX2_DISPATCH
+
+// ---------------------------------------------------------------------------
+// Phase 4: TBB parallel iteration kernel
+//
+// Each iteration of rob_scale_compute is a reduction over n elements:
+//   sum_rho = sum_i tanh((data[i]-off)*hinv)^2
+// The reduction is embarrassingly parallel; the serial dep is only the
+// s update between iterations.
+//
+// This function is called only from rob_scale_core when:
+//   (a) USE_DIRECT_TBB is defined (TBB available)
+//   (b) ROBSCALE_HAS_SLEEF + ROBSCALE_HAS_AVX2_DISPATCH (fused kernel available)
+//   (c) n >= rob_scale_parallel_threshold (amortises TBB overhead)
+//   (d) AVX2 confirmed at runtime
+//
+// rob_scale_compute (single-threaded) is kept unchanged for the ensemble
+// bootstrap path which already parallelises over bootstrap replications.
+// ---------------------------------------------------------------------------
+#if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
+    defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
+                                          size_t n, double data_offset,
+                                          double s, int maxit, double tol) {
+  const double inv_n = 1.0 / static_cast<double>(n);
+  const size_t grain  = robscale::qnsn::RuntimeConfig::get().grain_size;
+
+  for (int k = 0; k < maxit; ++k) {
+    const double half_inv_sc = 0.5 * robscale::INV_RHO_SCALE_CONST / s;
+
+    // Split array into grain-sized blocks; each block runs rob_scale_fused_sum_avx2
+    // independently, then TBB reduces the partial sums.
+    const double sum_rho = tbb::parallel_reduce(
+      tbb::blocked_range<size_t>(0, n, grain),
+      0.0,
+      [data, data_offset, half_inv_sc]
+      (const tbb::blocked_range<size_t>& r, double acc) -> double {
+        return acc + rob_scale_fused_sum_avx2(
+            data + r.begin(), static_cast<int>(r.size()),
+            data_offset, half_inv_sc);
+      },
+      std::plus<double>{}
+    );
+
+    double v = std::sqrt(2.0 * sum_rho * inv_n);
+    s *= v;
+    if (std::abs(v - 1.0) <= tol) break;
+  }
+  return s;
+}
+#elif defined(ROBSCALE_HAS_OMP_PARALLEL) && \
+      defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+      defined(ROBSCALE_HAS_AVX2_DISPATCH)
+// OpenMP fallback: same grain-chunked structure, parallel_for + reduction.
+static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
+                                          size_t n, double data_offset,
+                                          double s, int maxit, double tol) {
+  const double inv_n   = 1.0 / static_cast<double>(n);
+  const size_t grain   = robscale::qnsn::RuntimeConfig::get().grain_size;
+  const size_t nchunks = (n + grain - 1) / grain;
+
+  for (int k = 0; k < maxit; ++k) {
+    const double half_inv_sc = 0.5 * robscale::INV_RHO_SCALE_CONST / s;
+    double sum_rho = 0.0;
+
+#pragma omp parallel for reduction(+:sum_rho) schedule(static)
+    for (size_t c = 0; c < nchunks; ++c) {
+      size_t begin = c * grain;
+      size_t end   = std::min(begin + grain, n);
+      sum_rho += rob_scale_fused_sum_avx2(data + begin, (int)(end - begin),
+                                           data_offset, half_inv_sc);
+    }
+
+    double v = std::sqrt(2.0 * sum_rho * inv_n);
+    s *= v;
+    if (std::abs(v - 1.0) <= tol) break;
+  }
+  return s;
+}
+#endif // parallel backends
 
 /**
  * Portably optimized robScale kernel.
@@ -168,6 +255,21 @@ static double rob_scale_core(const double* xp, size_t n,
   if (ROBSCALE_UNLIKELY(s_init == 0.0)) {
     return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
   }
+
+  // Phase 4: dispatch to parallel kernel for large n.
+  // Only from this call site (the user-facing path); ensemble_one_replicate
+  // calls rob_scale_compute directly to avoid nesting inside its own TBB loop.
+#if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB) || \
+     defined(ROBSCALE_HAS_OMP_PARALLEL)) && \
+    defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  {
+    const auto& cfg = robscale::qnsn::RuntimeConfig::get();
+    if (n >= cfg.rob_scale_parallel_threshold &&
+        cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2)
+      return rob_scale_parallel_compute(xp, n, t, s_init, maxit, tol);
+  }
+#endif
 
   return rob_scale_compute(xp, n, t, s_init, maxit, tol, w);
 }

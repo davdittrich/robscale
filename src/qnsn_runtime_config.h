@@ -20,6 +20,7 @@ public:
   size_t sn_stack_threshold;
   size_t sn_parallel_threshold;
   size_t qn_parallel_threshold;
+  size_t rob_scale_parallel_threshold; // parallel fused kernel for robScale
   size_t sort_boost_threshold;
   size_t sort_tbb_threshold;
   size_t pdq_median_threshold;
@@ -70,6 +71,12 @@ private:
     // Sn: inner loop accesses sorted_x + writes inner_medians (2 arrays)
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
+
+    // rob_scale_parallel: fused AVX2 kernel reads n doubles per iteration.
+    // Divisor=4 gives threshold where one iteration's data fits in per-core L2
+    // with headroom for prefetch; floor at 4096 to guarantee TBB amortises.
+    rob_scale_parallel_threshold = (std::max)(size_t(4096),
+        per_core_l2 / (sizeof(double) * 4));
 
     // --- Adaptive median-selection thresholds ---
     // Below threshold: FR-based selection wins (lower overhead at medium n).

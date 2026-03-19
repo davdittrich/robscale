@@ -51,6 +51,53 @@ if [ "$(uname -s)" = "Darwin" ]; then
   echo "  macOS detected, linking Accelerate framework"
 fi
 
+# ── TBB backend detection ────────────────────────────────────────────────────
+# Priority 1: system oneTBB  (explicit -ltbb, modern scheduler)
+# Priority 2: RcppParallel bundled TBB  (explicit link to its libtbb.so)
+# Priority 3: OpenMP thread-level parallel (#pragma omp parallel fallback)
+TBB_DEFINE=""
+TBB_LIBS=""
+OMP_PARALLEL_CFLAGS=""
+OMP_PARALLEL_LIBS=""
+
+SYSTEM_TBB_LIB=""
+SYSTEM_TBB_HEADER=""
+for libdir in /usr/lib /usr/local/lib; do
+  if [ -f "${libdir}/libtbb.so" ]; then
+    SYSTEM_TBB_LIB="${libdir}"
+    break
+  fi
+done
+for incdir in /usr/include /usr/local/include; do
+  if [ -f "${incdir}/oneapi/tbb/parallel_reduce.h" ]; then
+    SYSTEM_TBB_HEADER="${incdir}"
+    break
+  fi
+done
+
+if [ -n "${SYSTEM_TBB_LIB}" ] && [ -n "${SYSTEM_TBB_HEADER}" ]; then
+  TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB"
+  TBB_LIBS="-L${SYSTEM_TBB_LIB} -ltbb"
+  echo "  System oneTBB detected (${SYSTEM_TBB_LIB}/libtbb.so), using -ltbb"
+else
+  RCPP_PAR_LIB=""
+  if [ -n "${R_HOME}" ]; then
+    RCPP_PAR_LIB=$("${R_HOME}/bin/Rscript" --no-save -e \
+      "cat(system.file('lib', package='RcppParallel', mustWork=FALSE))" \
+      2>/dev/null || true)
+  fi
+  if [ -n "${RCPP_PAR_LIB}" ] && [ -f "${RCPP_PAR_LIB}/libtbb.so" ]; then
+    TBB_DEFINE="-DUSE_DIRECT_TBB"
+    TBB_LIBS="-L${RCPP_PAR_LIB} -ltbb -Wl,-rpath,${RCPP_PAR_LIB}"
+    echo "  RcppParallel TBB detected at ${RCPP_PAR_LIB}, using -ltbb"
+  else
+    TBB_DEFINE="-DROBSCALE_HAS_OMP_PARALLEL"
+    OMP_PARALLEL_CFLAGS='$(SHLIB_OPENMP_CXXFLAGS)'
+    OMP_PARALLEL_LIBS='$(SHLIB_OPENMP_CXXFLAGS)'
+    echo "  No TBB found, using OpenMP parallel fallback"
+  fi
+fi
+
 # Force recompilation when flags change (make doesn't track PKG_CXXFLAGS)
 rm -f src/*.o src/robscale.so
 
@@ -60,6 +107,10 @@ sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
     -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
     -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
+    -e "s|@TBB_DEFINE@|${TBB_DEFINE}|" \
+    -e "s|@TBB_LIBS@|${TBB_LIBS}|" \
+    -e "s|@OMP_PARALLEL_CFLAGS@|${OMP_PARALLEL_CFLAGS}|" \
+    -e "s|@OMP_PARALLEL_LIBS@|${OMP_PARALLEL_LIBS}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"
