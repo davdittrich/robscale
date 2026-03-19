@@ -138,12 +138,16 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
   n <- length(x)
   if (n == 0L) return(NA_real_)
 
-  fallback <- match.arg(fallback)
-  fallback_code <- if (fallback == "adm") 0L else 1L
+  fallback_code <- if (length(fallback) == 2L) {
+    0L  # default: "adm"
+  } else {
+    fallback <- match.arg(fallback)
+    if (fallback == "adm") 0L else 1L
+  }
 
   has_loc <- !is.null(loc)
   loc_val <- if (has_loc) loc else 0.0
-  res <- rob_scale_impl(x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
+  res <- .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
   if (ci) return(.analytical_ci(res, n, are = 0.55, level, "robScale"))
   res
 }

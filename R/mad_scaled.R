@@ -60,7 +60,7 @@
 #'
 #' @keywords univar robust
 #' @export
-mad_scaled <- function(x, center, constant = 1.482602218505602, na.rm = FALSE,
+mad_scaled <- function(x, center = NULL, constant = 1.482602218505602, na.rm = FALSE,
                        ci = FALSE, level = 0.95) {
   if (na.rm) {
     x <- x[!is.na(x)]
@@ -71,10 +71,10 @@ mad_scaled <- function(x, center, constant = 1.482602218505602, na.rm = FALSE,
   }
   n <- length(x)
   if (n == 0L) return(NA_real_)
-  if (missing(center)) {
-    res <- mad_impl_auto(x, constant)
+  if (is.null(center)) {
+    res <- .Call(`_robscale_mad_impl_auto`, x, constant)
   } else {
-    res <- mad_impl_center(x, center, constant)
+    res <- .Call(`_robscale_mad_impl_center`, x, center, constant)
   }
   if (ci) return(.analytical_ci(res, n, are = 0.368, level, "mad_scaled"))
   res

@@ -40,3 +40,12 @@ test_that("robScale handles NAs and edge cases", {
   expect_equal(robScale(5), 0)
   expect_equal(robScale(c(5, 5, 5, 5)), 0)
 })
+
+test_that("robScale default and explicit fallback='adm' give identical results", {
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(42)
+  x <- rnorm(9)
+  expect_equal(robScale(x), robScale(x, fallback = "adm"), tolerance = tol)
+  expect_equal(robScale(c(5, 5, 5, 5, 6)),
+               robScale(c(5, 5, 5, 5, 6), fallback = "adm"), tolerance = tol)
+})

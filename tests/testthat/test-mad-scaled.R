@@ -87,3 +87,10 @@ test_that("mad_scaled with supplied center still works", {
                  label = paste("center, n =", n))
   }
 })
+
+test_that("mad_scaled center = NULL is equivalent to omitting center", {
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(42)
+  x <- rnorm(9)
+  expect_equal(mad_scaled(x, center = NULL), mad_scaled(x), tolerance = tol)
+})
