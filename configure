@@ -100,20 +100,35 @@ OMP_PARALLEL_LIBS=""
 
 SYSTEM_TBB_LIB=""
 SYSTEM_TBB_HEADER=""
-for libdir in /usr/lib /usr/local/lib; do
-  if [ -f "${libdir}/libtbb.so" ]; then
+for libdir in /usr/lib /usr/lib64 /usr/lib/x86_64-linux-gnu \
+              /usr/lib/aarch64-linux-gnu /usr/lib/arm-linux-gnueabihf \
+              /usr/local/lib /opt/homebrew/lib; do
+  if [ -f "${libdir}/libtbb.so" ] || [ -f "${libdir}/libtbb.dylib" ]; then
     SYSTEM_TBB_LIB="${libdir}"
     break
   fi
 done
-for incdir in /usr/include /usr/local/include; do
+for incdir in /usr/include /usr/local/include /opt/homebrew/include; do
   if [ -f "${incdir}/oneapi/tbb/parallel_reduce.h" ]; then
     SYSTEM_TBB_HEADER="${incdir}"
     break
   fi
 done
 
-if [ -n "${SYSTEM_TBB_LIB}" ] && [ -n "${SYSTEM_TBB_HEADER}" ]; then
+# pkg-config fallback if path search failed
+if [ -z "${SYSTEM_TBB_LIB}" ] || [ -z "${SYSTEM_TBB_HEADER}" ]; then
+  if pkg-config --exists tbb 2>/dev/null; then
+    SYSTEM_TBB_LIB="pkg-config"
+    SYSTEM_TBB_HEADER="pkg-config"
+    TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB $(pkg-config --cflags tbb)"
+    TBB_LIBS="$(pkg-config --libs tbb)"
+    echo "  System oneTBB detected via pkg-config"
+  fi
+fi
+
+if [ "${SYSTEM_TBB_LIB}" = "pkg-config" ]; then
+  : # TBB_DEFINE and TBB_LIBS already set above by pkg-config
+elif [ -n "${SYSTEM_TBB_LIB}" ] && [ -n "${SYSTEM_TBB_HEADER}" ]; then
   TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB"
   TBB_LIBS="-L${SYSTEM_TBB_LIB} -ltbb"
   echo "  System oneTBB detected (${SYSTEM_TBB_LIB}/libtbb.so), using -ltbb"

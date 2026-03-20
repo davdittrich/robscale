@@ -122,6 +122,28 @@ private:
 
   void discover_windows() {
 #ifdef _WIN32
+    DWORD len = 0;
+    GetLogicalProcessorInformation(nullptr, &len);
+    if (len > 0) {
+      std::vector<SYSTEM_LOGICAL_PROCESSOR_INFORMATION>
+        buf(len / sizeof(SYSTEM_LOGICAL_PROCESSOR_INFORMATION));
+      if (GetLogicalProcessorInformation(buf.data(), &len)) {
+        size_t phys = 0;
+        for (size_t i = 0; i < buf.size(); ++i) {
+          if (buf[i].Relationship == RelationCache &&
+              buf[i].Cache.Level == 2) {
+            l2_cache_size = buf[i].Cache.Size;
+          }
+          if (buf[i].Relationship == RelationProcessorCore) {
+            phys++;
+          }
+        }
+        if (phys > 0) num_physical_cores = phys;
+        l2_per_core = (num_physical_cores > 0)
+                        ? l2_cache_size / num_physical_cores
+                        : l2_cache_size;
+      }
+    }
 #endif
   }
 
