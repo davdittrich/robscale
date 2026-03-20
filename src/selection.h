@@ -12,6 +12,11 @@ void floyd_rivest_select(Iter left_in, Iter k, Iter right_in) {
   using T = typename std::iterator_traits<Iter>::value_type;
   size_t n = static_cast<size_t>(std::distance(left_in, right_in));
   if (n < 600) {
+    // Floyd-Rivest recursion threshold. For n < 600, std::nth_element
+    // is faster because FR's overhead (log, exp, sqrt for pivot selection)
+    // exceeds the gain from better expected partitioning.
+    // Note: median_select() already dispatches to median_net for n <= 64,
+    // so this branch handles n in [65, 599] from FR callers.
     std::nth_element(left_in, k, right_in);
     return;
   }
