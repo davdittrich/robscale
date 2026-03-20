@@ -11,26 +11,12 @@
 #include "qnsn_dispatcher.h"
 #include "qnsn_runtime_config.h"
 
-#include <RcppParallel.h>
-#ifdef USE_DIRECT_TBB
-// Include TBB headers
-#include <tbb/parallel_for.h>
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
-#endif
+#include "worker_compat.h"
 #include <algorithm>
 #include <memory>
 #include <type_traits>
 #include <cassert>
 #include <vector>
-
-#ifdef USE_DIRECT_TBB
-struct WorkerBase {};
-using SplitType = tbb::split;
-#else
-using WorkerBase = RcppParallel::Worker;
-using SplitType = RcppParallel::Split;
-#endif
 
 namespace robscale::qnsn {
 
