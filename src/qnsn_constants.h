@@ -36,6 +36,7 @@ inline constexpr double factors_qn[] = {
     0.98295, 0.96139, 0.98329, 0.96212, 0.98363, 0.96294, 0.98399, 0.96364, 0.98430, 0.96438};
 
 inline double get_sn_factor(size_t n) {
+  if (n < 2) return 0.0;  // undefined for n < 2; callers must check
   if (n <= 100)
     return factors_sn[n - 1];
   double inv_n = 1.0 / static_cast<double>(n);
@@ -46,6 +47,7 @@ inline double get_sn_factor(size_t n) {
 }
 
 inline double get_qn_factor(size_t n) {
+  if (n < 2) return 0.0;  // undefined for n < 2; callers must check
   if (n <= 100)
     return factors_qn[n - 1];
   double inv_n = 1.0 / static_cast<double>(n);
