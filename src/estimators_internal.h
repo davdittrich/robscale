@@ -134,7 +134,7 @@ inline double rob_scale(const double* x, double* buf, int n) {
   double s_init = MAD_CONSISTENCY * robscale::median_select(buf, static_cast<size_t>(n));
 
   // MAD implosion: return ADM fallback
-  if (s_init <= 1e-4) {
+  if (s_init <= robscale::IMPLOSION_BOUND) {
     return robscale::adm_core(x, n, t, ADM_CONSISTENCY);
   }
 

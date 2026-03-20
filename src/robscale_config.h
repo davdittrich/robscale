@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cmath>
+#include <memory>
 
 /**
  * robscale_config.h
@@ -98,7 +99,15 @@ namespace robscale {
   constexpr double GMD_CONSISTENCY      = 0.886226925452758;  // sqrt(pi)/2
   constexpr double IQR_CONSISTENCY      = 0.741301109252801;  // 1/(Phi^-1(0.75) - Phi^-1(0.25))
   constexpr double RHO_SCALE_CONST      = 0.37394112142347236;
-  constexpr double INV_RHO_SCALE_CONST  = 1.0 / 0.37394112142347236;
+  constexpr double INV_RHO_SCALE_CONST  = 1.0 / RHO_SCALE_CONST;  // N3
+
+  /// MAD implosion threshold for M-scale and ensemble estimators.
+  /// When MAD(x) <= IMPLOSION_BOUND, more than 50% of observations are tied
+  /// and the scale is degenerate; triggers ADM fallback.
+  /// Value 1e-4: small enough to be effectively zero for practical scales,
+  /// but above floating-point noise for data with legitimate small spread.
+  /// Ref: Rousseeuw & Verboven (2002), Sec. 4.3.
+  constexpr double IMPLOSION_BOUND = 1e-4;
 
   // c4(n) consistency constant for unbiased standard deviation
   // Formula: sqrt(2/(n-1)) * Gamma(n/2) / Gamma((n-1)/2)
@@ -110,6 +119,24 @@ namespace robscale {
   }
 }
 
+
+/// Tiered stack/heap scratch buffer.
+/// N_MICRO: fits in L1 (hot path for very small n, zero malloc overhead).
+/// N_STACK: fits in L2 (medium n, no heap allocation).
+/// Falls back to heap for n > N_STACK.
+template <size_t N_MICRO = 128, size_t N_STACK = 2048>
+struct StackArena {
+  double buf_micro[N_MICRO];
+  double buf_stack[N_STACK];
+  std::unique_ptr<double[]> heap;
+
+  double* get(size_t n) {
+    if (n <= N_MICRO) return buf_micro;
+    if (n <= N_STACK) return buf_stack;
+    heap.reset(new double[n]);
+    return heap.get();
+  }
+};
 
 // --- Runtime SIMD dispatch ---
 // Per-function target attributes: the compiler emits AVX2/FMA instructions
