@@ -45,4 +45,5 @@
 #' @useDynLib robscale, .registration = TRUE
 #' @importFrom Rcpp sourceCpp
 #' @importFrom RcppParallel RcppParallelLibs
+#' @importFrom stats qchisq qnorm
 NULL

@@ -46,10 +46,10 @@ namespace robscale {
 constexpr double ARE_ROBSCALE   = 0.55;
 constexpr double ARE_QN         = 0.82;
 constexpr double ARE_SN         = 0.58;
-constexpr double ARE_GMD        = 0.95;
-constexpr double ARE_MAD        = 0.37;
+constexpr double ARE_GMD        = 0.98;
+constexpr double ARE_MAD        = 0.368;
 constexpr double ARE_IQR        = 0.37;
-constexpr double ARE_ADM        = 0.37;
+constexpr double ARE_ADM        = 0.88;
 constexpr double ARE_SD_C4      = 1.00;
 
 // --- Low-level Kernels ---
