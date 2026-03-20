@@ -57,10 +57,6 @@ C_get_qn_factor <- function(n) {
     .Call(`_robscale_C_get_qn_factor`, n)
 }
 
-cpp_get_are_constants <- function() {
-    .Call(`_robscale_cpp_get_are_constants`)
-}
-
 rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
