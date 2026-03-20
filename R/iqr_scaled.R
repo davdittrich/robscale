@@ -68,6 +68,6 @@ iqr_scaled <- function(x, constant = 0.741301109252801, na.rm = FALSE,
   n <- length(x)
   if (n == 0L) return(NA_real_)
   res <- iqr_impl(x, constant)
-  if (ci) return(.analytical_ci(res, n, are = 0.37, level, "iqr_scaled"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values$iqr, level, "iqr_scaled"))
   res
 }

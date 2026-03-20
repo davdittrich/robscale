@@ -175,6 +175,16 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_get_are_constants
+Rcpp::NumericVector cpp_get_are_constants();
+RcppExport SEXP _robscale_cpp_get_are_constants() {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    rcpp_result_gen = Rcpp::wrap(cpp_get_are_constants());
+    return rcpp_result_gen;
+END_RCPP
+}
 // rob_loc_impl
 double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val, int maxit, double tol);
 RcppExport SEXP _robscale_rob_loc_impl(SEXP xSEXP, SEXP has_scaleSEXP, SEXP scale_valSEXP, SEXP maxitSEXP, SEXP tolSEXP) {
@@ -278,6 +288,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_C_qn_int_fast", (DL_FUNC) &_robscale_C_qn_int_fast, 1},
     {"_robscale_get_qnsn_config", (DL_FUNC) &_robscale_get_qnsn_config, 0},
     {"_robscale_C_get_qn_factor", (DL_FUNC) &_robscale_C_get_qn_factor, 1},
+    {"_robscale_cpp_get_are_constants", (DL_FUNC) &_robscale_cpp_get_are_constants, 0},
     {"_robscale_rob_loc_impl", (DL_FUNC) &_robscale_rob_loc_impl, 5},
     {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 7},
     {"_robscale_sd_c4_impl", (DL_FUNC) &_robscale_sd_c4_impl, 1},

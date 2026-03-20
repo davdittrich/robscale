@@ -4,7 +4,14 @@
 \alias{adm}
 \title{Average Distance to the Median}
 \usage{
-adm(x, center, constant = 1.2533141373155, na.rm = FALSE)
+adm(
+  x,
+  center = NULL,
+  constant = 1.2533141373155,
+  na.rm = FALSE,
+  ci = FALSE,
+  level = 0.95
+)
 }
 \arguments{
 \item{x}{A numeric vector.}
@@ -21,6 +28,12 @@ absolute deviation.}
 \item{na.rm}{Logical.  If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation.  If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
+
+\item{ci}{Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+with the point estimate and asymptotic confidence interval.
+Default: \code{FALSE}.}
+
+\item{level}{Confidence level for the interval (default 0.95).}
 }
 \value{
 A single numeric value: the scaled mean absolute deviation from the

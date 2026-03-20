@@ -68,6 +68,6 @@ gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE,
   n <- length(x)
   if (n == 0L) return(NA_real_)
   res <- gmd_impl(x, constant)
-  if (ci) return(.analytical_ci(res, n, are = 0.98, level, "gmd"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values$gmd, level, "gmd"))
   res
 }

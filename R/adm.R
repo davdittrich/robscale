@@ -14,6 +14,10 @@
 #' @param na.rm Logical.  If \code{TRUE}, \code{NA} values are stripped from
 #'   \code{x} before computation.  If \code{FALSE} (the default), the presence
 #'   of any \code{NA} raises an error.
+#' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
+#'   with the point estimate and asymptotic confidence interval.
+#'   Default: \code{FALSE}.
+#' @param level Confidence level for the interval (default 0.95).
 #'
 #' @details
 #' The average distance to the median (ADM) is defined as
@@ -79,7 +83,8 @@
 #'
 #' @keywords univar robust
 #' @export
-adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE) {
+adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
+                ci = FALSE, level = 0.95) {
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -89,8 +94,10 @@ adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE) 
   }
   if (length(x) == 0L) return(NA_real_)
   if (is.null(center)) {
-    .Call(`_robscale_adm_impl_auto`, x, constant)
+    res <- .Call(`_robscale_adm_impl_auto`, x, constant)
   } else {
-    .Call(`_robscale_adm_impl`, x, center, constant)
+    res <- .Call(`_robscale_adm_impl`, x, center, constant)
   }
+  if (ci) return(.analytical_ci(res, length(x), are = .are_values$adm, level, "adm"))
+  res
 }
