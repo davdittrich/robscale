@@ -19,9 +19,10 @@
 // with 32 iterations that is 1 GB of tmp traffic.
 //
 // The fused kernel collapses all three passes into one, reading data[] once
-// and never touching tmp[].  Uses Sleef_tanhd4_u10avx2 + 4-wide FMA
-// accumulation; FP results are within 1e-12 of the 3-pass path (golden
-// test tolerance) even though the accumulation order differs slightly.
+// and never touching tmp[].  Uses ROBSCALE_TANH4_AVX2 (libmvec preferred,
+// SLEEF fallback) + 4-wide FMA accumulation; FP results are within 1e-12
+// of the 3-pass path (golden test tolerance) even though the accumulation
+// order differs slightly.
 // ---------------------------------------------------------------------------
 
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
@@ -29,8 +30,9 @@
 /**
  * Fused sum: compute sum_i tanh((data[i]-off)*hinv)^2 in one pass.
  *
- * Uses Sleef_tanhd4_u10avx2 + FMA accumulation into 4 independent SIMD
- * lanes, avoiding the serial scalar-extraction dependency chain that would
+ * Uses ROBSCALE_TANH4_AVX2 (glibc libmvec _ZGVdN4v_tanh when available,
+ * SLEEF Sleef_tanhd4_u10avx2 otherwise) + FMA accumulation into 4 independent
+ * SIMD lanes, avoiding the serial scalar-extraction dependency chain that would
  * otherwise serialise the accumulation loop.  A horizontal sum at the end
  * collapses the 4 lanes.  FP rounding differs from the 3-pass scalar sum
  * by at most n*eps*sum_rho ≈ 1e-12 for the golden test sizes (n ≤ 20),
@@ -50,7 +52,7 @@ static double rob_scale_fused_sum_avx2(const double* ROBSCALE_RESTRICT data,
   int i = 0;
   for (; i + 4 <= n; i += 4) {
     __m256d d = _mm256_loadu_pd(data + i);
-    __m256d t = Sleef_tanhd4_u10avx2(
+    __m256d t = ROBSCALE_TANH4_AVX2(
         _mm256_mul_pd(_mm256_sub_pd(d, off4), hinv4));
     acc = _mm256_fmadd_pd(t, t, acc);  // acc[lane] += t[lane]^2, 4-wide
   }
