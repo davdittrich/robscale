@@ -1,13 +1,14 @@
-# Not exported; called by individual estimator functions when ci = TRUE
-.are_values <- list(
-  qn       = 0.82,
-  sn       = 0.58,
-  robScale = 0.55,
-  gmd      = 0.98,
-  mad      = 0.368,
-  iqr      = 0.37,
-  adm      = 0.88,
-  sd_c4    = 1.00
+# Not exported; called by individual estimator functions when ci = TRUE.
+# Source: Rousseeuw & Croux (1993) and standard references.
+.are_values <- c(
+  sd_c4      = 1.00,
+  gmd        = 0.98,
+  mad_scaled = 0.368,
+  iqr_scaled = 0.37,
+  sn         = 0.58,
+  qn         = 0.82,
+  robScale   = 0.55,
+  adm        = 0.88
 )
 
 # ARE-based normal approximation CI (all estimators except sd_c4)
