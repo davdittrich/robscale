@@ -129,12 +129,6 @@ struct QnRefineWorker : public WorkerBase {
   QnRefineWorker(const T* x, size_t n, double trial, bool is_sumP, int32_t* bounds)
       : x(x), n(n), trial(trial), is_sumP(is_sumP), bounds(bounds) {}
 
-#ifdef USE_DIRECT_TBB
-  void operator()(const tbb::blocked_range<size_t>& r) const {
-    const_cast<QnRefineWorker*>(this)->operator()(r.begin(), r.end());
-  }
-#endif
-
   void operator()(size_t begin, size_t end) {
     if (begin >= end) return;
     size_t i = begin;
@@ -308,7 +302,8 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
       if (n > config.qn_parallel_threshold) {
         size_t g = config.get_dynamic_grain_size(n);
 #ifdef USE_DIRECT_TBB
-        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g), refineWorker);
+        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g),
+                          [&refineWorker](const tbb::blocked_range<size_t>& r) { refineWorker(r.begin(), r.end()); });
 #else
         RcppParallel::parallelFor(1, n, refineWorker, g);
 #endif
@@ -318,7 +313,8 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, false, left);
       if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
-        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)), refineWorker);
+        tbb::parallel_for(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)),
+                          [&refineWorker](const tbb::blocked_range<size_t>& r) { refineWorker(r.begin(), r.end()); });
 #else
         RcppParallel::parallelFor(1, n, refineWorker, config.get_dynamic_grain_size(n));
 #endif

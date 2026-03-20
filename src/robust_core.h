@@ -113,24 +113,6 @@ ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double co
   return constant * sum / n;
 }
 
-// robLoc iteration kernel
-inline double rob_loc_kernel(const double* x, int n, double t, double* tmp) {
-  for (int k = 0; k < 100; ++k) {
-    for (int i = 0; i < n; ++i) tmp[i] = (x[i] - t) * 0.5; // Scale fixed at 1 for inner
-    bulk_tanh(tmp, n);
-    double sum_psi = 0.0, sum_dpsi = 0.0;
-    for (int i = 0; i < n; ++i) {
-      double p = tmp[i];
-      sum_psi += p;
-      sum_dpsi += 1.0 - p*p;
-    }
-    double v = 2.0 * sum_psi / sum_dpsi;
-    t += v;
-    if (std::abs(v) <= 1e-10) break;
-  }
-  return t;
-}
-
 // Median of pre-sorted array
 ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
   if (n & 1) return x[n / 2];

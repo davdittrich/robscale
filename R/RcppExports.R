@@ -77,10 +77,6 @@ C_sn_fast <- function(x) {
     .Call(`_robscale_C_sn_fast`, x)
 }
 
-C_sn_float <- function(x) {
-    .Call(`_robscale_C_sn_float`, x)
-}
-
 C_sn_int_fast <- function(x) {
     .Call(`_robscale_C_sn_int_fast`, x)
 }
