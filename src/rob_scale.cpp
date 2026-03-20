@@ -77,6 +77,58 @@ static double rob_scale_fused_sum_avx2(const double* ROBSCALE_RESTRICT data,
 #endif // ROBSCALE_HAS_SLEEF && ROBSCALE_HAS_AVX2_DISPATCH
 
 // ---------------------------------------------------------------------------
+// Aitken Δ² (Steffensen) accelerated fixed-point iteration for M-scale.
+//
+// Collects triplets (s0, s1, s2) via 2 standard steps then extrapolates:
+//   s_acc = s2 - (s2-s1)² / (s2 - 2*s1 + s0)
+//
+// Acceptance guards:
+//   (a) Monotone + contracting: d1*d2>0 && |d2|<|d1| — Steffensen is
+//       unreliable for oscillating or diverging sequences (small n).
+//   (b) k < maxit: never exit with an unverified Aitken value.
+//   (c) candidate > 0 and step-reduction check (|cand-s2| < |s2-s0|).
+//
+// @tparam RhoSum  Callable: double(double sc) → sum_i tanh(...)^2
+// @param  rho_sum The reduction callable (parallel or serial)
+// @param  s       Initial scale estimate
+// @param  maxit   Maximum iterations
+// @param  tol     Convergence tolerance: |v - 1| <= tol
+// @param  inv_n   1.0 / n
+// ---------------------------------------------------------------------------
+template <typename RhoSum>
+static double aitken_iterate(RhoSum&& rho_sum, double s,
+                             int maxit, double tol, double inv_n) {
+  int k = 0;
+  while (k < maxit) {
+    const double s0 = s;
+    const double v0 = std::sqrt(2.0 * rho_sum(s0) * inv_n);
+    ++k;
+    const double s1 = s0 * v0;
+    if (std::abs(v0 - 1.0) <= tol) { s = s1; break; }
+    if (k >= maxit)               { s = s1; break; }
+
+    const double v1 = std::sqrt(2.0 * rho_sum(s1) * inv_n);
+    ++k;
+    const double s2 = s1 * v1;
+    if (std::abs(v1 - 1.0) <= tol) { s = s2; break; }
+
+    const double d1    = s1 - s0;
+    const double d2    = s2 - s1;
+    const double denom = d2 - d1;  // = s2 - 2*s1 + s0
+    if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
+        std::abs(denom) > 1e-30 * s0 && k < maxit) {
+      const double candidate = s2 - d2 * d2 / denom;
+      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
+        s = candidate;
+        continue;
+      }
+    }
+    s = s2;
+  }
+  return s;
+}
+
+// ---------------------------------------------------------------------------
 // Phase 4: TBB parallel iteration kernel
 //
 // Each iteration of rob_scale_compute is a reduction over n elements:
@@ -118,35 +170,7 @@ static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
     );
   };
 
-  // Aitken Δ² accelerated iteration (see rob_scale_compute for rationale).
-  int k = 0;
-  while (k < maxit) {
-    const double s0 = s;
-    const double v0 = std::sqrt(2.0 * rho_sum(s0) * inv_n);
-    ++k;
-    const double s1 = s0 * v0;
-    if (std::abs(v0 - 1.0) <= tol) { s = s1; break; }
-    if (k >= maxit) { s = s1; break; }
-
-    const double v1 = std::sqrt(2.0 * rho_sum(s1) * inv_n);
-    ++k;
-    const double s2 = s1 * v1;
-    if (std::abs(v1 - 1.0) <= tol) { s = s2; break; }
-
-    const double d1 = s1 - s0;
-    const double d2 = s2 - s1;
-    const double denom = d2 - d1;
-    if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
-        std::abs(denom) > 1e-30 * s0 && k < maxit) {
-      const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
-        s = candidate;
-        continue;
-      }
-    }
-    s = s2;
-  }
-  return s;
+  return aitken_iterate(rho_sum, s, maxit, tol, inv_n);
 }
 #elif defined(ROBSCALE_HAS_OMP_PARALLEL) && \
       defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
@@ -159,55 +183,20 @@ static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
   const size_t grain   = robscale::qnsn::RuntimeConfig::get().grain_size;
   const size_t nchunks = (n + grain - 1) / grain;
 
-  // Aitken Δ² accelerated iteration (OpenMP reduction, inlined for pragma compat).
-  int k = 0;
-  while (k < maxit) {
-    const double s0 = s;
-    double sr0 = 0.0;
-    { const double hisc = 0.5 * robscale::INV_RHO_SCALE_CONST / s0;
-#pragma omp parallel for reduction(+:sr0) schedule(static)
-      for (size_t c = 0; c < nchunks; ++c) {
-        size_t begin = c * grain;
-        size_t end   = std::min(begin + grain, n);
-        sr0 += rob_scale_fused_sum_avx2(data + begin, (int)(end - begin),
-                                         data_offset, hisc);
-      }
+  auto rho_sum = [&](double sc) -> double {
+    const double hisc = 0.5 * robscale::INV_RHO_SCALE_CONST / sc;
+    double sr = 0.0;
+#pragma omp parallel for reduction(+:sr) schedule(static)
+    for (size_t c = 0; c < nchunks; ++c) {
+      size_t begin = c * grain;
+      size_t end   = std::min(begin + grain, n);
+      sr += rob_scale_fused_sum_avx2(data + begin, (int)(end - begin),
+                                     data_offset, hisc);
     }
-    const double v0 = std::sqrt(2.0 * sr0 * inv_n);
-    ++k;
-    const double s1 = s0 * v0;
-    if (std::abs(v0 - 1.0) <= tol) { s = s1; break; }
-    if (k >= maxit) { s = s1; break; }
+    return sr;
+  };
 
-    double sr1 = 0.0;
-    { const double hisc = 0.5 * robscale::INV_RHO_SCALE_CONST / s1;
-#pragma omp parallel for reduction(+:sr1) schedule(static)
-      for (size_t c = 0; c < nchunks; ++c) {
-        size_t begin = c * grain;
-        size_t end   = std::min(begin + grain, n);
-        sr1 += rob_scale_fused_sum_avx2(data + begin, (int)(end - begin),
-                                         data_offset, hisc);
-      }
-    }
-    const double v1 = std::sqrt(2.0 * sr1 * inv_n);
-    ++k;
-    const double s2 = s1 * v1;
-    if (std::abs(v1 - 1.0) <= tol) { s = s2; break; }
-
-    const double d1 = s1 - s0;
-    const double d2 = s2 - s1;
-    const double denom = d2 - d1;
-    if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
-        std::abs(denom) > 1e-30 * s0 && k < maxit) {
-      const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
-        s = candidate;
-        continue;
-      }
-    }
-    s = s2;
-  }
-  return s;
+  return aitken_iterate(rho_sum, s, maxit, tol, inv_n);
 }
 #endif // parallel backends
 
@@ -251,43 +240,7 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
     return sr;
   };
 
-  // Aitken Δ² (Steffensen) accelerated iteration.
-  // Collects triplets (s0, s1, s2) via 2 standard steps then extrapolates:
-  //   s_acc = s2 - (s2-s1)^2 / (s2 - 2*s1 + s0)
-  // s_acc seeds the next round; convergence always exits via |v-1| <= tol.
-  //
-  // Acceptance guards:
-  //   (a) Monotone + contracting: d1*d2 > 0 && |d2| < |d1| — Steffensen
-  //       is unreliable for oscillating or diverging sequences (small n).
-  //   (b) k < maxit: never exit the loop with an unverified Aitken value.
-  int k = 0;
-  while (k < maxit) {
-    const double s0 = s;
-    const double v0 = std::sqrt(2.0 * rho_sum(s0) * inv_n);
-    ++k;
-    const double s1 = s0 * v0;
-    if (std::abs(v0 - 1.0) <= tol) { s = s1; break; }
-    if (k >= maxit) { s = s1; break; }
-
-    const double v1 = std::sqrt(2.0 * rho_sum(s1) * inv_n);
-    ++k;
-    const double s2 = s1 * v1;
-    if (std::abs(v1 - 1.0) <= tol) { s = s2; break; }
-
-    const double d1 = s1 - s0;
-    const double d2 = s2 - s1;
-    const double denom = d2 - d1;  // = s2 - 2*s1 + s0
-    if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
-        std::abs(denom) > 1e-30 * s0 && k < maxit) {
-      const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
-        s = candidate;
-        continue;
-      }
-    }
-    s = s2;
-  }
-  return s;
+  return aitken_iterate(rho_sum, s, maxit, tol, inv_n);
 }
 
 /**
