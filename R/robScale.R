@@ -138,6 +138,8 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
   n <- length(x)
   if (n == 0L) return(NA_real_)
 
+  # Detect "user didn't specify fallback" via match.arg's default behavior:
+  # when both choices are present (length 2), the user left it at default.
   fallback_code <- if (length(fallback) == 2L) {
     0L  # default: "adm"
   } else {
@@ -148,6 +150,6 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
   has_loc <- !is.null(loc)
   loc_val <- if (has_loc) loc else 0.0
   res <- .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
-  if (ci) return(.analytical_ci(res, n, are = .are_values$robScale, level, "robScale"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values[["robScale"]], level, "robScale"))
   res
 }

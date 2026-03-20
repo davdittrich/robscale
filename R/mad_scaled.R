@@ -76,6 +76,6 @@ mad_scaled <- function(x, center = NULL, constant = 1.482602218505602, na.rm = F
   } else {
     res <- .Call(`_robscale_mad_impl_center`, x, center, constant)
   }
-  if (ci) return(.analytical_ci(res, n, are = .are_values$mad, level, "mad_scaled"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values[["mad_scaled"]], level, "mad_scaled"))
   res
 }

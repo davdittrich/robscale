@@ -98,6 +98,6 @@ adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
   } else {
     res <- .Call(`_robscale_adm_impl`, x, center, constant)
   }
-  if (ci) return(.analytical_ci(res, length(x), are = .are_values$adm, level, "adm"))
+  if (ci) return(.analytical_ci(res, length(x), are = .are_values[["adm"]], level, "adm"))
   res
 }
