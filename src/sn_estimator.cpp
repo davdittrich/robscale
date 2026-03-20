@@ -29,12 +29,6 @@ struct SnWorker : public WorkerBase {
   SnWorker(const T* sorted_x, size_t n, T* results)
       : sorted_x(sorted_x), n(n), results(results) {}
 
-#ifdef USE_DIRECT_TBB
-  void operator()(const tbb::blocked_range<size_t>& r) const {
-    const_cast<SnWorker*>(this)->operator()(r.begin(), r.end());
-  }
-#endif
-
   void operator()(size_t begin, size_t end) {
     if (ROBSCALE_UNLIKELY(begin >= end)) return;
     int32_t h = static_cast<int32_t>(n / 2);
@@ -119,7 +113,8 @@ double sn_kernel(const T* sorted_x, size_t n) {
   } else {
     SnWorker<T> worker(sorted_x, n, inner_medians);
 #ifdef USE_DIRECT_TBB
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size), worker);
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
+                      [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
 #else
     RcppParallel::parallelFor(0, n, worker, config.grain_size);
 #endif
@@ -180,7 +175,6 @@ double C_sn_impl_sorted(const T* sorted_x, size_t n) {
 
 // Explicit template instantiations
 template double C_sn_impl<double>(const double*, size_t);
-template double C_sn_impl<float>(const float*, size_t);
 template double C_sn_impl_sorted<double>(const double*, size_t);
 
 } // namespace robscale::qnsn
@@ -188,12 +182,6 @@ template double C_sn_impl_sorted<double>(const double*, size_t);
 // [[Rcpp::export]]
 double C_sn_fast(Rcpp::NumericVector x) { 
   return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size())); 
-}
-
-// [[Rcpp::export]]
-double C_sn_float(Rcpp::NumericVector x) {
-  std::vector<float> x_float(x.begin(), x.end());
-  return robscale::qnsn::C_sn_impl(x_float.data(), x_float.size());
 }
 
 // [[Rcpp::export]]
