@@ -2711,7 +2711,7 @@ inline void nbis_sort(T* x, int n) {
   }
 }
 
-// Dispatcher: use sorting networks for n<=16, nbis_sort for n>16
+// Dispatcher: sorting networks for n<=64, std::sort for n>64
 template <typename T>
 inline void small_sort(T* x, size_t n) {
   switch (n) {
@@ -2908,6 +2908,9 @@ inline void small_sort(T* x, size_t n) {
       sort_net_64(x);
       return;
     default:
+      // nbis_sort is O(n²) — safe only for n<=64 (covered by cases above).
+      // For n>64, fall back to O(n log n) std::sort.
+      if (n > 64) { std::sort(x, x + n); return; }
       nbis_sort(x, (int)n);
       return;
   }
@@ -12498,7 +12501,11 @@ inline T median_net(T* x, size_t n) {
     case 63: return median_net_63(x);
     case 64: return median_net_64(x);
     default:
-      small_sort(x, n);
+      // median_select never calls median_net for n>64 (guarded by
+      // ROBSCALE_SORT_MEDIAN_THRESHOLD), so this branch is unreachable in
+      // practice.  Guard defensively anyway: std::sort is O(n log n) safe.
+      if (n > 64) { std::sort(x, x + n); }
+      else        { small_sort(x, n); }
       if (n & 1) return x[n/2];
       return (x[n/2-1]+x[n/2])*T(0.5);
   }
