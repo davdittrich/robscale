@@ -1,6 +1,14 @@
-#' @importFrom stats qnorm qchisq
-# Internal helpers for analytical confidence intervals
 # Not exported; called by individual estimator functions when ci = TRUE
+.are_values <- list(
+  qn       = 0.82,
+  sn       = 0.58,
+  robScale = 0.55,
+  gmd      = 0.95,
+  mad      = 0.37,
+  iqr      = 0.37,
+  adm      = 0.37,
+  sd_c4    = 1.00
+)
 
 # ARE-based normal approximation CI (all estimators except sd_c4)
 .analytical_ci <- function(estimate, n, are, level, method) {

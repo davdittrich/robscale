@@ -92,6 +92,6 @@ sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE,
     res <- res / .Call(`_robscale_C_get_sn_factor`, n)
   }
 
-  if (ci) return(.analytical_ci(res, n, are = 0.58, level, "sn"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values$sn, level, "sn"))
   res
 }

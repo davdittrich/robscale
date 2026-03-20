@@ -148,6 +148,6 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
   has_loc <- !is.null(loc)
   loc_val <- if (has_loc) loc else 0.0
   res <- .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback_code)
-  if (ci) return(.analytical_ci(res, n, are = 0.55, level, "robScale"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values$robScale, level, "robScale"))
   res
 }

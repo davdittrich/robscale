@@ -93,6 +93,6 @@ qn <- function(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE,
     res <- res / .Call(`_robscale_C_get_qn_factor`, n)
   }
 
-  if (ci) return(.analytical_ci(res, n, are = 0.82, level, "qn"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values$qn, level, "qn"))
   res
 }

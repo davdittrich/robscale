@@ -6,7 +6,7 @@
 \usage{
 mad_scaled(
   x,
-  center,
+  center = NULL,
   constant = 1.4826022185056,
   na.rm = FALSE,
   ci = FALSE,
