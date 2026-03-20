@@ -44,6 +44,44 @@ else
   echo "  SLEEF not detected, falling back to Accelerate/OpenMP"
 fi
 
+# Detect glibc libmvec _ZGVdN4v_tanh (Linux, glibc >= 2.35)
+# libmvec is 25-50% faster than SLEEF for 4-wide double tanh on Zen/Skylake.
+# Guard: requires HAS_SLEEF (so ROBSCALE_HAS_AVX2_DISPATCH is also present),
+# Linux-only (macOS uses Accelerate, Windows uses SLEEF).
+HAS_GLIBC_MVEC="no"
+GLIBC_MVEC_CFLAGS=""
+GLIBC_MVEC_LIBS=""
+if [ "${HAS_SLEEF}" = "yes" ] && [ "$(uname -s)" = "Linux" ]; then
+  # Test 1: glibc >= 2.35 (versioned _ZGVdN4v_tanh@GLIBC_2.35 requires this)
+  cat > conftest_glibc.c << 'CFEOF'
+#include <features.h>
+#if !(__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 35))
+#error "glibc < 2.35"
+#endif
+int main(void) { return 0; }
+CFEOF
+  if ${CC:-gcc} conftest_glibc.c -o conftest_glibc 2>/dev/null; then
+    # Test 2: _ZGVdN4v_tanh linkable from libmvec
+    cat > conftest_mvec.c << 'CFEOF'
+typedef double v4d __attribute__((vector_size(32)));
+extern v4d _ZGVdN4v_tanh(v4d);
+int main(void) { v4d x = {0.5,0.5,0.5,0.5}; v4d r = _ZGVdN4v_tanh(x); return (int)r[0]; }
+CFEOF
+    if ${CC:-gcc} conftest_mvec.c -lmvec -o conftest_mvec 2>/dev/null; then
+      HAS_GLIBC_MVEC="yes"
+      GLIBC_MVEC_CFLAGS="-DROBSCALE_HAS_GLIBC_MVEC"
+      GLIBC_MVEC_LIBS="-lmvec"
+      echo "  glibc libmvec _ZGVdN4v_tanh detected (preferred over SLEEF)"
+    else
+      echo "  libmvec not available, retaining SLEEF"
+    fi
+    rm -f conftest_mvec.c conftest_mvec
+  else
+    echo "  glibc < 2.35, retaining SLEEF"
+  fi
+  rm -f conftest_glibc.c conftest_glibc
+fi
+
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
 ACCELERATE_LIBS=""
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -111,6 +149,8 @@ sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@TBB_LIBS@|${TBB_LIBS}|" \
     -e "s|@OMP_PARALLEL_CFLAGS@|${OMP_PARALLEL_CFLAGS}|" \
     -e "s|@OMP_PARALLEL_LIBS@|${OMP_PARALLEL_LIBS}|" \
+    -e "s|@GLIBC_MVEC_CFLAGS@|${GLIBC_MVEC_CFLAGS}|" \
+    -e "s|@GLIBC_MVEC_LIBS@|${GLIBC_MVEC_LIBS}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"
