@@ -7,7 +7,7 @@ library(purrr)
 #' @param target_times Vector of timings for the new implementation
 #' @param ref_times Vector of timings for the reference implementation
 #' @param R Number of bootstrap replicates
-compute_bca_speedup <- function(target_times, ref_times, R = 500) {
+compute_bca_speedup <- function(target_times, ref_times, R = 2000) {
   # Take min length to align samples
   len <- min(length(target_times), length(ref_times))
   boot_data <- data.frame(
@@ -22,9 +22,13 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
     ref_med / target_med
   }
 
-  # Bootstrap
+  # Bootstrap — parallelise across cores for faster CI computation at R=2000.
+  # Falls back to "no" parallelism if ncores=1 (avoids fork overhead).
+  n_cores <- max(1L, parallel::detectCores(logical = FALSE))
+  par_type <- if (n_cores > 1L) "multicore" else "no"
   set.seed(42)
-  b <- boot::boot(boot_data, ratio_median, R = R, parallel = "no", ncpus = 1)
+  b <- boot::boot(boot_data, ratio_median, R = R,
+                  parallel = par_type, ncpus = n_cores)
 
   # Try BCa; boot.ci warns (does not error) when all t are equal, returning
   # NULL for $bca.  Treat a NULL or short result as an error so the fallback
@@ -56,10 +60,18 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
     }
   )
 
+  median_speedup <- median(boot_data$ref) / median(boot_data$target)
+  ci_width_frac  <- (ci[2] - ci[1]) / median_speedup
+
   list(
-    median_speedup = median(boot_data$ref) / median(boot_data$target),
-    ci_low = ci[1],
-    ci_high = ci[2]
+    median_speedup = median_speedup,
+    ci_low         = ci[1],
+    ci_high        = ci[2],
+    # Quality diagnostics — flag rows with unreliable CIs
+    cv_target      = sd(boot_data$target) / mean(boot_data$target),
+    cv_ref         = sd(boot_data$ref)    / mean(boot_data$ref),
+    ci_width_frac  = ci_width_frac,       # CI width as fraction of point estimate
+    reliable       = ci_width_frac < 0.5  # FALSE flags noisy / low-iteration cells
   )
 }
 

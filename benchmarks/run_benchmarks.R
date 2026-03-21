@@ -81,6 +81,60 @@ get_cpu_governor <- function() {
   if (file.exists(gov)) trimws(readLines(gov, n = 1)) else "unknown"
 }
 
+#' Pre-flight system noise check (BM-4)
+#' Measures the coefficient of variation (CV) of a minimal timing operation.
+#' A CV > 10% indicates the system is too noisy for reliable micro-benchmarks.
+#' @return Named list: cv (numeric), noisy (logical), warning (character or NULL)
+check_system_noise <- function(reps = 1000L) {
+  times <- numeric(reps)
+  for (i in seq_len(reps)) {
+    t0 <- proc.time()[["elapsed"]]
+    1L + 1L
+    times[i] <- proc.time()[["elapsed"]] - t0
+  }
+  # Drop exact zeros (timer resolution) before computing CV
+  times <- times[times > 0]
+  cv <- if (length(times) > 1L) sd(times) / mean(times) else NA_real_
+  noisy <- !is.na(cv) && cv > 0.10
+  list(
+    cv     = cv,
+    noisy  = noisy,
+    warning = if (noisy) sprintf(
+      "System noise CV=%.1f%% > 10%% — results may be unreliable. Consider: performance governor, isolcpus, taskset.",
+      cv * 100
+    ) else NULL
+  )
+}
+
+#' Pool time vectors from multiple bench::press runs (one per seed). (BM-2)
+#' Returns the first result with the `time` list-column replaced by the
+#' concatenated per-iteration times (in seconds, bench_time unit) from all
+#' seeds, and all summary stats recomputed from the pooled distribution.
+#' @param seed_results List of bench_mark/bench_press objects (one per seed).
+pool_bench_press <- function(seed_results) {
+  if (length(seed_results) == 1L) return(seed_results[[1L]])
+  base <- seed_results[[1L]]
+  # as.numeric() on bench_time returns seconds — pool across seeds per row.
+  for (i in seq_len(nrow(base))) {
+    pooled_s <- unlist(lapply(seed_results, function(sr) as.numeric(sr$time[[i]])))
+    base$time[[i]] <- pooled_s   # plain numeric in seconds; as.numeric() in
+  }                              # analyze_results.R handles it transparently.
+  pool_s <- lapply(base$time, as.numeric)
+  base$min      <- bench::as_bench_time(vapply(pool_s, min,    numeric(1L)))
+  base$median   <- bench::as_bench_time(vapply(pool_s, median, numeric(1L)))
+  base$mean     <- bench::as_bench_time(vapply(pool_s, mean,   numeric(1L)))
+  base$max      <- bench::as_bench_time(vapply(pool_s, max,    numeric(1L)))
+  # Update iteration counts and throughput from the pooled data.
+  base$n_itr    <- vapply(pool_s, length, integer(1L))
+  base[["itr/sec"]] <- 1 / vapply(pool_s, mean, numeric(1L))
+  base$total_time <- bench::as_bench_time(vapply(pool_s, sum, numeric(1L)))
+  base
+}
+
+# Seeds used for multi-seed benchmark runs (BM-2).
+# Spaced 100 apart to avoid correlated .Random.seed states.
+BENCH_SEEDS <- c(42L, 142L, 242L)
+
 # ---------------------------------------------------------------------------
 
 #' Benchmark a specific version of robscale
@@ -89,7 +143,18 @@ get_cpu_governor <- function() {
 benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_"), source_path = ".") {
   dir.create(lib_path, showWarnings = FALSE, recursive = TRUE)
 
-  # Create a temporary source directory to avoid polluting the current src/ 
+  # ── Pre-flight system checks (BM-4) ───────────────────────────────────────
+  gov <- get_cpu_governor()
+  if (!gov %in% c("performance", "unknown")) {
+    message(sprintf(
+      "WARNING: CPU governor is '%s', not 'performance'. Set with:\n  echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor",
+      gov
+    ))
+  }
+  noise <- check_system_noise()
+  if (!is.null(noise$warning)) message("WARNING: ", noise$warning)
+
+  # Create a temporary source directory to avoid polluting the current src/
   # or using stale .o files from a different build Type
   tmp_src <- tempfile("src_")
   dir.create(tmp_src, showWarnings = FALSE, recursive = TRUE)
@@ -140,18 +205,18 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
   # Determine if SLEEF was used from the installation log
   has_sleef <- any(grepl("SLEEF detected|-DROBSCALE_HAS_SLEEF|-lsleef", res_install, ignore.case = TRUE))
 
-  # Run benchmarks in a completely isolated R subprocess to prevent DLL/namespace 
+  # Run benchmarks in a completely isolated R subprocess to prevent DLL/namespace
   # caching across targets in the pipeline.
-  res_obj <- callr::r(function(lib_path, lp) {
+  res_obj <- callr::r(function(lib_path, lp, seeds) {
     # Isolate library paths for this process
     withr::with_libpaths(new = lib_path, action = "prefix", {
       library(robscale)
       library(bench)
-      
+
       n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
-      n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+      n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
                    12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
-      
+
       get_min_iters <- function(n) {
         if (n <= 128) 10000L
         else if (n <= 2048) 2000L
@@ -159,65 +224,109 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
         else if (n <= 1048576) 20L
         else 5L
       }
-      
-      # Small sample benchmarks
-      results_m <- bench::press(
-        n = n_small,
-        {
-          set.seed(42 + n)
-          x <- rnorm(n)
-          bench::mark(
-            robLoc = robscale::robLoc(x),
-            robScale = robscale::robScale(x),
-            adm = robscale::adm(x),
-            check = FALSE,
-            min_iterations = get_min_iters(n),
-            min_time = 1.0 # Beat noise
-          )
+
+      # Pool time vectors from multiple bench::press runs (one per seed). (BM-2)
+      pool_bench_press <- function(seed_results) {
+        if (length(seed_results) == 1L) return(seed_results[[1L]])
+        base <- seed_results[[1L]]
+        for (i in seq_len(nrow(base))) {
+          pooled_s <- unlist(lapply(seed_results, function(sr) as.numeric(sr$time[[i]])))
+          base$time[[i]] <- pooled_s
         }
-      )
-      
-      # Large sample benchmarks
-      results_scale <- bench::press(
-        n = n_large,
-        {
-          set.seed(42 + n)
-          x <- rnorm(n)
-          bench::mark(
-            qn = robscale::qn(x),
-            sn = robscale::sn(x),
-            check = FALSE,
-            min_iterations = get_min_iters(n),
-            min_time = 1.0
-          )
-        }
-      )
-      
-      # New estimators benchmarks (gmd, iqr_scaled, mad_scaled)
-      results_new <- bench::press(
-        n = n_large,
-        {
-          set.seed(42 + n)
-          x <- rnorm(n)
-          bench::mark(
-            gmd = robscale::gmd(x),
-            iqr_scaled = robscale::iqr_scaled(x),
-            mad_scaled = robscale::mad_scaled(x),
-            check = FALSE,
-            min_iterations = get_min_iters(n),
-            min_time = 1.0
-          )
-        }
-      )
+        pool_s <- lapply(base$time, as.numeric)
+        base$min         <- bench::as_bench_time(vapply(pool_s, min,    numeric(1L)))
+        base$median      <- bench::as_bench_time(vapply(pool_s, median, numeric(1L)))
+        base$mean        <- bench::as_bench_time(vapply(pool_s, mean,   numeric(1L)))
+        base$max         <- bench::as_bench_time(vapply(pool_s, max,    numeric(1L)))
+        base$n_itr       <- vapply(pool_s, length, integer(1L))
+        base[["itr/sec"]]  <- 1 / vapply(pool_s, mean, numeric(1L))
+        base$total_time  <- bench::as_bench_time(vapply(pool_s, sum, numeric(1L)))
+        base
+      }
+
+      # ── Warmup (BM-3): stabilise CPU P-states and instruction cache ────────
+      .wu_x <- rnorm(64L)
+      for (.wu_i in seq_len(300L)) {
+        robscale::robLoc(.wu_x)
+        robscale::robScale(.wu_x)
+        robscale::adm(.wu_x)
+        robscale::qn(.wu_x)
+        robscale::sn(.wu_x)
+        robscale::gmd(.wu_x)
+      }
+      rm(.wu_x, .wu_i)
+      gc(full = TRUE)
+
+      # ── Small sample benchmarks (3-seed pooled) ────────────────────────────
+      seed_results_m <- lapply(seeds, function(seed) {
+        bench::press(
+          n = n_small,
+          {
+            set.seed(seed + n)
+            x <- rnorm(n)
+            gc(full = TRUE)   # BM-3: flush GC before each configuration
+            bench::mark(
+              robLoc   = robscale::robLoc(x),
+              robScale = robscale::robScale(x),
+              adm      = robscale::adm(x),
+              check    = FALSE,
+              min_iterations = get_min_iters(n),
+              min_time = 1.0
+            )
+          }
+        )
+      })
+      results_m <- pool_bench_press(seed_results_m)
+
+      # ── Large sample benchmarks (3-seed pooled) ────────────────────────────
+      seed_results_scale <- lapply(seeds, function(seed) {
+        bench::press(
+          n = n_large,
+          {
+            set.seed(seed + n)
+            x <- rnorm(n)
+            gc(full = TRUE)
+            bench::mark(
+              qn = robscale::qn(x),
+              sn = robscale::sn(x),
+              check    = FALSE,
+              min_iterations = get_min_iters(n),
+              min_time = 1.0
+            )
+          }
+        )
+      })
+      results_scale <- pool_bench_press(seed_results_scale)
+
+      # ── New estimators (3-seed pooled) ─────────────────────────────────────
+      seed_results_new <- lapply(seeds, function(seed) {
+        bench::press(
+          n = n_large,
+          {
+            set.seed(seed + n)
+            x <- rnorm(n)
+            gc(full = TRUE)
+            bench::mark(
+              gmd        = robscale::gmd(x),
+              iqr_scaled = robscale::iqr_scaled(x),
+              mad_scaled = robscale::mad_scaled(x),
+              check    = FALSE,
+              min_iterations = get_min_iters(n),
+              min_time = 1.0
+            )
+          }
+        )
+      })
+      results_new <- pool_bench_press(seed_results_new)
 
       list(
-        m_estimators = results_m,
+        m_estimators     = results_m,
         scale_estimators = results_scale,
-        new_estimators = results_new,
-        sys_info = sessioninfo::session_info()
+        new_estimators   = results_new,
+        sys_info         = sessioninfo::session_info()
       )
     })
-  }, args = list(lib_path = lib_path, lp = .libPaths()), show = TRUE)
+  }, args = list(lib_path = lib_path, lp = .libPaths(), seeds = BENCH_SEEDS), show = TRUE)
   
   # Attach all build-time and system metadata captured at benchmark time
   res_obj$has_sleef <- has_sleef
@@ -228,7 +337,9 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
       r_version      = res_obj$sys_info$platform$version,
       platform       = res_obj$sys_info$platform$os,
       cpu_name       = get_cpu_name(),
-      cpu_governor   = get_cpu_governor(),
+      cpu_governor   = gov,             # captured in pre-flight check above
+      noise_cv       = noise$cv,        # system noise level at benchmark time
+      bench_seeds    = BENCH_SEEDS,     # seeds used for multi-seed pooling
       benchmark_date = as.character(Sys.Date())
     )
   )
@@ -238,87 +349,128 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
 #' Benchmark legacy packages
 benchmark_legacy <- function() {
   # Also run legacy in its own process for consistency
-  res_obj <- callr::r(function(lp) {
+  res_obj <- callr::r(function(lp, seeds) {
     library(bench)
     library(robustbase)
     library(revss)
     library(Hmisc)
     library(GiniDistance)
     library(collapse)
-    
+
     n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
-    n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 
+    n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
-    
+
     get_min_iters <- function(n) {
-        if (n <= 128) 10000L
-        else if (n <= 2048) 2000L
-        else if (n <= 16384) 500L
-        else if (n <= 1048576) 20L
-        else 5L
+      if (n <= 128) 10000L
+      else if (n <= 2048) 2000L
+      else if (n <= 16384) 500L
+      else if (n <= 1048576) 20L
+      else 5L
     }
-    
-    results_revss <- bench::press(
-      n = n_small,
-      {
-        set.seed(42 + n)
-        x <- rnorm(n)
-        bench::mark(
-          robLoc = revss::robLoc(x),
-          robScale = revss::robScale(x),
-          adm = revss::adm(x),
-          check = FALSE,
-          min_iterations = get_min_iters(n),
-          min_time = 1.0
-        )
+
+    # Pool time vectors from multiple bench::press runs (one per seed). (BM-2)
+    pool_bench_press <- function(seed_results) {
+      if (length(seed_results) == 1L) return(seed_results[[1L]])
+      base <- seed_results[[1L]]
+      for (i in seq_len(nrow(base))) {
+        pooled_ns <- unlist(lapply(seed_results, function(sr) as.numeric(sr$time[[i]])))
+        base$time[[i]] <- pooled_ns
       }
-    )
-    
-    results_robustbase <- bench::press(
-      n = n_large,
-      {
-        set.seed(42 + n)
-        x <- rnorm(n)
-        bench::mark(
-          qn = robustbase::Qn(x),
-          sn = robustbase::Sn(x),
-          check = FALSE,
-          min_iterations = get_min_iters(n),
-          min_time = 1.0
-        )
-      }
-    )
-    
+      pool_ns <- lapply(base$time, as.numeric)
+      base$min    <- bench::as_bench_time(vapply(pool_ns, min,    numeric(1L)))
+      base$median <- bench::as_bench_time(vapply(pool_ns, median, numeric(1L)))
+      base$mean   <- bench::as_bench_time(vapply(pool_ns, mean,   numeric(1L)))
+      base$max    <- bench::as_bench_time(vapply(pool_ns, max,    numeric(1L)))
+      base
+    }
+
+    # ── Warmup (BM-3) ──────────────────────────────────────────────────────
+    .wu_x <- rnorm(64L)
+    for (.wu_i in seq_len(300L)) {
+      revss::robLoc(.wu_x)
+      revss::robScale(.wu_x)
+      robustbase::Qn(.wu_x)
+      robustbase::Sn(.wu_x)
+    }
+    rm(.wu_x, .wu_i)
+    gc(full = TRUE)
+
     fast_mad <- function(x, constant = 1.4826) {
       m <- collapse::fmedian(x)
-      return(collapse::fmedian(abs(x - m)) * constant)
+      collapse::fmedian(abs(x - m)) * constant
     }
 
-    # New estimator competitors
-    results_new <- bench::press(
-      n = n_large,
-      {
-        set.seed(42 + n)
-        x <- rnorm(n)
-        bench::mark(
-          gmd = Hmisc::GiniMd(x) * 0.886226925452758,
-          gmd_gd = GiniDistance::gmd(x) * 0.886226925452758,
-          iqr_scaled = stats::IQR(x) * 0.741301109252801,
-          iqr_collapse = diff(collapse::fquantile(x, c(0.25, 0.75))) * 0.741301109252801,
-          mad_scaled = stats::mad(x),
-          mad_collapse = fast_mad(x),
-          check = FALSE,
-          min_iterations = get_min_iters(n),
-          min_time = 1.0
-        )
-      }
-    )
+    # ── revss (3-seed pooled) ──────────────────────────────────────────────
+    seed_results_revss <- lapply(seeds, function(seed) {
+      bench::press(
+        n = n_small,
+        {
+          set.seed(seed + n)
+          x <- rnorm(n)
+          gc(full = TRUE)
+          bench::mark(
+            robLoc   = revss::robLoc(x),
+            robScale = revss::robScale(x),
+            adm      = revss::adm(x),
+            check    = FALSE,
+            min_iterations = get_min_iters(n),
+            min_time = 1.0
+          )
+        }
+      )
+    })
+    results_revss <- pool_bench_press(seed_results_revss)
+
+    # ── robustbase (3-seed pooled) ─────────────────────────────────────────
+    seed_results_robustbase <- lapply(seeds, function(seed) {
+      bench::press(
+        n = n_large,
+        {
+          set.seed(seed + n)
+          x <- rnorm(n)
+          gc(full = TRUE)
+          bench::mark(
+            qn = robustbase::Qn(x),
+            sn = robustbase::Sn(x),
+            check    = FALSE,
+            min_iterations = get_min_iters(n),
+            min_time = 1.0
+          )
+        }
+      )
+    })
+    results_robustbase <- pool_bench_press(seed_results_robustbase)
+
+    # ── New estimator competitors (3-seed pooled) ──────────────────────────
+    seed_results_new <- lapply(seeds, function(seed) {
+      bench::press(
+        n = n_large,
+        {
+          set.seed(seed + n)
+          x <- rnorm(n)
+          gc(full = TRUE)
+          bench::mark(
+            gmd          = Hmisc::GiniMd(x) * 0.886226925452758,
+            gmd_gd       = GiniDistance::gmd(x) * 0.886226925452758,
+            iqr_scaled   = stats::IQR(x) * 0.741301109252801,
+            iqr_collapse = diff(collapse::fquantile(x, c(0.25, 0.75))) * 0.741301109252801,
+            mad_scaled   = stats::mad(x),
+            mad_collapse = fast_mad(x),
+            check    = FALSE,
+            min_iterations = get_min_iters(n),
+            min_time = 1.0
+          )
+        }
+      )
+    })
+    results_new <- pool_bench_press(seed_results_new)
 
     list(
-      revss = results_revss,
-      robustbase = results_robustbase,
+      revss          = results_revss,
+      robustbase     = results_robustbase,
       new_estimators = results_new,
-      pkg_versions = list(
+      pkg_versions   = list(
         robustbase   = as.character(packageVersion("robustbase")),
         revss        = as.character(packageVersion("revss")),
         Hmisc        = as.character(packageVersion("Hmisc")),
@@ -326,7 +478,7 @@ benchmark_legacy <- function() {
         collapse     = as.character(packageVersion("collapse"))
       )
     )
-  }, args = list(lp = .libPaths()), show = TRUE)
-  
+  }, args = list(lp = .libPaths(), seeds = BENCH_SEEDS), show = TRUE)
+
   return(res_obj)
 }
