@@ -101,6 +101,36 @@ inline void bulk_tanh(double* inout, int n) {
 #endif
 }
 
+// OPT-L2: dispatch variant accepting a pre-hoisted AVX2 flag, avoiding a
+// repeated RuntimeConfig::get() (TLS read) on each NR iteration.
+// CPUID features are invariant for process lifetime; hoisting is safe.
+inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
+  if (n < 8) {
+    for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
+    return;
+  }
+#if defined(ROBSCALE_HAS_ACCELERATE)
+  (void)use_avx2;
+  vvtanh(inout, inout, &n);
+#elif defined(ROBSCALE_HAS_SLEEF)
+  #ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  if (use_avx2) {
+    bulk_tanh_sleef_avx2(inout, n);
+    return;
+  }
+  #else
+  (void)use_avx2;
+  #endif
+  for (int i = 0; i < n; i++) inout[i] = std::tanh(inout[i]);
+#else
+  (void)use_avx2;
+  #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+    #pragma omp simd
+  #endif
+  for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
+#endif
+}
+
 // ADM core: constant * mean(|x - center|)
 ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double constant) {
   double sum = 0.0;
