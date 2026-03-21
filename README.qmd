@@ -53,31 +53,12 @@ n_raw_rob <- benchmark_report$fast$new_estimators %>%
 n_raw_ref <- benchmark_report$legacy$new_estimators %>%
   mutate(n = as.numeric(unlist(n)), expr = as.character(expression))
 
-# 0. Capture System Metadata
-sys_info <- sessioninfo::platform_info()
+# 0. Benchmark-time metadata (captured by run_benchmarks.R at build time)
+bm_info  <- benchmark_report$fast$build_info      # compile flags, libraries, system
+bm_pkgs  <- benchmark_report$legacy$pkg_versions  # competitor package versions
 
-get_cpu_name <- function() {
-  if (file.exists("/proc/cpuinfo")) {
-    cpu_info <- system("grep 'model name' /proc/cpuinfo | head -n1 | cut -d':' -f2", intern = TRUE)
-    if (length(cpu_info) > 0) return(trimws(cpu_info))
-  } else {
-    cpu_brand <- try(system("sysctl -n machdep.cpu.brand_string", intern = TRUE), silent = TRUE)
-    if (!inherits(cpu_brand, "try-error") && length(cpu_brand) > 0) return(trimws(cpu_brand))
-  }
-  return("Unknown CPU")
-}
-
-get_cpu_governor <- function() {
-  gov_path <- "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
-  if (file.exists(gov_path)) trimws(readLines(gov_path, n = 1)) else "unknown"
-}
-
-hw_cpu <- get_cpu_name()
-sys_gov <- get_cpu_governor()
-sys_os <- sys_info$os
-sys_r <- sys_info$version
-sys_date <- as.character(Sys.Date())
-pkg_version <- read.dcf("DESCRIPTION")[, "Version"]
+# Convenience aliases used in inline R throughout the document
+pkg_version <- bm_info$pkg_version
 
 # Helper to format speedup with CI
 format_speedup_ci <- function(med, lo, hi) {
@@ -1029,14 +1010,15 @@ knitr::include_graphics(tar_read(speedup_figure))
 
 **Benchmark environment:**
 
-- **Machine:** AMD Ryzen 9 5900HX with Radeon Graphics
-- **CPU Governor:** powersave
-- **OS:** Arch Linux (Kernel 6.13.5-arch1-1)
-- **R version:** R version 4.5.3 (2026-03-11)
-- **Package version:** 0.3.0 (baseline comparisons against `robustbase` 0.99.7, `revss` 3.1.0, `Hmisc` 5.2.5, `GiniDistance` 0.1.1, and `collapse` 2.1.6)
-- **Compile flags:** `-march=native -mtune=native -O3 -fno-math-errno -pipe -fPIC -fopenmp -DROBSCALE_HAS_OMP_SIMD -DROBSCALE_HAS_SLEEF -DUSE_DIRECT_TBB -DROBSCALE_HAS_OMP_PARALLEL`
-- **SLEEF (Optimized Build):** Detected
-- **Date:** 2026-03-19
+- **Machine:** `r bm_info$cpu_name`
+- **CPU Governor:** `r bm_info$cpu_governor`
+- **OS:** `r bm_info$platform`
+- **R version:** `r bm_info$r_version`
+- **Package version:** `r bm_info$pkg_version` (baseline comparisons against `robustbase` `r bm_pkgs$robustbase`, `revss` `r bm_pkgs$revss`, `Hmisc` `r bm_pkgs$Hmisc`, `GiniDistance` `r bm_pkgs$GiniDistance`, and `collapse` `r bm_pkgs$collapse`)
+- **Compile flags:** `` `r bm_info$cxx_flags` ``
+- **tanh backend:** `r bm_info$tanh_backend`
+- **TBB:** `r bm_info$tbb_source`
+- **Date:** `r bm_info$benchmark_date`
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
