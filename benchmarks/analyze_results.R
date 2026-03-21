@@ -26,26 +26,31 @@ compute_bca_speedup <- function(target_times, ref_times, R = 500) {
   set.seed(42)
   b <- boot::boot(boot_data, ratio_median, R = R, parallel = "no", ncpus = 1)
 
-  # Try BCa
+  # Try BCa; boot.ci warns (does not error) when all t are equal, returning
+  # NULL for $bca.  Treat a NULL or short result as an error so the fallback
+  # chain fires instead of propagating NULL into as.data.frame().
   ci <- tryCatch(
     {
       res <- boot::boot.ci(b, type = "bca")
-      # bca is 4th and 5th element of $bca
-      c(res$bca[4], res$bca[5])
+      bca <- res$bca
+      if (is.null(bca) || length(bca) < 5) stop("BCa returned NULL or short")
+      c(bca[4], bca[5])
     },
     error = function(e) {
       # Fallback to percentile if BCa fails (e.g. constant values)
       tryCatch(
         {
           res <- boot::boot.ci(b, type = "perc")
-          c(res$percent[4], res$percent[5])
+          pct <- res$percent
+          if (is.null(pct) || length(pct) < 5) stop("percentile returned NULL")
+          c(pct[4], pct[5])
         },
         error = function(e2) {
-          # If even percentile fails, check if all values are equal
-          if (all(b$t == b$t0)) {
-            return(c(b$t0, b$t0))
+          # If even percentile fails, use the point estimate as a degenerate CI
+          if (length(b$t0) >= 1 && !is.na(b$t0[1])) {
+            return(c(b$t0[1], b$t0[1]))
           }
-          c(NA, NA)
+          c(NA_real_, NA_real_)
         }
       )
     }
