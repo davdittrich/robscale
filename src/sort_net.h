@@ -12517,12 +12517,21 @@ inline T median_net(T* x, size_t n) {
 // Extern template declarations suppress redundant codegen in every TU.
 // The explicit instantiations are provided by sort_net_inst.cpp.
 // This suppresses the ~30s/TU cost of instantiating all 63 sort networks.
+//
+// TUs that define ROBSCALE_NO_EXTERN_TEMPLATES before including this header
+// opt out of the extern declarations to force a local instantiation.  Note:
+// on Linux with -fPIC the linker still routes weak-symbol calls via PLT, so
+// this does not eliminate the PLT overhead; use it only if you also apply
+// visibility("hidden") to the symbol or if compile-time instantiation is
+// needed for other reasons (e.g. constant-folding over small fixed-n calls).
 #ifndef ROBSCALE_SORT_NET_INST
+#ifndef ROBSCALE_NO_EXTERN_TEMPLATES
 namespace robscale {
 extern template void small_sort<double>(double*, size_t);
 extern template void small_sort<int>(int*, size_t);
 extern template double median_net<double>(double*, size_t);
 } // namespace robscale
-#endif
+#endif // ROBSCALE_NO_EXTERN_TEMPLATES
+#endif // ROBSCALE_SORT_NET_INST
 
 #endif // ROBSCALE_SORT_NET_H
