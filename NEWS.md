@@ -1,3 +1,67 @@
+# robscale 0.4.0
+
+## Performance
+
+* **Fused single-pass NR kernel for `robLoc()`** (OPT-L1): `rob_loc_nr_step_avx2`
+  collapses the three-pass Newton--Raphson loop (scale residuals, `bulk_tanh`,
+  accumulate) into a single AVX2 pass. Two accumulators advance in lockstep:
+  `acc_psi` via `addpd` and `acc_p2` via `fmadd` ($p_i^2 = \tanh^2(u_i)$).
+  The derivative sum follows from $\sum \text{sech}^2(u_i) = n - \sum \tanh^2(u_i)$,
+  avoiding a second transcendental evaluation. A degenerate-scale guard
+  (`sum_dpsi < DBL_MIN`) prevents NaN on near-constant inputs.
+
+* **RuntimeConfig hoist for `robLoc()`** (OPT-L2): The SIMD dispatch flag
+  was re-read from thread-local storage on every Newton--Raphson iteration.
+  CPUID features are invariant over process lifetime; the flag is now hoisted
+  once before the loop. Added `bulk_tanh_dispatched()` to `robust_core.h` to
+  accept the pre-hoisted flag.
+
+* **Warm-cache MAD for `robLoc()`** (OPT-L4): `rob_loc_core` copies input
+  into `buf[]` and selects the median in place. MAD is permutation-invariant,
+  so `mad_select` now reads from `buf[]`---warm in L1/L2 cache---rather than
+  the cold input array.
+
+* **TBB parallel NR for `robLoc()`** (OPT-L3): For $n \geq \max(4096, L_2/32)$,
+  `rob_loc_parallel_compute` partitions the array across TBB threads via
+  `parallel_reduce`. Each chunk calls `rob_loc_nr_step_avx2`; an `NRAccum`
+  struct accumulates partial sums with `operator+=`.
+
+* **Combined speedup:** These four optimizations yield **2.6--4.1x** speedup
+  over `revss` for `robLoc()` at $n = 100$ to $10{,}000$ on x86\_64 with AVX2
+  (benchmark ratios: 0.347 at $n = 100$, 0.243 at $n = 10{,}000$).
+
+* **Sorting-network threshold corrected for `robScale()`** (OPT-A): Lowered
+  `ROBSCALE_SORT_MEDIAN_THRESHOLD` from 64 to 16. The median-net comparator
+  count grows as $O(n^{1.5})$ ($n = 64$: 337 swaps; $n = 16$: 46 swaps);
+  Floyd--Rivest is $O(n)$, crossing over at $n \approx 16$. Using sorting
+  networks up to $n = 64$ incurred ~3.5× unnecessary overhead per median call.
+  This change eliminates the $n = 500$--$1{,}000$ regression in `robScale()`:
+  benchmarks show ratios 0.201 ($n = 500$) and 0.174 ($n = 1{,}000$), versus
+  1.126 and 1.122 before the fix (a 5--6× reversal).
+
+* **PLT elimination for `median_net<T>`** (OPT-B): Added
+  `__attribute__((visibility("hidden")))` to the `median_net<T>` template
+  definition in `sort_net.h`. On Linux `-fPIC`, this eliminates PLT
+  indirection for all intra-DSO calls, replacing the W (weak) symbol with a
+  direct $t$ (local) binding.
+
+* **`adm()` hot-buffer pass** (OPT-A): `adm_impl_auto()` now passes the
+  already-copied working buffer to `adm_core()` rather than the cold SEXP
+  pointer. The $n$ doubles remain in L1/L2 cache from the initial copy
+  through the deviation sum, avoiding an additional cold read.
+
+* **`adm()` stack-frame split** (OPT-B): Extracted `adm_large_n()` as a
+  `ROBSCALE_NOINLINE` helper. This reduces the `adm_impl_auto()` stack frame
+  from 8,256 to 624 bytes (objdump verified), preventing the 32 KB large-$n$
+  buffer from penalizing small calls.
+
+## Internal
+
+* Added `rob_loc_scalar_impl`, `rob_loc_has_parallel`, and `rob_loc_serial_impl`
+  diagnostic exports for TDD correctness gates.
+* Added compile-time diagnostic helpers (`src/diag.cpp`) for sorting-network
+  threshold validation; not user-facing.
+
 # robscale 0.3.0
 
 ## Performance
