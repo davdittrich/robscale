@@ -12433,6 +12433,9 @@ inline T median_net_64(T* x) {
 }
 
 template <typename T>
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((visibility("hidden")))
+#endif
 inline T median_net(T* x, size_t n) {
   switch (n) {
     case 0: return T(0);

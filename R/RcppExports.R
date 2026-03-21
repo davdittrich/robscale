@@ -9,6 +9,18 @@ adm_impl_auto <- function(x, constant) {
     .Call(`_robscale_adm_impl_auto`, x, constant)
 }
 
+rob_scale_diag_impl <- function(x_r, maxit = 80L, tol = 1.4901161193847656e-8) {
+    .Call(`_robscale_rob_scale_diag_impl`, x_r, maxit, tol)
+}
+
+bench_median_net_impl <- function(x) {
+    .Call(`_robscale_bench_median_net_impl`, x)
+}
+
+bench_fr_select_impl <- function(x) {
+    .Call(`_robscale_bench_fr_select_impl`, x)
+}
+
 cpp_scale_ensemble <- function(x, n_boot) {
     .Call(`_robscale_cpp_scale_ensemble`, x, n_boot)
 }
