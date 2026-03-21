@@ -22,13 +22,11 @@ compute_bca_speedup <- function(target_times, ref_times, R = 2000) {
     ref_med / target_med
   }
 
-  # Bootstrap — parallelise across cores for faster CI computation at R=2000.
-  # Falls back to "no" parallelism if ncores=1 (avoids fork overhead).
-  n_cores <- max(1L, parallel::detectCores(logical = FALSE))
-  par_type <- if (n_cores > 1L) "multicore" else "no"
+  # Bootstrap — run serially: this function is already called from mclapply,
+  # so inner boot parallelism would nest forks (n_cores^2 processes, crash risk).
   set.seed(42)
   b <- boot::boot(boot_data, ratio_median, R = R,
-                  parallel = par_type, ncpus = n_cores)
+                  parallel = "no")
 
   # Try BCa; boot.ci warns (does not error) when all t are equal, returning
   # NULL for $bca.  Treat a NULL or short result as an error so the fallback
@@ -111,16 +109,16 @@ analyze_benchmarks <- function(rob, legacy) {
       return(NULL)
     }
 
-    # Parallelize across rows using mclapply (base R parallel)
-    # This is more efficient for our row-wise structure than inner boot parallelism
+    # Parallelize across rows using mclapply (all physical cores).
+    # boot::boot inside each worker runs serially — no nested fork risk.
     n_cores <- parallel::detectCores(logical = FALSE)
-    
+
     indices <- seq_len(nrow(df))
     ll <- parallel::mclapply(indices, function(i) {
       row <- df[i, ]
       target_data <- as.numeric(row[[target_col]][[1]])
       ref_data <- as.numeric(row[[ref_col]][[1]])
-      
+
       analysis <- compute_bca_speedup(target_data, ref_data)
       cbind(row, as.data.frame(analysis))
     }, mc.cores = n_cores)

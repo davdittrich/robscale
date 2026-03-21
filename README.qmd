@@ -1,5 +1,5 @@
 ---
-title: "robscale: A Comprehensive Toolkit for Robust Scale Estimation"
+title: "robscale: A Comprehensive Toolkit for Robust Location and Scale Estimation"
 format:
   gfm:
     toc: false
@@ -161,7 +161,7 @@ most widely used robust implementations in R---`revss` for small-sample
 M-estimation and `robustbase` for the $Q_n$ and $S_n$ scale estimators---carry
 significant computational overhead for time-critical applications.
 
-`robscale` v0.3.0 provides 11 exported functions spanning the full
+`robscale` v0.4.0 provides 11 exported functions spanning the full
 robustness--efficiency spectrum: from the non-robust but
 maximally efficient bias-corrected standard deviation (`sd_c4`, 100% ARE) through
 the Gini mean difference (`gmd`, 98% ARE, 29.3% breakdown), to
@@ -176,7 +176,8 @@ All estimators are implemented as C++17 kernels. The M-estimators use vectorized
 iteration; $Q_n$ and $S_n$ use parallelized $O(n \log n)$ algorithms via TBB.
 Against `revss`, the package achieves
 **`r m_speedup_min`--`r m_speedup_max`x** speedups for the small-sample
-M-estimators. Against `robustbase`, it achieves
+M-estimators and **2.6--4.1x** for `robLoc()` at $n = 100$ to $10{,}000$
+via a fused single-pass AVX2 Newton--Raphson kernel. Against `robustbase`, it achieves
 **`r sn_speedup_min`--`r sn_speedup_max`x** for $S_n$ and
 **`r qn_speedup_min`--`r qn_speedup_max`x** for $Q_n$---with gains peaking near
 **`r max_large_speedup`x** at $n = 10^7$ as TBB parallelism reduces the
@@ -653,10 +654,10 @@ this identity to reduce $\psi_{\log}$ to a single `tanh` call. The identity is n
   3. **OpenMP SIMD.** A compiler-guided fallback via `#pragma omp simd`.
   4. **Scalar.** Standard `std::tanh` fallback.
 
-For $n \leq 64$ the vectorized paths are bypassed in favour of a simple scalar
-loop---the setup overhead exceeds any SIMD benefit at that batch size. SIMD
-acceleration therefore applies to the scale iteration for larger samples, not
-the small-sample M-estimator regime (which targets $n \leq 20$).
+For $n < 8$ the vectorized paths are bypassed in favour of a simple scalar
+loop---fewer than two full AVX2 vectors yield no net gain over scalar code. SIMD
+acceleration therefore applies to the scale iteration at $n \geq 8$, covering
+the M-estimator regime and all larger samples.
 
 ### 2. Newton--Raphson iteration for location
 
@@ -750,6 +751,16 @@ Several estimators use an adaptive selection strategy that switches between
 Floyd--Rivest and pdqselect (miniselect) based on a runtime threshold derived
 from the per-core L2 cache size. Section 9 describes this dispatch in detail.
 
+`ROBSCALE_SORT_MEDIAN_THRESHOLD` controls when `median_select` delegates to
+sorting networks vs. introselect. In v0.4.0 this threshold was corrected from
+64 to 16: median-net comparator counts grow as $O(n^{1.5})$---674 total swaps
+at $n = 64$ vs. 96 for introselect---while the crossover with Floyd--Rivest
+falls near $n = 16$. Using sorting networks through $n = 64$ imposed ~3.5×
+unnecessary overhead per MAD initialization, causing a measurable regression
+in `robScale()` at $n = 500$--$1{,}000$ relative to `revss`. The corrected
+threshold eliminates the regression: `robScale()` now runs at 0.17--0.20 of
+`revss` time at those sizes.
+
 ### 4. Arena allocation and fused single-buffer algorithms
 
 Each estimator requires working arrays: a copy of the input (for destructive
@@ -771,9 +782,13 @@ the second scratch array. This halves memory from $2n$ to $n$ doubles per
 estimator and reduces cache pressure in the ensemble, where multiple estimators
 share working memory.
 
-The `robLoc()` and `robScale()` entry points separate the small-$n$ path
-($n \leq 64$) into `ROBSCALE_NOINLINE` helpers with a 1 KB stack frame,
-so that the 32 KB large-$n$ buffer does not penalize small calls.
+The `robLoc()`, `robScale()`, and `adm()` entry points separate the large-$n$
+path into `ROBSCALE_NOINLINE` helpers so that the 32 KB large-$n$ buffer does
+not penalize small calls. For `adm()`, this extraction (`adm_large_n()`) shrinks
+the `adm_impl_auto()` stack frame from 8,256 to 624 bytes. Since v0.4.0,
+`adm_core()` receives the hot copy buffer rather than the cold input pointer, so
+the $n$ doubles stay in L1/L2 cache from the initial copy through the deviation
+accumulation loop.
 
 ### 5. Compile-time reciprocal constants
 
@@ -890,6 +905,53 @@ $$
 where $\hat\sigma_j^2$ is the sample variance of estimator $j$ across bootstrap
 replicates. The final estimate is $\hat\sigma = \sum_j w_j \cdot \hat\sigma_j(x)$
 evaluated on the original data.
+
+### 11. Fused single-pass Newton--Raphson kernel for location
+
+The standard three-pass Newton--Raphson step for `robLoc()` scales residuals
+$u_i = (x_i - t)/(2s)$ into a scratch buffer, applies `bulk_tanh`, then
+accumulates $\sum \psi_i$ and $\sum \text{dpsi}_i$ in a second sweep. Each
+iteration therefore reads $n$ doubles three times.
+
+**Fused AVX2 kernel.** `rob_loc_nr_step_avx2` collapses all three passes into
+one. Two AVX2 accumulators advance in lockstep---`acc_psi` via `addpd` and
+`acc_p2` via `fmadd`---for each batch of four doubles:
+
+$$
+\texttt{acc\_psi} \mathrel{+}= p_i, \qquad \texttt{acc\_p2} \mathrel{+}= p_i^2
+$$
+
+where $p_i = \tanh(u_i)$ is evaluated once via `ROBSCALE_TANH4_AVX2` (glibc
+`libmvec` on AVX2 systems, SLEEF as fallback). The derivative sum follows from
+$\text{sech}^2(u) = 1 - \tanh^2(u)$:
+
+$$
+\sum \text{dpsi} = n - \sum p_i^2
+$$
+
+Using `fmadd` for $p_i^2$ incurs a single rounding step, preserving
+non-negativity. A degenerate-scale guard (`sum_dpsi < DBL_MIN`) catches
+pathological inputs where $|u_i| \gg 1$ and $\sum \text{dpsi} \to 0$.
+
+**RuntimeConfig hoist.** The dispatch flag for the AVX2 path was re-read from
+thread-local storage on every Newton--Raphson iteration. Because CPUID features
+are invariant over process lifetime, the flag is hoisted once before the loop
+and passed to `bulk_tanh_dispatched()` directly.
+
+**Warm-cache MAD.** `rob_loc_core` copies the input into a working buffer
+`buf[]` and selects the median in place. Because MAD is permutation-invariant
+($\{|b_i - m|\} = \{|x_i - m|\}$ for any permutation $b$ of $x$), the
+subsequent `mad_select` call reads from `buf[]`---warm in L1/L2 cache---rather
+than the cold input array.
+
+**TBB parallel reduction.** For $n \geq \max(4096, L_2/32)$,
+`rob_loc_parallel_compute` partitions the array across TBB threads via
+`parallel_reduce`. Each chunk calls `rob_loc_nr_step_avx2`; an `NRAccum`
+struct accumulates partial sums and combines them with `operator+=`.
+
+Together these four optimizations yield **2.6--4.1x** speedup over `revss` for
+`robLoc()` at $n = 100$ to $10{,}000$ on x86\_64 with AVX2 (benchmark ratios:
+0.347 at $n = 100$, 0.243 at $n = 10{,}000$).
 
 ```{r}
 #| label: tbl-qn-bench
@@ -1029,6 +1091,10 @@ In the target regime ($n \le 20$), `robscale` outperforms `revss` by
 - Achieving quadratic convergence with Newton--Raphson (3 iterations vs 6--8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $n \le 16$.
+- Fusing the three-pass Newton--Raphson inner loop into a single AVX2 pass for `robLoc()` (v0.4.0).
+- Correcting the sorting-network threshold from 64 to 16, eliminating $O(n^{1.5})$ overhead
+  in MAD initialization and the $n = 500$--$1{,}000$ regression for `robScale()` (v0.4.0).
+- Passing the hot copy buffer to `adm_core()`, reducing a redundant cache miss per call (v0.4.0).
 
 Even at $n = 16{,}384$, the gains remain **`r m_16k_min`--`r m_16k_max`x** because the interpreter
 overhead of `revss` scales with the number of Newton--Raphson iterations, not
