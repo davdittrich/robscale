@@ -35,14 +35,22 @@
 #define ROBSCALE_SORT_BOOST_THRESHOLD  512
 
 /**
- * Threshold for median_select: use small_sort (NBIS) for n <= this value,
- * floyd_rivest_select for n > this value. Empirically calibrated: NBIS
- * (branchless O(n²)) beats floyd_rivest_select for small n because NBIS has
- * zero branch mispredictions and full L1 residency. Set conservatively at 32;
- * raise after benchmarking Phase 3+4 of the optimization plan.
+ * Threshold for median_select: use median_net (partial sort network) for
+ * n <= this value, floyd_rivest_select (→ std::nth_element for n < 600)
+ * for n > this value.
+ *
+ * Calibrated 2026-03-21 (OPT-A):
+ *   - median_net comparator growth is O(n^1.5): n=8→16 swaps, n=16→46,
+ *     n=32→128, n=64→337.  Called TWICE per rob_scale_core (median + MAD).
+ *   - FR/nth_element is O(n) throughout.
+ *   - Theoretical crossover at n~16 (FR overhead ≈ 12 comparisons vs 46 for
+ *     network at n=16).  Confirmed by Gemini analysis and benchmark evidence
+ *     (see findings.md F-10 and F-2).
+ *   - Set to 16: at n≤16 the network is tighter (16–46 swaps, fits L1
+ *     entirely); at n>16 FR wins and the gap grows with n.
  */
 #ifndef ROBSCALE_SORT_MEDIAN_THRESHOLD
-#define ROBSCALE_SORT_MEDIAN_THRESHOLD 64
+#define ROBSCALE_SORT_MEDIAN_THRESHOLD 16
 #endif
 
 

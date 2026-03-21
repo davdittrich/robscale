@@ -35,6 +35,41 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// rob_scale_diag_impl
+Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r, int maxit, double tol);
+RcppExport SEXP _robscale_rob_scale_diag_impl(SEXP x_rSEXP, SEXP maxitSEXP, SEXP tolSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x_r(x_rSEXP);
+    Rcpp::traits::input_parameter< int >::type maxit(maxitSEXP);
+    Rcpp::traits::input_parameter< double >::type tol(tolSEXP);
+    rcpp_result_gen = Rcpp::wrap(rob_scale_diag_impl(x_r, maxit, tol));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bench_median_net_impl
+double bench_median_net_impl(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_bench_median_net_impl(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(bench_median_net_impl(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// bench_fr_select_impl
+double bench_fr_select_impl(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_bench_fr_select_impl(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(bench_fr_select_impl(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_scale_ensemble
 double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot);
 RcppExport SEXP _robscale_cpp_scale_ensemble(SEXP xSEXP, SEXP n_bootSEXP) {
@@ -255,6 +290,9 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
+    {"_robscale_rob_scale_diag_impl", (DL_FUNC) &_robscale_rob_scale_diag_impl, 3},
+    {"_robscale_bench_median_net_impl", (DL_FUNC) &_robscale_bench_median_net_impl, 1},
+    {"_robscale_bench_fr_select_impl", (DL_FUNC) &_robscale_bench_fr_select_impl, 1},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
     {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},
     {"_robscale_C_sn_sorted", (DL_FUNC) &_robscale_C_sn_sorted, 1},
