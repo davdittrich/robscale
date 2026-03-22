@@ -60,9 +60,29 @@ inline double mad_from_data(const double* x, double* buf, int n) {
 
 // IQR: incremental pdqselect, O(n)
 // Uses buf1 only; buf2 is unused (signature kept for call-site compatibility)
+// OPT-I6: n<=16 handled by iqr_small_sort() (defined in iqr.cpp) called
+// directly before the pdqselect path, keeping this function's hot code compact.
 inline double iqr(const double* x, double* buf1, double* buf2, int n) {
   (void)buf2;
   if (n < 2) return 0.0;
+
+  // OPT-I6: n<=16 sort-once-then-index fast path.
+  // buf1 is used for the copy — avoids declaring a separate local buffer.
+  if (n <= 16) {
+    std::memcpy(buf1, x, static_cast<size_t>(n) * sizeof(double));
+    double h1 = (n - 1.0) * 0.25;
+    int lo1 = static_cast<int>(h1);
+    double frac1 = h1 - lo1;
+    double h3 = (n - 1.0) * 0.75;
+    int lo3 = static_cast<int>(h3);
+    double frac3 = h3 - lo3;
+    robscale::small_sort(buf1, static_cast<size_t>(n));
+    double q1 = buf1[lo1];
+    if (frac1 > 0.0) q1 += frac1 * (buf1[lo1 + 1] - q1);
+    double q3 = buf1[lo3];
+    if (frac3 > 0.0 && lo3 + 1 < n) q3 += frac3 * (buf1[lo3 + 1] - q3);
+    return (q3 - q1) * IQR_CONSISTENCY;
+  }
 
   std::memcpy(buf1, x, n * sizeof(double));
 
