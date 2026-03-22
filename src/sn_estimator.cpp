@@ -124,6 +124,27 @@ double sn_kernel(const T* sorted_x, size_t n) {
   return raw * CONST_SN * get_sn_factor(n);
 }
 
+// OPT-S1: Large-n heap path extracted into a NOINLINE function to isolate the
+// large heap-allocation frame from the hot small-n stack path. This mirrors the
+// OPT-M1/OPT-I1 pattern: the compiler can now fully inline and optimise the
+// small-n branch without the large-n allocation machinery polluting the
+// instruction cache or preventing stack-frame optimisations.
+template <typename T>
+ROBSCALE_NOINLINE double C_sn_impl_large(const T* x_ptr, size_t n) {
+  std::unique_ptr<T[]> sorted_buf(new T[n]);
+  T* sorted_x = sorted_buf.get();
+
+  for (size_t i = 0; i < n; ++i) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_x[i] = x_ptr[i];
+  }
+  optimized_sort(sorted_x, sorted_x + n);
+
+  return sn_kernel(sorted_x, n);
+}
+
 template <typename T>
 double C_sn_impl(const T* x_ptr, size_t n) {
   if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
@@ -150,19 +171,7 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     return sn_kernel(sorted_x, n);
   }
 
-  // Heap path: copy + sort, then delegate to kernel
-  std::unique_ptr<T[]> sorted_buf(new T[n]);
-  T* sorted_x = sorted_buf.get();
-
-  for (size_t i = 0; i < n; ++i) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-    }
-    sorted_x[i] = x_ptr[i];
-  }
-  optimized_sort(sorted_x, sorted_x + n);
-
-  return sn_kernel(sorted_x, n);
+  return C_sn_impl_large(x_ptr, n);
 }
 
 // Sorted variant: input MUST be sorted ascending. No copy, no sort, no NaN scan.
