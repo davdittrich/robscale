@@ -1,3 +1,35 @@
+# robscale 0.5.1
+
+## Performance
+
+* **`mad_scaled()` small-n stack frame reduced 16 KB → 512 B** (OPT-M1): `mad_impl_auto`
+  and `mad_impl_center` now route `n > 64` through `ROBSCALE_NOINLINE` helpers.
+  The 16 KB `buf_stack[2048]` is declared only in those helpers, never in the entry frame.
+
+* **`#pragma omp simd` on all deviation loops** (OPT-M2): All absolute-deviation loops
+  in `mad_impl_auto`, `mad_impl_center`, and their large-n helpers are SIMD-annotated
+  via the established `ROBSCALE_HAS_OMP_SIMD` guard pattern.
+
+* **`ROBSCALE_RESTRICT` on NOINLINE helper parameters** (OPT-M3): `mad_impl_auto_large`
+  and `mad_impl_center_large` carry `ROBSCALE_RESTRICT` on their input pointers,
+  allowing the compiler to generate stronger SIMD code.
+
+* **`bulk_abs_diff` / `bulk_abs_diff_inplace` shared SIMD kernels** (OPT-M4): Two
+  inline SIMD kernels added to `src/robust_core.h`. All six deviation loops in
+  `mad.cpp` are replaced with kernel calls. n=1000 shows ~2–3.5% improvement.
+
+* **`mad_from_data` uses `bulk_abs_diff_inplace`** (OPT-M5): The deviation loop in
+  `estimators_internal.h::mad_from_data` (used by the ensemble compute path) is
+  replaced with the shared kernel.
+
+* **Ensemble MAD block uses `bulk_abs_diff`** (OPT-M6): The per-replicate deviation
+  loop in `ensemble_one_replicate` is replaced with `bulk_abs_diff`.
+
+* **V-shaped deviation median in ensemble MAD block** (OPT-M7): Since `resample` is
+  sorted, the deviation array is V-shaped. `vshaped_mad` finds the median of the two
+  sorted halves via O(log n) binary search (`kth_of_two_sorted`), replacing the O(n)
+  `median_select` call and eliminating the `work2` write-read cycle.
+
 # robscale 0.5.0
 
 ## Performance
