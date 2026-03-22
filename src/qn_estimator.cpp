@@ -393,20 +393,12 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
   return final_raw * CONST_QN * get_qn_factor(n);
 }
 
+// Large-n path: heap allocation + copy + sort + refinement. Extracted NOINLINE
+// so the compiler does not spill qn_refinement_kernel's large local objects
+// (float[n], int32_t[3n], vector<size_t>) into C_qn_impl's stack frame,
+// keeping the hot small-n brute-force path's frame minimal.
 template <typename T>
-double C_qn_impl(const T* x_ptr, size_t n) {
-  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
-  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
-    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
-  }
-
-  const auto& config = RuntimeConfig::get();
-
-  if (n <= config.qn_exact_threshold) {
-    return qn_brute_force_exact(x_ptr, n);
-  }
-
-  // Copy + sort, then delegate to refinement kernel
+ROBSCALE_NOINLINE double C_qn_impl_large(const T* x_ptr, size_t n) {
   std::unique_ptr<T[]> sorted_x_buf;
   try {
     sorted_x_buf.reset(new T[n]);
@@ -414,7 +406,6 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     Rcpp::stop("robscale Out of Memory: failed to allocate Qn sorted buffer.");
   }
   T* sorted_x = sorted_x_buf.get();
-
   for (size_t i = 0; i < n; i++) {
     if constexpr (std::is_floating_point_v<T>) {
       if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
@@ -422,8 +413,20 @@ double C_qn_impl(const T* x_ptr, size_t n) {
     sorted_x[i] = x_ptr[i];
   }
   optimized_sort(sorted_x, sorted_x + n);
-
   return qn_refinement_kernel(sorted_x, n);
+}
+
+template <typename T>
+double C_qn_impl(const T* x_ptr, size_t n) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
+    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
+  }
+  const auto& config = RuntimeConfig::get();
+  if (n <= config.qn_exact_threshold) {
+    return qn_brute_force_exact(x_ptr, n);
+  }
+  return C_qn_impl_large(x_ptr, n);
 }
 
 // Sorted variant: input MUST be sorted ascending. No copy, no sort, no NaN scan.
@@ -440,6 +443,7 @@ double C_qn_impl_sorted(const T* sorted_x, size_t n) {
 }
 
 // Explicit template instantiations
+template double C_qn_impl_large<double>(const double*, size_t);
 template double C_qn_impl_sorted<double>(const double*, size_t);
 template double C_qn_impl<double>(const double*, size_t);
 template double C_qn_impl<int>(const int*, size_t);
@@ -449,8 +453,39 @@ template double C_qn_impl<int>(const int*, size_t);
 // --- R EXPORTS ---
 
 // [[Rcpp::export]]
-double C_qn_fast(Rcpp::NumericVector x) { 
-  return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size())); 
+double C_qn_fast(Rcpp::NumericVector x) {
+  return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size()));
+}
+
+// Diagnostic export for WU-Q1 H2H benchmarking: pre-NOINLINE version with
+// large-n path inline. Remove after WU-Q3 commits.
+// [[Rcpp::export]]
+double C_qn_fast_orig(Rcpp::NumericVector x) {
+  using namespace robscale::qnsn;
+  const double* x_ptr = x.begin();
+  size_t n = static_cast<size_t>(x.size());
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
+    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
+  }
+  const auto& config = RuntimeConfig::get();
+  if (n <= config.qn_exact_threshold) {
+    return qn_brute_force_exact(x_ptr, n);
+  }
+  // Inline large-n path (no NOINLINE) — mirrors pre-WU-Q1 C_qn_impl behaviour.
+  std::unique_ptr<double[]> sorted_x_buf;
+  try {
+    sorted_x_buf.reset(new double[n]);
+  } catch (const std::bad_alloc& e) {
+    Rcpp::stop("robscale Out of Memory: failed to allocate Qn sorted buffer.");
+  }
+  double* sorted_x = sorted_x_buf.get();
+  for (size_t i = 0; i < n; i++) {
+    if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    sorted_x[i] = x_ptr[i];
+  }
+  optimized_sort(sorted_x, sorted_x + n);
+  return qn_refinement_kernel(sorted_x, n);
 }
 
 // [[Rcpp::export]]
