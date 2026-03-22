@@ -263,9 +263,53 @@ double C_sn_impl_sorted(const T* sorted_x, size_t n) {
   return sn_kernel(sorted_x, n);
 }
 
+// OPT-S7: Workspace-accepting overload of sn_kernel for large-n heap path.
+// When workspace != nullptr AND n > sn_stack_threshold, the provided buffer
+// (caller guarantees >= n elements) is used as inner_medians instead of
+// heap-allocating. For n <= sn_stack_threshold the workspace is ignored and
+// the existing stack path (Tier 1 or Tier 2) is used unchanged.
+template <typename T>
+double sn_kernel(const T* sorted_x, size_t n, T* workspace) {
+  const auto& config = RuntimeConfig::get();
+  if (n <= config.sn_stack_threshold) {
+    // Tier 1 / Tier 2: stack path unchanged — workspace ignored.
+    return sn_kernel(sorted_x, n);
+  }
+  // Tier 3 heap path: use caller-supplied workspace instead of heap-allocating.
+  // workspace != nullptr is a pre-condition for n > sn_stack_threshold callers.
+  T* inner_medians = workspace;
+  if (n < config.sn_parallel_threshold) {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
+    worker(0, n);
+  } else {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
+#ifdef USE_DIRECT_TBB
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
+                      [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
+#else
+    RcppParallel::parallelFor(0, n, worker, config.grain_size);
+#endif
+  }
+  double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
+  return raw * CONST_SN * get_sn_factor(n);
+}
+
+// OPT-S7: Workspace-accepting overload of C_sn_impl_sorted.
+// Delegates to the workspace-accepting sn_kernel. workspace may be nullptr
+// only when n <= sn_stack_threshold (stack path ignores it); for n above
+// the threshold the caller must supply a buffer of >= n doubles.
+// Pre-condition: n >= 2 (guarded by the n < 2 check below).
+template <typename T>
+double C_sn_impl_sorted(const T* sorted_x, size_t n, T* workspace) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  assert(std::is_sorted(sorted_x, sorted_x + n));
+  return sn_kernel(sorted_x, n, workspace);
+}
+
 // Explicit template instantiations
 template double C_sn_impl<double>(const double*, size_t);
 template double C_sn_impl_sorted<double>(const double*, size_t);
+template double C_sn_impl_sorted<double>(const double*, size_t, double*);
 
 } // namespace robscale::qnsn
 

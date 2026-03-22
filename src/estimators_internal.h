@@ -15,6 +15,8 @@ namespace robscale::qnsn {
   template <typename T> double C_sn_impl(const T* x, size_t n);
   template <typename T> double C_qn_impl_sorted(const T* x, size_t n);
   template <typename T> double C_sn_impl_sorted(const T* x, size_t n);
+  // OPT-S7: workspace-accepting overload (Tier 3 only; workspace ignored for n <= sn_stack_threshold)
+  template <typename T> double C_sn_impl_sorted(const T* x, size_t n, T* workspace);
 }
 
 // rob_scale_compute: promoted from static in rob_scale.cpp
@@ -173,6 +175,14 @@ inline double qn(const double* x, int n) {
 // C_sn_impl_sorted retains its own n < 2 guard as defense-in-depth (returns R_NaReal).
 inline double sn_sorted(const double* sorted_x, int n) {
   return robscale::qnsn::C_sn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
+}
+
+// OPT-S7: workspace-accepting overload. workspace must point to a buffer of >= n doubles.
+// For n <= sn_stack_threshold, workspace is unused (stack path). For n > threshold,
+// workspace replaces the inner_medians heap allocation, eliminating per-bootstrap alloc.
+// Pre-condition: n >= 2 (same as sn_sorted above — no guard added here).
+inline double sn_sorted(const double* sorted_x, int n, double* workspace) {
+  return robscale::qnsn::C_sn_impl_sorted<double>(sorted_x, static_cast<size_t>(n), workspace);
 }
 
 inline double qn_sorted(const double* sorted_x, int n) {
