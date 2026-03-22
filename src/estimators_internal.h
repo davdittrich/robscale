@@ -153,7 +153,10 @@ inline double sd_c4(const double* x, int n) {
   return sd / robscale::c4_factor(n);
 }
 
-// Sn: delegates to existing optimized implementation
+// Sn: delegates to existing optimized implementation.
+// NOTE: guard retained — compute_all_estimators() is called with n-1 in the
+// BCa jackknife loop (ensemble.cpp:379); n=2 input reaches sn(x, 1) here.
+// sn_sorted() below is safe without a guard (bootstrap always uses full n).
 inline double sn(const double* x, int n) {
   if (n < 2) return 0.0;
   return robscale::qnsn::C_sn_impl<double>(x, static_cast<size_t>(n));
@@ -166,8 +169,9 @@ inline double qn(const double* x, int n) {
 }
 
 // Sorted variants: input MUST be sorted ascending. No copy, no sort.
+// Pre-condition: callers must guarantee n >= 2.
+// C_sn_impl_sorted retains its own n < 2 guard as defense-in-depth (returns R_NaReal).
 inline double sn_sorted(const double* sorted_x, int n) {
-  if (n < 2) return 0.0;
   return robscale::qnsn::C_sn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
 }
 
