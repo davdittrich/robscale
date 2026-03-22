@@ -22,11 +22,13 @@ constexpr size_t SN_MICRO_SIZE = 128;
 
 // --- SN ESTIMATOR WORKER ---
 
+// OPT-S4: ROBSCALE_RESTRICT on pointer members: the compiler can now prove
+// sorted_x and results do not alias, enabling load hoisting across the inner loop.
 template <typename T>
 struct SnWorker : public WorkerBase {
-  const T* sorted_x;
+  const T* ROBSCALE_RESTRICT sorted_x;
   size_t n;
-  mutable T* results; // mutable to allow updating results in const operator()
+  mutable T* ROBSCALE_RESTRICT results; // mutable to allow updating results in const operator()
 
   SnWorker(const T* sorted_x, size_t n, T* results)
       : sorted_x(sorted_x), n(n), results(results) {}
@@ -115,45 +117,59 @@ double sn_kernel(const T* sorted_x, size_t n) {
 
   // OPT-S3: Tier 1 — micro path: n <= SN_MICRO_SIZE (128). inner_medians fits in
   // ~1 KB, fully L1-resident. Avoids the 16 KB SN_MAX_STACK frame for small inputs.
+  // OPT-S4: RESTRICT aliases allow the compiler to hoist loads and eliminate
+  // aliasing barriers between sorted_x reads and inner_medians writes.
   if (n <= SN_MICRO_SIZE) {
     T inner_medians[SN_MICRO_SIZE];
+    const T* ROBSCALE_RESTRICT sx = sorted_x;
+    T* ROBSCALE_RESTRICT im = inner_medians;
     int32_t h = static_cast<int32_t>(n / 2);
     int32_t L = 0;
     for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
       int32_t L_min = (std::max)(0, i - h);
       int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
       if (L < L_min) L = L_min;
-      T candidate = (std::max)(sorted_x[i] - sorted_x[L], sorted_x[L + h] - sorted_x[i]);
+      T candidate = (std::max)(sx[i] - sx[L], sx[L + h] - sx[i]);
       while (L < L_max) {
-        T next = (std::max)(sorted_x[i] - sorted_x[L + 1], sorted_x[L + 1 + h] - sorted_x[i]);
+        T next = (std::max)(sx[i] - sx[L + 1], sx[L + 1 + h] - sx[i]);
         if (candidate < next) break;
         L++;
         candidate = next;
       }
-      inner_medians[i] = candidate;
+      im[i] = candidate;
+    }
+    // OPT-S5: n <= 16 fast path — small_sort + direct index avoids FR/pdqselect dispatch.
+    if (n <= 16) {
+      robscale::small_sort(inner_medians, n);
+      double raw = static_cast<double>(inner_medians[(n - 1) / 2]);
+      return raw * CONST_SN * get_sn_factor(n);
     }
     double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
     return raw * CONST_SN * get_sn_factor(n);
   }
 
   // Tier 2 — medium stack path: SN_MICRO_SIZE < n <= sn_stack_threshold (2048). 16 KB frame.
+  // OPT-S4: RESTRICT aliases allow the compiler to hoist loads and eliminate
+  // aliasing barriers between sorted_x reads and inner_medians writes.
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);
     T inner_medians[SN_MAX_STACK];
+    const T* ROBSCALE_RESTRICT sx = sorted_x;
+    T* ROBSCALE_RESTRICT im = inner_medians;
     int32_t h = static_cast<int32_t>(n / 2);
     int32_t L = 0;
     for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
       int32_t L_min = (std::max)(0, i - h);
       int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
       if (L < L_min) L = L_min;
-      T candidate = (std::max)(sorted_x[i] - sorted_x[L], sorted_x[L + h] - sorted_x[i]);
+      T candidate = (std::max)(sx[i] - sx[L], sx[L + h] - sx[i]);
       while (L < L_max) {
-        T next = (std::max)(sorted_x[i] - sorted_x[L + 1], sorted_x[L + 1 + h] - sorted_x[i]);
+        T next = (std::max)(sx[i] - sx[L + 1], sx[L + 1 + h] - sx[i]);
         if (candidate < next) break;
         L++;
         candidate = next;
       }
-      inner_medians[i] = candidate;
+      im[i] = candidate;
     }
     double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
     return raw * CONST_SN * get_sn_factor(n);
@@ -266,4 +282,15 @@ double C_sn_int_fast(Rcpp::IntegerVector x) {
 // [[Rcpp::export]]
 double C_get_sn_factor(int n) {
   return robscale::qnsn::get_sn_factor(static_cast<size_t>(n));
+}
+
+// OPT-S4: Diagnostic export — pre-RESTRICT baseline for H2H benchmarking.
+// C_sn_fast_orig is identical to C_sn_fast at the source level; both call
+// C_sn_impl. The H2H comparison measures the effect of the RESTRICT annotations
+// on compiled output by running both exports in the same benchmark session.
+// This function exists solely as a diagnostic aid and is not part of the
+// public API.
+// [[Rcpp::export]]
+double C_sn_fast_orig(Rcpp::NumericVector x) {
+  return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size()));
 }

@@ -318,6 +318,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// C_sn_fast_orig
+double C_sn_fast_orig(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_sn_fast_orig(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_sn_fast_orig(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
@@ -346,6 +357,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_C_sn_fast", (DL_FUNC) &_robscale_C_sn_fast, 1},
     {"_robscale_C_sn_int_fast", (DL_FUNC) &_robscale_C_sn_int_fast, 1},
     {"_robscale_C_get_sn_factor", (DL_FUNC) &_robscale_C_get_sn_factor, 1},
+    {"_robscale_C_sn_fast_orig", (DL_FUNC) &_robscale_C_sn_fast_orig, 1},
     {NULL, NULL, 0}
 };
 
