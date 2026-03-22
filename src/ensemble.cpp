@@ -41,26 +41,37 @@ static void ensemble_one_replicate(
     resample[i] = xp[rng.next() % n];
   }
 
-  // Sort resample once — all estimators below exploit sorted order
+  // Sort resample once — all estimators below exploit sorted order.
+  // OPT-G4: boost::float_sort (serial radix) for n > sort_boost_threshold.
+  //   tbb::parallel_sort is PROHIBITED: nested TBB inside tbb::parallel_for
+  //   causes oversubscription (same constraint as rob_scale_compute here).
   if (n <= 16) {
     robscale::small_sort(resample, n);
   } else {
-    std::sort(resample, resample + n);
+    const size_t boost_thresh =
+      robscale::qnsn::RuntimeConfig::get().sort_boost_threshold;
+    if (static_cast<size_t>(n) <= boost_thresh)
+      std::sort(resample, resample + n);
+    else
+      boost::sort::spreadsort::float_sort(resample, resample + n);
   }
 
   // 0: sd_c4 (read-only, order-agnostic)
   boot_row[0] = robscale::internal::sd_c4(resample, n);
 
-  // 1: gmd — inline sorted kernel, O(n) weighted sum
+  // 1: gmd — inline sorted kernel, O(n) weighted sum.
+  // OPT-G5: scale precomputed once outside the accumulation loop.
   {
+    const double gmd_scale = (n < 2) ? 0.0
+      : robscale::GMD_CONSISTENCY * 2.0
+        / (static_cast<double>(n) * (n - 1));
     double sum = 0.0;
 #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
     #pragma omp simd reduction(+:sum)
 #endif
     for (int i = 0; i < n; ++i)
       sum += (2.0 * (i + 1) - n - 1.0) * resample[i];
-    boot_row[1] = (n < 2) ? 0.0
-      : robscale::GMD_CONSISTENCY * 2.0 * sum / (static_cast<double>(n) * (n - 1));
+    boot_row[1] = gmd_scale * sum;
   }
 
   // 2: mad — O(1) median from sorted data, then deviations
