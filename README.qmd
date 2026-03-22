@@ -79,9 +79,31 @@ format_duration <- function(s_val) {
 }
 
 # 1. Processing M-estimators (Panel A: robscale (fast) vs revss)
-m_target_regime <- m_analyzed %>% filter(n <= 20)
-m_speedup_min <- format_speedup(min(m_target_regime$median_speedup))
-m_speedup_max <- format_speedup(max(m_target_regime$median_speedup))
+# Per-estimator splits for accurate headline reporting
+adm_analyzed  <- m_analyzed %>% filter(grepl("adm",      expr))
+rLoc_analyzed <- m_analyzed %>% filter(grepl("robLoc",   expr))
+rSc_analyzed  <- m_analyzed %>% filter(grepl("robScale", expr))
+
+adm_target  <- adm_analyzed  %>% filter(n <= 20)
+rLoc_target <- rLoc_analyzed %>% filter(n <= 20)
+rSc_target  <- rSc_analyzed  %>% filter(n <= 20)
+
+adm_speedup_min  <- format_speedup(min(adm_target$median_speedup,  na.rm = TRUE))
+adm_speedup_max  <- format_speedup(max(adm_target$median_speedup,  na.rm = TRUE))
+rLoc_speedup_min <- format_speedup(min(rLoc_target$median_speedup, na.rm = TRUE))
+rLoc_speedup_max <- format_speedup(max(rLoc_target$median_speedup, na.rm = TRUE))
+rSc_speedup_min  <- format_speedup(min(rSc_target$median_speedup,  na.rm = TRUE))
+rSc_speedup_max  <- format_speedup(max(rSc_target$median_speedup,  na.rm = TRUE))
+
+# NR-based estimators combined (robLoc + robScale) for the panel headline
+m_nr_target   <- bind_rows(rLoc_target, rSc_target)
+m_speedup_min <- format_speedup(min(m_nr_target$median_speedup, na.rm = TRUE))
+m_speedup_max <- format_speedup(max(m_nr_target$median_speedup, na.rm = TRUE))
+
+# adm at n>=128 (computation dominates over .Call overhead)
+adm_large <- adm_analyzed %>% filter(n >= 128)
+adm_large_min <- format_speedup(min(adm_large$median_speedup, na.rm = TRUE))
+adm_large_max <- format_speedup(max(adm_large$median_speedup, na.rm = TRUE))
 
 m_16k <- m_analyzed %>% filter(n == 16384)
 m_16k_min <- format_speedup(min(m_16k$median_speedup))
@@ -175,9 +197,13 @@ All estimators are implemented as C++17 kernels. The M-estimators use vectorized
 `tanh` evaluation (where batch sizes justify the overhead) and Newton--Raphson
 iteration; $Q_n$ and $S_n$ use parallelized $O(n \log n)$ algorithms via TBB.
 Against `revss`, the package achieves
-**`r m_speedup_min`--`r m_speedup_max`x** speedups for the small-sample
-M-estimators and **2.6--4.1x** for `robLoc()` at $n = 100$ to $10{,}000$
-via a fused single-pass AVX2 Newton--Raphson kernel. Against `robustbase`, it achieves
+**`r rSc_speedup_min`--`r rSc_speedup_max`x** speedups for `robScale()` and
+**`r rLoc_speedup_min`--`r rLoc_speedup_max`x** for `robLoc()` in the small-sample
+regime ($n \leq 20$), driven by Newton--Raphson quadratic convergence, a fused
+single-pass AVX2 kernel, and stack-allocated arenas. `adm()` matches or exceeds
+`revss` at all sizes, with **`r adm_large_min`--`r adm_large_max`x** gains at
+$n \geq 128$ as the computation cost overtakes the fixed `.Call()` boundary
+overhead (~1.5 µs for both packages at $n \leq 10$). Against `robustbase`, it achieves
 **`r sn_speedup_min`--`r sn_speedup_max`x** for $S_n$ and
 **`r qn_speedup_min`--`r qn_speedup_max`x** for $Q_n$---with gains peaking near
 **`r max_large_speedup`x** at $n = 10^7$ as TBB parallelism reduces the
@@ -1084,21 +1110,31 @@ knitr::include_graphics(tar_read(speedup_figure))
 
 ### Small-sample M-estimators vs. `revss` (Panel A)
 
-In the target regime ($n \le 20$), `robscale` outperforms `revss` by
-**`r m_speedup_min`--`r m_speedup_max`x**. Drivers include:
+Performance differs by estimator type, reflecting their distinct computational
+profiles.
+
+**`robScale()` and `robLoc()`** (Newton--Raphson estimators): In the target
+regime ($n \le 20$), speedups are **`r rSc_speedup_min`--`r rSc_speedup_max`x**
+for `robScale()` and **`r rLoc_speedup_min`--`r rLoc_speedup_max`x** for
+`robLoc()`. Drivers include:
 
 - Transitioning from interpreted R to compiled C++17.
 - Achieving quadratic convergence with Newton--Raphson (3 iterations vs 6--8 for scoring).
 - Eliminating heap allocation via stack-allocated memory arenas.
 - Deploying optimal sorting networks for $n \le 16$.
-- Fusing the three-pass Newton--Raphson inner loop into a single AVX2 pass for `robLoc()` (v0.4.0).
+- Fusing the three-pass NR inner loop into a single AVX2 pass for `robLoc()` (v0.4.0).
 - Correcting the sorting-network threshold from 64 to 16, eliminating $O(n^{1.5})$ overhead
   in MAD initialization and the $n = 500$--$1{,}000$ regression for `robScale()` (v0.4.0).
-- Passing the hot copy buffer to `adm_core()`, reducing a redundant cache miss per call (v0.4.0).
 
-Even at $n = 16{,}384$, the gains remain **`r m_16k_min`--`r m_16k_max`x** because the interpreter
-overhead of `revss` scales with the number of Newton--Raphson iterations, not
-just vector length.
+**`adm()`** (single-pass deviation sum): At $n \le 20$, both `robscale` and
+`revss` complete in approximately 1.5--2.0 µs --- the fixed R→C++ `.Call()`
+boundary cost dominates computation time. `robscale` allocates zero bytes per
+call; `revss` allocates ~3.5 KB per call due to `as.double()` coercion. As $n$
+grows and computation overtakes the boundary cost, the advantage compounds:
+**`r adm_large_min`--`r adm_large_max`x** at $n \ge 128$.
+
+Even at $n = 16{,}384$, the NR estimators retain **`r m_16k_min`--`r m_16k_max`x** gains
+because `revss` interpreter overhead scales with iteration count, not just vector length.
 
 ### Scale estimators vs. `robustbase` (Panel B)
 
