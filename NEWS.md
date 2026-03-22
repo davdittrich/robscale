@@ -2,6 +2,35 @@
 
 ## Performance
 
+* **`iqr_scaled()` dead stack eliminated** (OPT-I1+I2): The entry frame previously
+  allocated both a 32 KB `buf_stack[4096]` and a 2 KB `buf_micro[256]` unconditionally,
+  even for n=2. `buf_stack` is now declared only inside a `ROBSCALE_NOINLINE` large-n
+  helper (`n > 256`); `buf_stack` size reduced 4096 → 2048 (IQR needs one copy).
+  Stack at small n reduced from ~34 KB to ~2 KB.
+
+* **`ROBSCALE_RESTRICT` on `iqr_impl_large` and `interp_q7`** (OPT-I5): Pointer
+  parameters carry `ROBSCALE_RESTRICT`, allowing the compiler to generate stronger
+  SIMD code in the selection and scan loops.
+
+* **`iqr_scaled()` n≤16 sort fast path** (OPT-I6): For n≤16, two pdqselect calls
+  plus two min-scan passes are replaced by a single `small_sort` (branch-free sorting
+  network) followed by direct index reads. Q1/Q3 are O(1) after the sort.
+
+* **Symmetric Q1 selection for n>16 with frac1>0** (OPT-I3): When the Q1 quantile
+  requires interpolation (`(n-1) % 4 ≠ 0`, ~75% of n values), the lower-partition
+  scan is reduced from O(0.75n) to O(0.25n). Instead of finding the minimum of
+  `buf[lo1+1..n-1]`, pdqselect places `lo1+1` exactly and a max-scan over
+  `buf[0..lo1]` recovers Q1. Applies to both the micro path (17≤n≤256) and the
+  large-n NOINLINE helper (n>257). Gate results: n=100 −4.3%, n=1000 −3.3%.
+
+* **`ROBSCALE_RESTRICT` on `estimators_internal::iqr()`** (OPT-I8): Pointer
+  parameters of the inline `iqr()` function (used in the ensemble compute path) carry
+  `ROBSCALE_RESTRICT`, allowing alias-free code generation in the pdqselect path.
+
+* **`iqr_sorted()` added** (OPT-I7): New `robscale::internal::iqr_sorted(sorted_x, n)`
+  for pre-sorted data — O(1) Type 7 quantile reads, no copy, no selection. Completes
+  the sorted-variant family alongside `sn_sorted()` and `qn_sorted()`.
+
 * **`mad_scaled()` small-n stack frame reduced 16 KB → 512 B** (OPT-M1): `mad_impl_auto`
   and `mad_impl_center` now route `n > 64` through `ROBSCALE_NOINLINE` helpers.
   The 16 KB `buf_stack[2048]` is declared only in those helpers, never in the entry frame.
