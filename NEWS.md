@@ -1,6 +1,59 @@
-# robscale 0.4.0
+# robscale 0.5.0
 
 ## Performance
+
+* **`gmd()` small-n stack frame reduced 17 KB → 1 KB** (OPT-G1): `gmd_impl` now
+  routes `n ≤ 128` through an `ROBSCALE_NOINLINE` helper that allocates only a
+  128-double arena. The large `buf_stack[2048]` is declared only in the `n > 128`
+  path, eliminating 16 KB of unnecessary stack allocation on every small-sample
+  call.
+
+* **Ensemble bootstrap sort upgraded to `boost::float_sort`** (OPT-G4): The
+  per-replicate sort in `ensemble_one_replicate` now dispatches to
+  `boost::sort::spreadsort::float_sort` (serial radix sort) for `n` above the
+  runtime-configured `sort_boost_threshold`. Expected speedup ~1.5–2× for
+  bootstrap samples of size ≥ 512. `tbb::parallel_sort` is not used here to
+  avoid nested-TBB oversubscription inside the outer `tbb::parallel_for`.
+
+* **`gmd()` internal sort path uses `optimized_sort`** (OPT-G3): `internal::gmd()`
+  in `estimators_internal.h` now uses `robscale::qnsn::optimized_sort` (tiered
+  `std::sort` → `boost::float_sort` → `tbb::parallel_sort`) instead of plain
+  `std::sort`. Call sites (`compute_all_estimators` at lines 216 and 330 of
+  `ensemble.cpp`) are serial, so the optional TBB dispatch is safe.
+
+* **GMD kernel scale factor precomputed** (OPT-G5): `constant * 2 / (n*(n-1))`
+  is now computed once before the accumulation loop across all three call sites
+  (`gmd_sorted`, `internal::gmd()`, ensemble inline block), reducing per-element
+  work to a single multiply.
+
+* **`ROBSCALE_RESTRICT` annotations on `gmd_sorted` and `gmd_core`** (OPT-G6):
+  No-aliasing hints allow the compiler to generate tighter SIMD code for the
+  accumulation loop.
+
+---
+
+# robscale 0.4.0
+
+## Bug fixes
+
+* **Aitken Δ² step-reduction guard removed** (`robScale()`): The previous
+  guard rejected a valid extrapolation whenever the Aitken jump exceeded the
+  two-step pair displacement (`|cand - s2| < |s2 - s0|`). For convergence
+  rates $r \gtrsim 0.73$ this condition is never satisfied, so the
+  acceleration never fired and the M-scale iteration required up to 80
+  `rho_sum` evaluations per call at small $n$. Removing the guard — keeping
+  only the minimal safety `candidate > 0` — cuts typical `rho_evals` from
+  50–80 down to 7–12 for the previously-slow cases (n=5 seed=47/247,
+  n=7 seed=49/149). The case n=7 seed=49, which previously hit `maxit` without
+  converging, now converges in fewer than 40 evaluations.
+
+## Performance
+
+* **Fused AVX2 kernel threshold lowered from n≥8 to n≥4** (`robScale()`):
+  The `use_fused` flag in `rob_scale_compute` now activates at $n \geq 4$
+  instead of $n \geq 8$. Inputs of length 4, 5, 6, and 7 now use the
+  single-pass fused AVX2 kernel rather than the three-pass scalar fallback,
+  eliminating the remaining per-call overhead for very small samples.
 
 * **Fused single-pass NR kernel for `robLoc()`** (OPT-L1): `rob_loc_nr_step_avx2`
   collapses the three-pass Newton--Raphson loop (scale residuals, `bulk_tanh`,
@@ -56,6 +109,12 @@
   buffer from penalizing small calls.
 
 ## Internal
+
+* **Benchmark seed pool widened to 7 seeds** (`benchmarks/run_benchmarks.R`):
+  `BENCH_SEEDS` increased from 3 to 7 seeds (spaced 50 apart: 42, 92, 142,
+  192, 242, 292, 342). At small $n$ ($n \leq 16$) the previous 3-seed pool
+  had high variance because 2 of 3 seeds could land on the previously-slow
+  Aitken path, biasing the pooled-median timing toward the slow cluster.
 
 * Added `rob_loc_scalar_impl`, `rob_loc_has_parallel`, and `rob_loc_serial_impl`
   diagnostic exports for TDD correctness gates.

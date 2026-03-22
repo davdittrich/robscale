@@ -4,6 +4,7 @@
 #include "robscale_config.h"
 #include "robust_core.h"
 #include "pdq_select.h"
+#include "qnsn_sort_utils.h"
 #include <cstring>
 #include <cmath>
 
@@ -24,22 +25,26 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
 
 namespace robscale { namespace internal {
 
-// GMD: sorts buf in-place, O(n log n)
+// GMD: sorts buf in-place, O(n log n).
+// OPT-G3: optimized_sort replaces std::sort (boost::float_sort for large n).
+//   Call sites (compute_all_estimators lines 216, 330) are serial — not inside
+//   TBB — so tbb::parallel_sort dispatch at large n is safe here.
+// OPT-G5: scale precomputed outside the accumulation loop.
 inline double gmd(double* buf, int n) {
   if (n < 2) return 0.0;
-  // Small sort via sorting networks
-  if (n <= 16) {
+  if (n <= 16)
     robscale::small_sort(buf, n);
-  } else {
-    std::sort(buf, buf + n);  // plain std::sort for ensemble's small resamples
-  }
+  else
+    robscale::qnsn::optimized_sort(buf, buf + n);
+  const double scale = GMD_CONSISTENCY * 2.0
+    / (static_cast<double>(n) * (n - 1));
   double sum = 0.0;
 #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
   #pragma omp simd reduction(+:sum)
 #endif
   for (int i = 0; i < n; ++i)
     sum += (2.0 * (i + 1) - n - 1.0) * buf[i];
-  return GMD_CONSISTENCY * 2.0 * sum / (static_cast<double>(n) * (n - 1));
+  return scale * sum;
 }
 
 // MAD from original data: fused single-buffer approach.
