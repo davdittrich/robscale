@@ -119,6 +119,24 @@ inline double iqr(const double* x, double* buf1, double* buf2, int n) {
   return (q3 - q1) * IQR_CONSISTENCY;
 }
 
+// IQR for pre-sorted data: O(1) direct index reads + Type 7 interpolation.
+// OPT-I7: mirrors ensemble.cpp inline IQR block; no copy, no selection.
+// Input MUST be sorted ascending. Undefined behaviour otherwise.
+inline double iqr_sorted(const double* sorted_x, int n) {
+  if (n < 2) return 0.0;
+  double h1 = (n - 1.0) * 0.25;
+  int lo1 = static_cast<int>(h1);
+  double frac1 = h1 - lo1;
+  double q1 = sorted_x[lo1];
+  if (frac1 > 0.0) q1 += frac1 * (sorted_x[lo1 + 1] - q1);
+  double h3 = (n - 1.0) * 0.75;
+  int lo3 = static_cast<int>(h3);
+  double frac3 = h3 - lo3;
+  double q3 = sorted_x[lo3];
+  if (frac3 > 0.0 && lo3 + 1 < n) q3 += frac3 * (sorted_x[lo3 + 1] - q3);
+  return (q3 - q1) * IQR_CONSISTENCY;
+}
+
 // SD with c4 correction: read-only, O(n)
 inline double sd_c4(const double* x, int n) {
   if (n < 2) return 0.0;
