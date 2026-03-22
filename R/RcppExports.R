@@ -105,3 +105,7 @@ C_get_sn_factor <- function(n) {
     .Call(`_robscale_C_get_sn_factor`, n)
 }
 
+C_sn_fast_orig <- function(x) {
+    .Call(`_robscale_C_sn_fast_orig`, x)
+}
+
