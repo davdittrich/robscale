@@ -17,6 +17,8 @@
 namespace robscale::qnsn {
 
 constexpr size_t SN_MAX_STACK = ROBSCALE_SN_STACK_THRESHOLD;
+// OPT-S3: Micro-buffer threshold for L1-resident fast path (n <= 128 → 1 KB stack frame).
+constexpr size_t SN_MICRO_SIZE = 128;
 
 // --- SN ESTIMATOR WORKER ---
 
@@ -111,6 +113,30 @@ template <typename T>
 double sn_kernel(const T* sorted_x, size_t n) {
   const auto& config = RuntimeConfig::get();
 
+  // OPT-S3: Tier 1 — micro path: n <= SN_MICRO_SIZE (128). inner_medians fits in
+  // ~1 KB, fully L1-resident. Avoids the 16 KB SN_MAX_STACK frame for small inputs.
+  if (n <= SN_MICRO_SIZE) {
+    T inner_medians[SN_MICRO_SIZE];
+    int32_t h = static_cast<int32_t>(n / 2);
+    int32_t L = 0;
+    for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
+      int32_t L_min = (std::max)(0, i - h);
+      int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
+      if (L < L_min) L = L_min;
+      T candidate = (std::max)(sorted_x[i] - sorted_x[L], sorted_x[L + h] - sorted_x[i]);
+      while (L < L_max) {
+        T next = (std::max)(sorted_x[i] - sorted_x[L + 1], sorted_x[L + 1 + h] - sorted_x[i]);
+        if (candidate < next) break;
+        L++;
+        candidate = next;
+      }
+      inner_medians[i] = candidate;
+    }
+    double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
+    return raw * CONST_SN * get_sn_factor(n);
+  }
+
+  // Tier 2 — medium stack path: SN_MICRO_SIZE < n <= sn_stack_threshold (2048). 16 KB frame.
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);
     T inner_medians[SN_MAX_STACK];
@@ -133,6 +159,7 @@ double sn_kernel(const T* sorted_x, size_t n) {
     return raw * CONST_SN * get_sn_factor(n);
   }
 
+  // Tier 3 — large heap path (n > sn_stack_threshold).
   return sn_kernel_large(sorted_x, n);
 }
 
@@ -152,8 +179,28 @@ ROBSCALE_NOINLINE double C_sn_impl_large(const T* x_ptr, size_t n) {
     }
     sorted_x[i] = x_ptr[i];
   }
+  // n > sn_stack_threshold >= SN_MICRO_SIZE (128) > 16, so n <= 16 is
+  // structurally unreachable here — optimized_sort is always correct.
   optimized_sort(sorted_x, sorted_x + n);
 
+  return sn_kernel(sorted_x, n);
+}
+
+// OPT-S3: Medium stack path (SN_MICRO_SIZE < n <= sn_stack_threshold) extracted
+// into a NOINLINE function so the compiler cannot merge the 16 KB SN_MAX_STACK
+// frame with the 1 KB SN_MICRO_SIZE frame in the hot micro path.
+template <typename T>
+ROBSCALE_NOINLINE double C_sn_impl_medium(const T* x_ptr, size_t n) {
+  assert(n <= SN_MAX_STACK);
+  T sorted_x[SN_MAX_STACK];
+  for (size_t i = 0; i < n; ++i) {
+    if constexpr (std::is_floating_point_v<T>) {
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+    }
+    sorted_x[i] = x_ptr[i];
+  }
+  // n > SN_MICRO_SIZE (128) > 16 — small_sort branch is structurally unreachable.
+  optimized_sort(sorted_x, sorted_x + n);
   return sn_kernel(sorted_x, n);
 }
 
@@ -166,9 +213,9 @@ double C_sn_impl(const T* x_ptr, size_t n) {
 
   const auto& config = RuntimeConfig::get();
 
-  if (n <= config.sn_stack_threshold) {
-    assert(config.sn_stack_threshold <= SN_MAX_STACK);
-    T sorted_x[SN_MAX_STACK];
+  // OPT-S3: Tier 1 — micro path: n <= SN_MICRO_SIZE (128). sorted_x fits in ~1 KB (L1-resident).
+  if (n <= SN_MICRO_SIZE) {
+    T sorted_x[SN_MICRO_SIZE];
     for (size_t i = 0; i < n; ++i) {
       if constexpr (std::is_floating_point_v<T>) {
         if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
@@ -181,6 +228,12 @@ double C_sn_impl(const T* x_ptr, size_t n) {
       optimized_sort(sorted_x, sorted_x + n);
     }
     return sn_kernel(sorted_x, n);
+  }
+
+  // Tier 2 — medium stack path: SN_MICRO_SIZE < n <= sn_stack_threshold.
+  if (n <= config.sn_stack_threshold) {
+    assert(config.sn_stack_threshold <= SN_MAX_STACK);
+    return C_sn_impl_medium(x_ptr, n);
   }
 
   return C_sn_impl_large(x_ptr, n);
