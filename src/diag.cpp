@@ -64,13 +64,13 @@ static double aitken_iterate_diag(RhoSum&& rho_sum, double s,
     if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
         std::abs(denom) > 1e-30 * s0 && k < maxit) {
       const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
+      if (candidate > 0.0) {
         ++stats.aitken_fires;
         s = candidate;
         continue;
       }
     }
-    s = s2;
+    s = (d1 * d2 < 0.0) ? std::sqrt(s1 * s2) : s2;
   }
   return s;
 }
