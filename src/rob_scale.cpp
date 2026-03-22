@@ -118,12 +118,18 @@ static double aitken_iterate(RhoSum&& rho_sum, double s,
     if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
         std::abs(denom) > 1e-30 * s0 && k < maxit) {
       const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0 && std::abs(candidate - s2) < std::abs(s2 - s0)) {
+      // Accept when candidate > 0.  The previous step-reduction guard
+      // (|cand-s2| < |s2-s0|) over-rejected: for convergence rate r > ~0.73,
+      // the Aitken jump always exceeds the pair step, so it was never accepted
+      // despite pointing correctly toward s*.
+      if (candidate > 0.0) {
         s = candidate;
         continue;
       }
     }
-    s = s2;
+    // Oscillating sequence (d1*d2 < 0): s1 and s2 bracket s*.
+    // Geometric-mean step halves log-distance to s* per outer iteration.
+    s = (d1 * d2 < 0.0) ? std::sqrt(s1 * s2) : s2;
   }
   return s;
 }
@@ -213,9 +219,12 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
   // Select the fused AVX2 path once, outside the hot loop.
   // Condition: SLEEF+AVX2 compiled in, n large enough for vectorisation,
   // and AVX2 confirmed at runtime.
+  // Threshold n>=4: AVX2 processes 4 doubles/cycle; below 4 the setup cost
+  // exceeds the kernel benefit.  Previously n>=8 left n=4..7 on the slower
+  // scalar path and was the main driver of erratic small-n timing.
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
     defined(ROBSCALE_HAS_AVX2_DISPATCH)
-  const bool use_fused = (n >= 8) &&
+  const bool use_fused = (n >= 4) &&
     (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
      robscale::qnsn::SIMDLevel::AVX2);
 #else

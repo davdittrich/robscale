@@ -132,8 +132,10 @@ pool_bench_press <- function(seed_results) {
 }
 
 # Seeds used for multi-seed benchmark runs (BM-2).
-# Spaced 100 apart to avoid correlated .Random.seed states.
-BENCH_SEEDS <- c(42L, 142L, 242L)
+# Spaced 50 apart to avoid correlated .Random.seed states.
+# 7 seeds (up from 3) to reduce variance in the pooled-median estimate at
+# small n (n<=16), where the Aitken path hit vs miss ratio was biasing results.
+BENCH_SEEDS <- c(42L, 92L, 142L, 192L, 242L, 292L, 342L)
 
 # ---------------------------------------------------------------------------
 
