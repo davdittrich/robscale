@@ -287,3 +287,26 @@ test_that("Q.22 minimum valid n=2: C_qn_fast correct", {
   expect_true(is.finite(C_qn_fast(x)))
   expect_gt(C_qn_fast(x), 0)
 })
+
+# ---------------------------------------------------------------------------
+# WU-Q1 regression guards (added before WU-Q1 implementation)
+# ---------------------------------------------------------------------------
+test_that("Q.NOINLINE.1: C_qn_fast_orig exists as exported function", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # Fails if compileAttributes() was not run after adding the export annotation.
+  expect_true(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
+              label = "C_qn_fast_orig is exported")
+})
+
+test_that("Q.NOINLINE.2: C_qn_fast matches C_qn_fast_orig for all sizes", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
+              "C_qn_fast_orig not present (WU-Q1 not implemented)")
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(2L, 5L, 10L, 16L, 17L, 64L, 65L, 100L)) {
+    set.seed(n * 37L + 7L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
+                 label = paste("NOINLINE equivalence n =", n))
+  }
+})
