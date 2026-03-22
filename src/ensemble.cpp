@@ -29,6 +29,44 @@ static constexpr int N_ESTIMATORS = 7;
 static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 
 // Run all 7 estimators on a single bootstrap replicate.
+// Find the 0-indexed k-th smallest of A[0..la-1] union B[0..lb-1].
+// Both arrays sorted ascending. O(log(min(la, lb))).
+// Precondition: 0 <= k < la + lb.
+static double kth_of_two_sorted(
+    const double* A, int la, const double* B, int lb, int k) {
+  if (la > lb) return kth_of_two_sorted(B, lb, A, la, k);
+  if (la == 0) return B[k];
+  if (k == 0)  return std::min(A[0], B[0]);
+  int ia = std::min(la - 1, k / 2);
+  int ib = k - ia - 1;
+  if (A[ia] < B[ib])
+    return kth_of_two_sorted(A + ia + 1, la - ia - 1, B, lb, k - ia - 1);
+  if (A[ia] > B[ib])
+    return kth_of_two_sorted(A, la, B + ib + 1, lb - ib - 1, k - ib - 1);
+  return A[ia];
+}
+
+// V-shaped deviation median: find MAD of sorted s[0..n-1] with known median m.
+// tmp: caller-supplied scratch of >= n doubles (work2 from ensemble_one_replicate).
+// Complexity: O(log n). Returns 0.0 for n < 2.
+static double vshaped_mad(const double* s, int n, double m, double* tmp) {
+  if (n < 2) return 0.0;
+  const int k = (n - 1) / 2;
+  for (int i = 0; i <= k; ++i)     tmp[i] = m - s[k - i];
+  for (int i = k + 1; i < n; ++i)  tmp[i] = s[i] - m;
+  const double* L = tmp;
+  const double* R = tmp + k + 1;
+  const int la = k + 1;
+  const int lb = n - k - 1;
+  if (n & 1) {
+    return kth_of_two_sorted(L, la, R, lb, k);
+  } else {
+    double lo = kth_of_two_sorted(L, la, R, lb, k);
+    double hi = kth_of_two_sorted(L, la, R, lb, k + 1);
+    return (lo + hi) * 0.5;
+  }
+}
+
 // Sort resample once; use sorted-aware estimators to avoid redundant sorts.
 // resample, work1, work2 are per-task scratch buffers (each n doubles).
 static void ensemble_one_replicate(
@@ -74,12 +112,12 @@ static void ensemble_one_replicate(
     boot_row[1] = gmd_scale * sum;
   }
 
-  // 2: mad — O(1) median from sorted data, then deviations
+  // 2: mad — V-shaped O(log n) deviation median (OPT-M7)
+  // work2 is reused as scratch; estimator 6 overwrites it independently at line ~155.
   {
     double med = robscale::median_sorted(resample, static_cast<size_t>(n));
-    for (int i = 0; i < n; ++i) work2[i] = std::abs(resample[i] - med);
     boot_row[2] = (n < 2) ? 0.0
-      : robscale::MAD_CONSISTENCY * robscale::median_select(work2, static_cast<size_t>(n));
+      : robscale::MAD_CONSISTENCY * vshaped_mad(resample, n, med, work2);
   }
 
   // 3: iqr — direct index reads with interpolation
