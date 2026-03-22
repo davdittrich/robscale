@@ -76,6 +76,36 @@ struct SnWorker : public WorkerBase {
   }
 };
 
+// OPT-S2: Large-n heap path extracted into a NOINLINE function to isolate the
+// heap-allocation frame from the hot small-n stack path inside sn_kernel.
+// This mirrors the OPT-M1/OPT-I1 pattern: the compiler can fully inline and
+// optimise the small-n branch without heap-allocation machinery polluting the
+// instruction cache or preventing stack-frame optimisations.
+template <typename T>
+ROBSCALE_NOINLINE double sn_kernel_large(const T* sorted_x, size_t n) {
+  const auto& config = RuntimeConfig::get();
+
+  // Heap path: only inner_medians (n elements, not 2n — sorted_x provided by caller)
+  std::unique_ptr<T[]> inner_medians_buf(new T[n]);
+  T* inner_medians = inner_medians_buf.get();
+
+  if (n < config.sn_parallel_threshold) {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
+    worker(0, n);
+  } else {
+    SnWorker<T> worker(sorted_x, n, inner_medians);
+#ifdef USE_DIRECT_TBB
+    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
+                      [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
+#else
+    RcppParallel::parallelFor(0, n, worker, config.grain_size);
+#endif
+  }
+
+  double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
+  return raw * CONST_SN * get_sn_factor(n);
+}
+
 // Post-sort kernel: sorted_x is read-only, allocates its own inner_medians.
 template <typename T>
 double sn_kernel(const T* sorted_x, size_t n) {
@@ -103,25 +133,7 @@ double sn_kernel(const T* sorted_x, size_t n) {
     return raw * CONST_SN * get_sn_factor(n);
   }
 
-  // Heap path: only inner_medians (n elements, not 2n — sorted_x provided by caller)
-  std::unique_ptr<T[]> inner_medians_buf(new T[n]);
-  T* inner_medians = inner_medians_buf.get();
-
-  if (n < config.sn_parallel_threshold) {
-    SnWorker<T> worker(sorted_x, n, inner_medians);
-    worker(0, n);
-  } else {
-    SnWorker<T> worker(sorted_x, n, inner_medians);
-#ifdef USE_DIRECT_TBB
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
-                      [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
-#else
-    RcppParallel::parallelFor(0, n, worker, config.grain_size);
-#endif
-  }
-
-  double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
-  return raw * CONST_SN * get_sn_factor(n);
+  return sn_kernel_large(sorted_x, n);
 }
 
 // OPT-S1: Large-n heap path extracted into a NOINLINE function to isolate the
