@@ -12,7 +12,7 @@
 static constexpr int IQR_INLINE_LIMIT = 256;
 
 static ROBSCALE_NOINLINE
-double iqr_impl_large(const double* xp, int n, double constant) {
+double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
   constexpr int STACK_SIZE = 2048;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;

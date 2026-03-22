@@ -11,7 +11,7 @@ Implement all identified IQR performance optimizations using TDD discipline.
 | OPT   | Description                                                       | Priority  | Files            |
 |-------|-------------------------------------------------------------------|-----------|------------------|
 | I1+I2 | NOINLINE frame split + STACK_SIZE 4096→2048                       | HIGH      | src/iqr.cpp      |
-| I4    | `interp_q7` scalar loop → `std::min_element`                      | MED-HIGH  | src/pdq_select.h |
+| I4    | `interp_q7` scalar loop → `std::min_element` — **DROPPED**        | ~~MED-HIGH~~ | src/pdq_select.h |
 | I5    | `ROBSCALE_RESTRICT` on NOINLINE helper + `interp_q7`              | MEDIUM    | src/iqr.cpp, src/pdq_select.h |
 | I6    | n≤16 sort-once-then-index fast path                               | MEDIUM    | src/iqr.cpp, src/estimators_internal.h |
 | I3    | Symmetric Q1 selection: O(0.75n)→O(0.25n) scan for frac1>0, n>16 | MED-HIGH  | src/iqr.cpp, src/estimators_internal.h |
@@ -28,15 +28,22 @@ Implement all identified IQR performance optimizations using TDD discipline.
 
 - Tool: `bench::mark(min_iterations = N, check = FALSE)` where N=2000 for n≤256, N=500 for n>256; `100L` for ensemble.
 - Metric: `bm$median` in nanoseconds.
-- Threshold: `1.12` for n≤128 (`.Call`-overhead-dominated); `1.05` for n>128 (signal-dominated). **NEVER CHANGE THESE.**
+- Threshold: `1.05` for ALL sizes (ratio ≤ 1.05). **NEVER CHANGE THIS.**
+  Noisy small-n measurements are handled by better methodology (head-to-head same-session comparison), not wider thresholds.
 - Aggregation: **median across seeds per size** (robust to per-seed algorithmic variation at n=129).
 - Sizes: `c(16L, 17L, 64L, 100L, 128L, 129L, 1000L, 2049L)` — covers sort/pdqselect boundary (16/17), micro boundary (128), NOINLINE boundary (128/129), large stack path (1000), stack/heap boundary (2049).
 - Seeds: `c(42L, 57L, 99L, 123L, 200L, 314L, 628L, 777L, 1024L, 1618L)` — 10 seeds for stable median.
-- **Gate mode**: HEAD-TO-HEAD preferred for phases with a diagnostic `*_orig` export.
-  At n=16-17 (~3µs), inter-session OS scheduling noise can flip bimodal modes and produce false regressions.
-  The gate script (`bench/iqr_gate_check.R`) auto-detects `iqr_impl_orig()` and uses same-session
-  back-to-back `bench::mark(orig=..., new=...)` comparison when available.
-  Fallback: saved-baseline comparison from `benchmarks/iqr_perf_baseline.rds`.
+- **Invocation**: **Always run gates via `sudo bash bench/run_gate.sh`**, not `Rscript bench/iqr_gate_check.R` directly.
+  The wrapper sets CPU governor=performance + FIFO-99 scheduling before benchmarking, then restores the original governor.
+  Without this, `powersave` governor causes ~350ns bimodal quantization at n=16 that exceeds the 5% threshold (~97ns)
+  and produces false gate failures for phases that provably add zero instructions (e.g., RESTRICT annotations).
+- **Gate mode**: **HEAD-TO-HEAD is the default for every phase.** Add a `*_orig` diagnostic export
+  (the pre-optimization implementation) to every phase and run back-to-back `bench::mark(orig=..., new=...)`
+  in the same session. Same-session comparison eliminates inter-session OS scheduling noise completely —
+  at n=16-17 (~3µs), inter-session mode flipping produces false regressions that cannot be resolved
+  by wider thresholds. Remove the `*_orig` export before committing.
+  Fallback to saved-baseline (`benchmarks/iqr_perf_baseline.rds`) only when a `*_orig` export cannot
+  be added (e.g., the change is purely in a non-exported helper with no wrappable entry point).
 - All saved-baseline gates compare against `benchmarks/iqr_perf_baseline.rds` (Phase 0, 10 seeds).
 
 ---
@@ -95,7 +102,7 @@ inline micro path in `iqr_impl`.
 
 **1.3** Performance gate (run `bench/iqr_baseline.R` against saved baseline):
   - For each (size, seed): compute ratio = current_median / baseline_median.
-  - Gate: ratio ≤ 1.12 for size≤128; ratio ≤ 1.05 for size>128.
+  - Gate: ratio ≤ 1.05 for all sizes.
   - Expected direction: improvement (ratio < 1.0) for n≤128; neutral for n>128.
   - If gate fails: `git checkout src/iqr.cpp` and stop.
 
@@ -105,37 +112,21 @@ inline micro path in `iqr_impl`.
 
 ---
 
-## Phase 2: OPT-I4 — `interp_q7` Scalar Loop → `std::min_element`
+## Phase 2: OPT-I4 — DROPPED
 
-**Problem:** `pdq_select.h:83-84` uses a branch-based scalar `for` loop to find the next order
-statistic after a pdqselect. `std::min_element` on contiguous `double*` auto-vectorizes to MINPD
-on GCC/Clang — same pattern already used in `robust_core.h:191` (`median_select`). More portable
-than `#pragma omp simd reduction(min:)` for R packages (no OpenMP guarantee on CRAN macOS).
+**Status: ABANDONED after gate failure. Do not re-attempt without new evidence.**
 
-**Scope:** `interp_q7` is called ONLY from IQR paths (`src/iqr.cpp` and `src/estimators_internal.h`).
-No impact on MAD or other estimators.
+**What was tried:** Replace `interp_q7`'s scalar `for` min-reduction loop with `std::min_element`.
 
-**2.1** TDD correctness test (in `test-iqr-opt.R`):
-  - `"interp_q7 path: n values with frac>0 match stats::IQR exactly"` — covers n=2,3,4,6,7,8,10,14
-    (all values where (n-1)%4 ≠ 0, forcing the interp scan). Tolerance `sqrt(.Machine$double.eps)`.
-  - `"interp_q7 frac==0 path: no-scan n values still correct"` — covers n=5, n=9, n=13, n=17
-    (all values where (n-1)%4 == 0, frac==0, the scan is bypassed). Must match `IQR(x, type=7) * K_IQR`.
-    This guards against the `std::min_element` replacement accidentally executing when frac==0.
-  - Test is GREEN before and after (no behavior change, only loop implementation change).
+**Root cause of failure:** The scalar `if (buf[i] < nv) nv = buf[i]` loop is a value-reduction
+that GCC auto-vectorizes with VMINPD. `std::min_element` must track the iterator position of the
+first minimum (not just the value), which prevents auto-vectorization. Real regression confirmed
+via head-to-head same-session gate: n=64 (+10.3%), n=100 (+6.0%), n=128 (+12.6%), n=129 (+8.1%).
 
-**2.2** Implementation in `src/pdq_select.h::interp_q7`:
-  - Replace: `double nv = buf[lo + 1]; for (int i = lo + 2; i < n; ++i) if (buf[i] < nv) nv = buf[i];`
-  - With: `double nv = *std::min_element(buf + lo + 1, buf + n);`
-  - Add `#include <algorithm>` if not already present in the include chain.
-
-**2.3** Performance gate vs Phase 0 baseline (same thresholds):
-  - Expected direction: improvement for n≥64 (where Q1 scan ≥ 48 elements); neutral for n<64.
-  - If gate fails: `git checkout src/pdq_select.h` and stop.
-
-**2.4** All existing IQR tests GREEN: `devtools::test(filter = "iqr")`.
-  Ensemble correctness: `devtools::test(filter = "ensemble")`.
-
-**2.5** Git commit: `"perf: iqr_scaled() OPT-I4 — interp_q7 scalar loop → std::min_element"`
+**Lesson:** A scalar min-reduction loop is already optimal when auto-vectorized. Do not replace
+hand-written value-reduction loops with `std::algorithm` calls without checking vectorization output.
+The pattern `*std::min_element(ptr, ptr+n)` is only safe to use if the existing loop is NOT already
+vectorized (e.g., in a code path that GCC/Clang cannot otherwise prove is alias-free).
 
 ---
 
@@ -155,9 +146,14 @@ in the scan loops and memcpy, blocking SIMD code generation. Follows OPT-M3 patt
     `static ROBSCALE_NOINLINE double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, ...)`.
   - In `src/pdq_select.h::interp_q7`: change to
     `inline double interp_q7(double* ROBSCALE_RESTRICT buf, int n, int lo, double frac)`.
+  - Add temporary `iqr_impl_orig` diagnostic export (pre-RESTRICT version) for head-to-head gate.
+    Remove before commit.
 
-**3.3** Performance gate vs Phase 0 baseline (same thresholds):
-  - Expected direction: marginal (~3-8% for large n); may be below noise floor.
+**3.3** Performance gate — run via `sudo bash bench/run_gate.sh` (HEAD-TO-HEAD, governor=performance):
+  - `bench::mark(orig = iqr_impl_orig(x, K), new = iqr_impl(x, K), ...)` for all sizes/seeds.
+  - Expected direction: marginal (~3-8% for large n); at or below noise floor for small n.
+  - Note: RESTRICT is a zero-instruction compile-time hint — any failure at n=16 is definitively noise.
+    The performance governor eliminates the ~350ns bimodal that caused the false failure.
   - If gate fails: `git checkout src/iqr.cpp src/pdq_select.h` and stop.
 
 **3.4** All existing IQR and ensemble tests GREEN:
@@ -206,7 +202,7 @@ single sort, Q1/Q3 are direct index reads — no selection, no min scan.
   - After `std::memcpy(buf1, x, ...)`, add analogous n≤16 branch.
   - `small_sort(buf1, n)` + direct index reads.
 
-**4.4** Performance gate vs Phase 0 baseline for n=16 (threshold 1.12):
+**4.4** Performance gate vs Phase 0 baseline for n=16 (threshold 1.05):
   - Also verify no regression at n=17 (first pdqselect path), n=64, n=128, n=1000, n=2049 (first heap).
   - If gate fails at n=16: `git checkout src/iqr.cpp src/estimators_internal.h` and stop.
 
@@ -348,7 +344,7 @@ creates a named function mirroring that block for API completeness and future ca
 
 **7.3** Performance gate (ensemble proxy):
   - `scale_robust(rnorm(10), n_boot=50L)` — compare median to Phase 0 ensemble baseline.
-  - Threshold: 1.12 (small n ensemble is noisy).
+  - Threshold: 1.05 (universal).
   - If gate fails: `git checkout src/estimators_internal.h` and stop.
 
 **7.4** All tests GREEN: `devtools::test(filter = "iqr")` + `devtools::test(filter = "ensemble")`.

@@ -76,7 +76,7 @@ ROBSCALE_INLINE double adaptive_lowmedian_select(T* x, size_t n) {
 // Type 7 quantile interpolation after selection.
 // Precondition: buf[lo] is the lo-th order statistic (via pdqselect or similar).
 // If frac > 0, scans buf[lo+1..n-1] for the next order statistic.
-inline double interp_q7(double* buf, int n, int lo, double frac) {
+inline double interp_q7(double* ROBSCALE_RESTRICT buf, int n, int lo, double frac) {
   double q = buf[lo];
   if (frac > 0.0 && lo + 1 < n) {
     double nv = buf[lo + 1];

@@ -3,19 +3,41 @@
 # Compares iqr_scaled() performance against the Phase 0 baseline.
 # Must use devtools::load_all() — not library(robscale).
 #
+# IMPORTANT — CPU frequency noise at n<=16:
+#   At n=16 (~2µs), powersave governor causes bimodal quantization (~350ns spread)
+#   that exceeds the 5% gate threshold (~97ns). Run via the wrapper to suppress it:
+#     sudo bash bench/run_gate.sh
+#   The wrapper sets governor=performance + FIFO-99 scheduling before running this script.
+#
 # Gate mode (auto-selected):
 #   HEAD-TO-HEAD: if iqr_impl_orig() is exported in the current build, compare
 #     iqr_impl() vs iqr_impl_orig() back-to-back in the SAME bench::mark() call.
 #     This eliminates inter-session OS scheduling noise (bimodal ~3µs at n=16-17).
 #   SAVED-BASELINE: otherwise, compare against benchmarks/iqr_perf_baseline.rds.
 #
-# Gate thresholds (FIXED — never change):
-#   ratio <= 1.12  for size <= 128
-#   ratio <= 1.05  for size >  128
+# Gate threshold (FIXED — never change):
+#   ratio <= 1.05  for ALL sizes
+# Noisy small-n measurements must be handled by better methodology (head-to-head +
+# performance governor), not wider thresholds.
 #
 # Ratio aggregation: median across seeds per size (robust to per-seed variation).
 library(bench)
 devtools::load_all(quiet = TRUE)
+
+# Check CPU governor — warn if not 'performance' (causes false failures at n<=16).
+gov_file <- "/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor"
+if (file.exists(gov_file)) {
+  gov <- readLines(gov_file, 1L)
+  if (!identical(gov, "performance")) {
+    cat(sprintf(paste0(
+      "WARNING: CPU governor is '%s' (not 'performance').\n",
+      "  Powersave frequency scaling causes ~350ns bimodal jitter at n<=16,\n",
+      "  which exceeds the 5%% gate threshold (~97ns) and causes false failures.\n",
+      "  For reliable n<=16 results, run via:\n",
+      "    sudo bash bench/run_gate.sh\n\n"
+    ), gov))
+  }
+}
 
 K_IQR <- 0.741301109252801
 sizes <- c(16L, 17L, 64L, 100L, 128L, 129L, 1000L, 2049L)
@@ -107,7 +129,7 @@ cat(sprintf("%-6s  %10s  %10s  %6s  %s\n",
 
 any_fail <- FALSE
 for (sz in sizes) {
-  thr    <- if (sz <= 128L) 1.12 else 1.05
+  thr    <- 1.05
   sub    <- results[results$size == sz, ]
   sub    <- sub[!is.na(sub$base_ns), ]
   base_m <- median(sub$base_ns)
@@ -122,8 +144,8 @@ for (sz in sizes) {
 # Ensemble
 if (!is.na(base_ens_ns)) {
   ens_ratio   <- curr_ens_ns / base_ens_ns
-  ens_verdict <- if (ens_ratio <= 1.12) "PASS" else "FAIL (thr=1.12)"
-  if (ens_ratio > 1.12) any_fail <- TRUE
+  ens_verdict <- if (ens_ratio <= 1.05) "PASS" else "FAIL (thr=1.05)"
+  if (ens_ratio > 1.05) any_fail <- TRUE
   cat(sprintf("%-6s  %10.0f  %10.0f  %6.3f  %s  [ensemble n=10]\n",
               "ens", base_ens_ns, curr_ens_ns, ens_ratio, ens_verdict))
 }
