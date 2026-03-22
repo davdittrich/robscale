@@ -11,6 +11,8 @@
 // OPT-I2: STACK_SIZE reduced from 4096 to 2048 (IQR needs one working copy).
 static constexpr int IQR_INLINE_LIMIT = 256;
 
+// OPT-I3: symmetric Q1 selection for frac1>0 — pdqselect to lo1+1 then
+// max-scan [0..lo1] O(0.25n) instead of min-scan [lo1+1..n-1] O(0.75n).
 static ROBSCALE_NOINLINE
 double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
   constexpr int STACK_SIZE = 2048;
@@ -31,13 +33,26 @@ double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant
   int lo3 = static_cast<int>(h3);
   double frac3 = h3 - lo3;
 
-  // Q1: select on full array
-  miniselect::pdqselect(buf, buf + lo1, buf + n);
-  double q1 = robscale::interp_q7(buf, n, lo1, frac1);
+  // Q1
+  double q1;
+  int q3_start;
+  if (frac1 > 0.0) {
+    // OPT-I3: select to lo1+1; max-scan [0..lo1] is O(0.25n)
+    miniselect::pdqselect(buf, buf + lo1 + 1, buf + n);
+    double q1_next = buf[lo1 + 1];
+    double q1_val = buf[0];
+    for (int i = 1; i <= lo1; ++i)
+      if (buf[i] > q1_val) q1_val = buf[i];
+    q1 = q1_val + frac1 * (q1_next - q1_val);
+    q3_start = lo1 + 2;
+  } else {
+    miniselect::pdqselect(buf, buf + lo1, buf + n);
+    q1 = buf[lo1];
+    q3_start = lo1 + 1;
+  }
 
-  // Q3: select on buf[lo1+1 .. n-1] only (everything <= Q1 is irrelevant)
-  int start = lo1 + 1;
-  miniselect::pdqselect(buf + start, buf + lo3, buf + n);
+  // Q3: select on buf[q3_start .. n-1]
+  miniselect::pdqselect(buf + q3_start, buf + lo3, buf + n);
   double q3 = robscale::interp_q7(buf, n, lo3, frac3);
 
   return (q3 - q1) * constant;
@@ -89,11 +104,25 @@ double iqr_impl(Rcpp::NumericVector x, double constant) {
     int lo3 = static_cast<int>(h3);
     double frac3 = h3 - lo3;
 
-    miniselect::pdqselect(buf_micro, buf_micro + lo1, buf_micro + n);
-    double q1 = robscale::interp_q7(buf_micro, n, lo1, frac1);
+    // Q1
+    double q1;
+    int q3_start;
+    if (frac1 > 0.0) {
+      // OPT-I3: select to lo1+1; max-scan [0..lo1] O(0.25n) vs O(0.75n)
+      miniselect::pdqselect(buf_micro, buf_micro + lo1 + 1, buf_micro + n);
+      double q1_next = buf_micro[lo1 + 1];
+      double q1_val = buf_micro[0];
+      for (int i = 1; i <= lo1; ++i)
+        if (buf_micro[i] > q1_val) q1_val = buf_micro[i];
+      q1 = q1_val + frac1 * (q1_next - q1_val);
+      q3_start = lo1 + 2;
+    } else {
+      miniselect::pdqselect(buf_micro, buf_micro + lo1, buf_micro + n);
+      q1 = buf_micro[lo1];
+      q3_start = lo1 + 1;
+    }
 
-    int start = lo1 + 1;
-    miniselect::pdqselect(buf_micro + start, buf_micro + lo3, buf_micro + n);
+    miniselect::pdqselect(buf_micro + q3_start, buf_micro + lo3, buf_micro + n);
     double q3 = robscale::interp_q7(buf_micro, n, lo3, frac3);
 
     return (q3 - q1) * constant;
