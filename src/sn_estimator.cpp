@@ -328,13 +328,3 @@ double C_get_sn_factor(int n) {
   return robscale::qnsn::get_sn_factor(static_cast<size_t>(n));
 }
 
-// OPT-S4: Diagnostic export — pre-RESTRICT baseline for H2H benchmarking.
-// C_sn_fast_orig is identical to C_sn_fast at the source level; both call
-// C_sn_impl. The H2H comparison measures the effect of the RESTRICT annotations
-// on compiled output by running both exports in the same benchmark session.
-// This function exists solely as a diagnostic aid and is not part of the
-// public API.
-// [[Rcpp::export]]
-double C_sn_fast_orig(Rcpp::NumericVector x) {
-  return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size()));
-}
