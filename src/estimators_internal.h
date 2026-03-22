@@ -54,7 +54,7 @@ inline double mad_from_data(const double* x, double* buf, int n) {
   if (n < 2) return 0.0;
   std::memcpy(buf, x, n * sizeof(double));
   double med = robscale::adaptive_median_select(buf, static_cast<size_t>(n));
-  for (int i = 0; i < n; ++i) buf[i] = std::abs(buf[i] - med);
+  robscale::bulk_abs_diff_inplace(buf, n, med);
   return MAD_CONSISTENCY * robscale::adaptive_median_select(buf, static_cast<size_t>(n));
 }
 

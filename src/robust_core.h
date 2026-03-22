@@ -143,6 +143,32 @@ ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double co
   return constant * sum / n;
 }
 
+// Absolute-deviation kernel (in-place): w[i] = |w[i] - center|.
+// Single-pointer; RESTRICT valid since no other pointer aliases w in the caller.
+// Used by mad_impl_auto paths and mad_from_data.
+ROBSCALE_INLINE void bulk_abs_diff_inplace(
+    double* ROBSCALE_RESTRICT w, int n, double center) {
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd
+#endif
+  for (int i = 0; i < n; ++i)
+    w[i] = std::abs(w[i] - center);
+}
+
+// Absolute-deviation kernel (out-of-place): dst[i] = |src[i] - center|.
+// dst and src guaranteed non-aliasing by caller; RESTRICT enables SIMD.
+// Used by mad_impl_center paths and the ensemble MAD block.
+ROBSCALE_INLINE void bulk_abs_diff(
+    double* ROBSCALE_RESTRICT dst,
+    const double* ROBSCALE_RESTRICT src,
+    int n, double center) {
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd
+#endif
+  for (int i = 0; i < n; ++i)
+    dst[i] = std::abs(src[i] - center);
+}
+
 // Median of pre-sorted array
 ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
   if (n & 1) return x[n / 2];

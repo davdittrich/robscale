@@ -4,6 +4,26 @@
 #include <cstring>
 #include <memory>
 
+// OPT-M1: Extract large-n path as ROBSCALE_NOINLINE so buf_stack[2048] is
+// never allocated in the entry frame when n <= 64.
+// OPT-M2/M3: ROBSCALE_RESTRICT on helpers + #pragma omp simd (via bulk_abs_diff).
+// OPT-M4: bulk_abs_diff / bulk_abs_diff_inplace shared SIMD kernels.
+
+static ROBSCALE_NOINLINE
+double mad_impl_auto_large(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
+  constexpr int STACK_SIZE = 2048;
+  double buf_stack[STACK_SIZE];
+  std::unique_ptr<double[]> heap;
+  double* w = (n <= STACK_SIZE)
+    ? buf_stack
+    : (heap.reset(new double[n]), heap.get());
+  std::memcpy(w, xp, n * sizeof(double));
+  double med = robscale::adaptive_median_select(w, static_cast<size_t>(n));
+  robscale::bulk_abs_diff_inplace(w, n, med);
+  double mad_raw = robscale::adaptive_median_select(w, static_cast<size_t>(n));
+  return constant * mad_raw;
+}
+
 // MAD with auto-median: fused single-buffer approach.
 // After median selection, w is a permutation of x. Compute deviations
 // in-place: {|w[i] - med|} == {|x[i] - med|} as multisets, and MAD
@@ -13,34 +33,28 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
+  if (n <= 64) {
+    double buf_micro[64];
+    const double* xp = x.begin();
+    std::memcpy(buf_micro, xp, n * sizeof(double));
+    double med = robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
+    robscale::bulk_abs_diff_inplace(buf_micro, n, med);
+    return constant * robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
+  }
+  return mad_impl_auto_large(x.begin(), n, constant);
+}
 
-  const double* xp = x.begin();
-
-  // Single buffer of size n (was 2n)
-  double buf_micro[64];
+static ROBSCALE_NOINLINE
+double mad_impl_center_large(const double* ROBSCALE_RESTRICT xp, int n,
+                              double center, double constant) {
   constexpr int STACK_SIZE = 2048;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
-  double* w;
-
-  if (n <= 64) {
-    w = buf_micro;
-  } else if (n <= STACK_SIZE) {
-    w = buf_stack;
-  } else {
-    heap.reset(new double[n]);
-    w = heap.get();
-  }
-
-  // Step 1: copy and select median (destroys ordering of w)
-  std::memcpy(w, xp, n * sizeof(double));
-  double med = robscale::adaptive_median_select(w, n);
-
-  // Step 2: compute absolute deviations in-place
-  for (int i = 0; i < n; ++i) w[i] = std::abs(w[i] - med);
-
-  // Step 3: select median of deviations
-  double mad_raw = robscale::adaptive_median_select(w, static_cast<size_t>(n));
+  double* dev = (n <= STACK_SIZE)
+    ? buf_stack
+    : (heap.reset(new double[n]), heap.get());
+  robscale::bulk_abs_diff(dev, xp, n, center);
+  double mad_raw = robscale::adaptive_median_select(dev, static_cast<size_t>(n));
   return constant * mad_raw;
 }
 
@@ -50,25 +64,11 @@ double mad_impl_center(Rcpp::NumericVector x, double center, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
-
-  const double* xp = x.begin();
-
-  double buf_micro[64];
-  constexpr int STACK_SIZE = 2048;
-  double buf_stack[STACK_SIZE];
-  std::unique_ptr<double[]> heap;
-  double* dev;
-
   if (n <= 64) {
-    dev = buf_micro;
-  } else if (n <= STACK_SIZE) {
-    dev = buf_stack;
-  } else {
-    heap.reset(new double[n]);
-    dev = heap.get();
+    double buf_micro[64];
+    const double* xp = x.begin();
+    robscale::bulk_abs_diff(buf_micro, xp, n, center);
+    return constant * robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
   }
-
-  for (int i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - center);
-  double mad_raw = robscale::adaptive_median_select(dev, static_cast<size_t>(n));
-  return constant * mad_raw;
+  return mad_impl_center_large(x.begin(), n, center, constant);
 }
