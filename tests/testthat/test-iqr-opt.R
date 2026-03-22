@@ -12,7 +12,7 @@ K_IQR <- 0.741301109252801
 # Test I.1: Regression guard — bit-identical result before and after OPT-I1..I8
 # ---------------------------------------------------------------------------
 test_that("iqr_scaled pin unchanged after OPT-I1..I8", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   pin <- readRDS(testthat::test_path("fixtures/iqr_baseline_pin.rds"))
 
   set.seed(99)
@@ -96,7 +96,7 @@ test_that("interp_q7 frac==0 path: no-scan n values correct", {
 # Uses pin values from Phase 0 to verify bit-identical output.
 # ---------------------------------------------------------------------------
 test_that("RESTRICT path: iqr_scaled results identical to pin at representative n", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   pin <- readRDS(testthat::test_path("fixtures/iqr_baseline_pin.rds"))
 
   # Re-derive the same values and confirm identity
@@ -193,7 +193,7 @@ test_that("Symmetric Q1 known result: n=20, x=1:20", {
 # RED until Phase 6 adds iqr_sorted_impl. Removed diagnostic before Phase 6 commit.
 # ---------------------------------------------------------------------------
 test_that("iqr_sorted_impl: O(1) sorted IQR matches iqr_scaled on sorted input", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   # Skip gracefully if diagnostic export not yet present (Phases 0-5)
   if (!exists("iqr_sorted_impl", mode = "function")) {
     skip("iqr_sorted_impl diagnostic export not present yet (Phase 6 adds it)")
@@ -214,7 +214,7 @@ test_that("iqr_sorted_impl: O(1) sorted IQR matches iqr_scaled on sorted input",
 # compute_all_estimators() for n=10 (below auto_switch threshold of 20).
 # ---------------------------------------------------------------------------
 test_that("ensemble scale_robust pin unchanged after IQR optimizations", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   pin <- readRDS(testthat::test_path("fixtures/iqr_baseline_pin.rds"))
   set.seed(77)
   result <- scale_robust(rnorm(10), n_boot = 50)

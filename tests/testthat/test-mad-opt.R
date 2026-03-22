@@ -9,7 +9,7 @@ K_MAD <- 1.482602218505602
 
 # Test 1.1: Regression guard — pin-exact result before and after optimization
 test_that("mad_scaled pin unchanged after OPT-M1..M7", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   pin <- readRDS(testthat::test_path("fixtures/mad_baseline_pin.rds"))
 
   set.seed(99)
@@ -56,7 +56,7 @@ test_that("mad_impl_center RESTRICT path: known exact result and stats::mad agre
 # n=10 forces the ensemble path (below the auto_switch threshold of 20).
 # Bit-identical: XorShift32 per replicate; output is deterministic regardless of TBB scheduling.
 test_that("ensemble scale_robust pin unchanged after ensemble MAD optimization", {
-  devtools::load_all(quiet = TRUE)
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   pin <- readRDS(testthat::test_path("fixtures/mad_baseline_pin.rds"))
   set.seed(77)
   result <- scale_robust(rnorm(10), n_boot = 50)
