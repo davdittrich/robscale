@@ -62,7 +62,7 @@ inline double mad_from_data(const double* x, double* buf, int n) {
 // Uses buf1 only; buf2 is unused (signature kept for call-site compatibility)
 // OPT-I6: n<=16 handled by small_sort fast path, keeping pdqselect code compact.
 // OPT-I3: symmetric Q1 — pdqselect to lo1+1, max-scan [0..lo1] O(0.25n).
-inline double iqr(const double* x, double* buf1, double* buf2, int n) {
+inline double iqr(const double* ROBSCALE_RESTRICT x, double* ROBSCALE_RESTRICT buf1, double* buf2, int n) {
   (void)buf2;
   if (n < 2) return 0.0;
 
