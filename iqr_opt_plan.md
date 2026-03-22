@@ -37,13 +37,16 @@ Implement all identified IQR performance optimizations using TDD discipline.
   The wrapper sets CPU governor=performance + FIFO-99 scheduling before benchmarking, then restores the original governor.
   Without this, `powersave` governor causes ~350ns bimodal quantization at n=16 that exceeds the 5% threshold (~97ns)
   and produces false gate failures for phases that provably add zero instructions (e.g., RESTRICT annotations).
-- **Gate mode**: **HEAD-TO-HEAD is the default for every phase.** Add a `*_orig` diagnostic export
-  (the pre-optimization implementation) to every phase and run back-to-back `bench::mark(orig=..., new=...)`
-  in the same session. Same-session comparison eliminates inter-session OS scheduling noise completely —
-  at n=16-17 (~3µs), inter-session mode flipping produces false regressions that cannot be resolved
-  by wider thresholds. Remove the `*_orig` export before committing.
-  Fallback to saved-baseline (`benchmarks/iqr_perf_baseline.rds`) only when a `*_orig` export cannot
-  be added (e.g., the change is purely in a non-exported helper with no wrappable entry point).
+- **Gate mode**: **HYBRID SAME-SESSION is the default.** Add a `*_orig` diagnostic export (pre-optimization)
+  and remove before committing. Two sub-modes based on whether code paths differ between orig and new:
+  - **n≤16 (or any n where code paths differ)**: SEQUENTIAL — run orig and new in separate `bench::mark()`
+    calls. Interleaved H2H causes I-cache cross-contamination between different code regions (e.g., sort
+    vs pdqselect), which artificially slows both variants and produces unreliable ratios.
+  - **n≥17 (same code path in both)**: INTERLEAVED — single `bench::mark(orig=..., new=...)` call.
+    C-state wake-latency noise (~420ns bimodal) affects both equally; the ratio cancels the noise.
+  - **Iterations**: n≤17 uses 20,000 (vs 2,000 for n=18..256) to stabilise medians in the bimodal
+    C-state distribution. C-states cannot be disabled (causes thermal throttling; all times inflate ~35%).
+  Fallback to saved-baseline only when `*_orig` cannot be added.
 - All saved-baseline gates compare against `benchmarks/iqr_perf_baseline.rds` (Phase 0, 10 seeds).
 
 ---
