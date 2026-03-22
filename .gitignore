@@ -39,3 +39,38 @@ CRAN-SUBMISSION
 results/
 src/build.log
 src/clean_build.log
+
+# Secrets / env
+.env
+.env.local
+.env.example
+
+# macOS
+.DS_Store
+
+# AI agent tooling (not R package files)
+.beads/
+.metaswarm/
+.tldr/
+.tldrignore
+src/.tldr/
+CLAUDE.md
+bin/
+
+# Agent-generated planning/analysis documents
+*_opt_plan.md
+task_plan*.md
+ADM_REGRESSION_PLAN.md
+PERFORMANCE_OPTIMIZATION_PLAN.md
+RETROSPECTIVE.md
+SERVICE-INVENTORY.md
+SKILL_OPTIMIZATION_PLAN.md
+aitken_findings.md
+scripts/beads-*.ts
+.coverage-thresholds.json
+
+# Generated benchmark results (reproducible from source)
+benchmarks/*.rds
+benchmarks/comprehensive_regression_check.R
+bench/min_time_benchmark.R
+bench/parallel_threshold_sweep.R
