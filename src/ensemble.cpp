@@ -140,7 +140,9 @@ static void ensemble_one_replicate(
   }
 
   // 4: sn — sorted variant, skip redundant copy+sort
-  boot_row[4] = robscale::internal::sn_sorted(resample, n);
+  // OPT-S7: pass work1 as workspace to avoid heap allocation for n > sn_stack_threshold.
+  // work1 is free at this point: rob_scale_compute (estimator 6) writes it at line ~160.
+  boot_row[4] = robscale::internal::sn_sorted(resample, n, work1);
 
   // 5: qn — sorted variant, skip redundant copy+sort
   boot_row[5] = robscale::internal::qn_sorted(resample, n);
