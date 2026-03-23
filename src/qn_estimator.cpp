@@ -378,16 +378,19 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
       current += c;
     }
 
-    // Fill: each block writes diffs at its deterministic offset
+    // Fill: each block writes diffs at its deterministic offset (forward reads).
     tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
       size_t begin = 1 + block_idx * g;
       size_t end = std::min(begin + g, n);
       size_t o = block_offsets[block_idx];
       for (size_t i = begin; i < end; ++i) {
         if (left[i] <= right[i]) {
-          for (int32_t j = left[i]; j <= right[i]; ++j) {
-            diffs[o++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
-          }
+          size_t base = static_cast<size_t>(static_cast<int32_t>(i) - right[i]);
+          size_t len  = static_cast<size_t>(right[i] - left[i] + 1);
+          double xi   = static_cast<double>(sorted_x[i]);
+          for (size_t k = 0; k < len; k++)
+            diffs[o + k] = xi - static_cast<double>(sorted_x[base + k]);
+          o += len;
         }
       }
     });
@@ -397,9 +400,20 @@ double qn_refinement_kernel(const T* sorted_x, size_t n) {
   if (!filled_parallel) {
     size_t offset = 0;
     for (size_t i = 1; i < n; ++i) {
-      for (int32_t j = left[i]; j <= right[i]; ++j) {
-        diffs[offset++] = static_cast<double>(sorted_x[i]) - static_cast<double>(sorted_x[i - j]);
+      if (left[i] > right[i]) continue;
+      size_t base = static_cast<size_t>(static_cast<int32_t>(i) - right[i]);
+      size_t len  = static_cast<size_t>(right[i] - left[i] + 1);
+      double xi   = static_cast<double>(sorted_x[i]);
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+      if (config.hw.simd_level >= SIMDLevel::AVX2 && len >= 4) {
+        qn_fill_diffs_avx2(xi, sorted_x + base, diffs.get() + offset, len);
+      } else
+#endif
+      {
+        for (size_t k = 0; k < len; k++)
+          diffs[offset + k] = xi - static_cast<double>(sorted_x[base + k]);
       }
+      offset += len;
     }
   }
 
