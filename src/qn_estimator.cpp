@@ -217,22 +217,36 @@ double qn_brute_force_exact(const T* x_ptr, size_t n) {
 }
 
 // Post-sort refinement kernel: sorted_x is read-only, n > qn_exact_threshold.
+// ws: optional pre-allocated workspace (OPT-Q6). If non-null, ws->work/iweight/left/right
+// are used directly, eliminating per-call heap allocation. If null, heap-allocates.
 template <typename T>
-double qn_refinement_kernel(const T* sorted_x, size_t n) {
+double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws = nullptr) {
   const auto& config = RuntimeConfig::get();
 
   std::unique_ptr<float[]> work_buf;
   std::unique_ptr<int32_t[]> bounds_buf;
-  try {
-    work_buf.reset(new float[n]);
-    bounds_buf.reset(new int32_t[3 * n]);
-  } catch (const std::bad_alloc& e) {
-    Rcpp::stop("robscale Out of Memory: failed to allocate Qn arena.");
+  float*   work;
+  int32_t* iweight;
+  int32_t* left;
+  int32_t* right;
+
+  if (ws) {
+    work    = ws->work;
+    iweight = ws->iweight;
+    left    = ws->left;
+    right   = ws->right;
+  } else {
+    try {
+      work_buf.reset(new float[n]);
+      bounds_buf.reset(new int32_t[3 * n]);
+    } catch (const std::bad_alloc& e) {
+      Rcpp::stop("robscale Out of Memory: failed to allocate Qn arena.");
+    }
+    work    = work_buf.get();
+    iweight = bounds_buf.get();
+    left    = bounds_buf.get() + n;
+    right   = bounds_buf.get() + 2 * n;
   }
-  float* work = work_buf.get();
-  int32_t* iweight = bounds_buf.get();
-  int32_t* left = bounds_buf.get() + n;
-  int32_t* right = bounds_buf.get() + 2 * n;
 
   size_t h = n / 2 + 1;
   uint64_t k_target = static_cast<uint64_t>(h) * (h - 1) / 2;
@@ -479,9 +493,25 @@ double C_qn_impl_sorted(const T* sorted_x, size_t n) {
   return qn_refinement_kernel(sorted_x, n);
 }
 
+// OPT-Q6: workspace-accepting overload — passes pre-allocated arena through to
+// qn_refinement_kernel, eliminating per-bootstrap heap allocation.
+// ws == nullptr: falls back to heap allocation (same as the overload above).
+template <typename T>
+double C_qn_impl_sorted(const T* sorted_x, size_t n, const QnWorkspace* ws) {
+  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
+  assert(std::is_sorted(sorted_x, sorted_x + n));
+
+  const auto& config = RuntimeConfig::get();
+  if (n <= config.qn_exact_threshold) {
+    return qn_brute_force_kernel(sorted_x, n);
+  }
+  return qn_refinement_kernel(sorted_x, n, ws);
+}
+
 // Explicit template instantiations
 template double C_qn_impl_large<double>(const double*, size_t);
 template double C_qn_impl_sorted<double>(const double*, size_t);
+template double C_qn_impl_sorted<double>(const double*, size_t, const QnWorkspace*);
 template double C_qn_impl<double>(const double*, size_t);
 template double C_qn_impl<int>(const int*, size_t);
 

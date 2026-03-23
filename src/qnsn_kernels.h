@@ -111,6 +111,21 @@ void qn_brute_force_neon(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double 
 }
 #endif
 
+// Workspace for qn_refinement_kernel — allows callers to supply pre-allocated
+// buffers and avoid per-call heap allocation in the hot bootstrap path.
+// Layout contract (sizes in elements, not bytes):
+//   work    — float[n]   (packed into first half of an n-double buffer)
+//   iweight — int32_t[n] (packed into second half of same n-double buffer)
+//   left    — int32_t[n] (packed into first half of a second n-double buffer)
+//   right   — int32_t[n] (packed into second half of same second n-double buffer)
+// Caller guarantees: all four pointers are non-null and point to valid storage.
+struct QnWorkspace {
+  float*   work;
+  int32_t* iweight;
+  int32_t* left;
+  int32_t* right;
+};
+
 } // namespace robscale::qnsn
 
 #endif // ROBSCALE_QNSN_KERNELS_H

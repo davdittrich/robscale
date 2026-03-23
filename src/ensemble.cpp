@@ -145,7 +145,26 @@ static void ensemble_one_replicate(
   boot_row[4] = robscale::internal::sn_sorted(resample, n, work1);
 
   // 5: qn — sorted variant, skip redundant copy+sort
-  boot_row[5] = robscale::internal::qn_sorted(resample, n);
+  // OPT-Q6: workspace reuse — reinterpret work1/work2 as Qn arena to avoid
+  // per-bootstrap heap allocation inside qn_refinement_kernel.
+  // Layout: work1 -> float work[n] + int32_t iweight[n] (4n+4n = 8n bytes)
+  //         work2 -> int32_t left[n] + int32_t right[n] (4n+4n = 8n bytes)
+  // Guard: only for n <= sn_stack_threshold (2048); beyond that pass nullptr.
+  {
+    using WS = robscale::qnsn::QnWorkspace;
+    static constexpr size_t QN_WS_THRESHOLD = 2048;
+    const size_t un = static_cast<size_t>(n);
+    WS qn_ws{};
+    WS* qn_ws_ptr = nullptr;
+    if (un <= QN_WS_THRESHOLD) {
+      qn_ws.work    = reinterpret_cast<float*>(work1);
+      qn_ws.iweight = reinterpret_cast<int32_t*>(work1) + un;
+      qn_ws.left    = reinterpret_cast<int32_t*>(work2);
+      qn_ws.right   = reinterpret_cast<int32_t*>(work2) + un;
+      qn_ws_ptr = &qn_ws;
+    }
+    boot_row[5] = robscale::internal::qn_sorted(resample, n, qn_ws_ptr);
+  }
 
   // 6: robScale — O(1) median from sorted data, then Newton-Raphson
   {
