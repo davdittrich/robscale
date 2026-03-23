@@ -168,7 +168,11 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
 #endif
     {
       // OPT-RL2: single-pass fused scalar — no tmp[] writes, accumulators in registers.
+      // OPT-RL5: omp simd hint for non-AVX2 builds (no-op when AVX2+SLEEF are active).
       sum_psi = 0.0; sum_dpsi = 0.0;
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+#pragma omp simd reduction(+:sum_psi,sum_dpsi)
+#endif
       for (size_t i = 0; i < n; ++i) {
         double p = std::tanh((xp[i] - t) * half_inv_s);
         sum_psi  += p;
@@ -196,7 +200,13 @@ static double rob_loc_core(const double* ROBSCALE_RESTRICT xp, size_t n,
                            bool has_scale, double scale_val,
                            int maxit, double tol) {
   std::memcpy(buf, xp, n * sizeof(double));
-  double med = robscale::median_select(buf, n);
+
+  // OPT-RL5: hoist small-n dispatch check — avoids repeated branch inside
+  // median_select.  For n <= ROBSCALE_SORT_MEDIAN_THRESHOLD (16), call
+  // median_net directly (mirrors rob_scale_core pattern).
+  const bool is_small = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
+  double med = is_small ? robscale::median_net(buf, n)
+                        : robscale::median_select(buf, n);
 
   int minobs = has_scale ? 3 : 4;
   if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) return med;
