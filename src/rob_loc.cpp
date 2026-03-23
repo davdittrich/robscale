@@ -149,10 +149,10 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
   // OPT-L1+L2: hoist SIMD dispatch check once before the NR loop.
   // use_fused:     dispatch to rob_loc_nr_step_avx2 (fused single-pass kernel).
   // use_avx2_tanh: same flag — if AVX2+n>=8, also use it for the 3-pass fallback
-  //               (only reached when use_fused=false, i.e., n<8 or non-AVX2 build).
+  //               (only reached when use_fused=false, i.e., n<4 or non-AVX2 build).
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
     defined(ROBSCALE_HAS_AVX2_DISPATCH)
-  const bool use_fused = (n >= 8) &&
+  const bool use_fused = (n >= 4) &&  // OPT-RL1: lowered from n>=8 to n>=4
     (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
      robscale::qnsn::SIMDLevel::AVX2);
   const bool use_avx2_tanh = use_fused;
