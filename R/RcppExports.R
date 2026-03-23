@@ -73,6 +73,10 @@ rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
 
+rob_loc_fast_orig <- function(x, has_scale, scale_val, maxit, tol) {
+    .Call(`_robscale_rob_loc_fast_orig`, x, has_scale, scale_val, maxit, tol)
+}
+
 rob_loc_scalar_impl <- function(x) {
     .Call(`_robscale_rob_loc_scalar_impl`, x)
 }
