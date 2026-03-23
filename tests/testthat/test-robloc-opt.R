@@ -464,3 +464,55 @@ test_that("0.33 — rob_loc_fast_orig permutation invariance at gate sizes", {
       label=sprintf("n=%d: |perm-orig| = %.3e", n, abs(loc1-loc2)))
   }
 })
+
+# ---- WU-RL2 TDD guards: single-pass scalar vs reference ----
+# These tests must pass before AND after RL2 replaces the 3-pass scalar fallback.
+# rob_loc_scalar_impl is the independent 3-pass reference (uses std::tanh directly).
+
+test_that("0.34 — RL2 pre-condition: n=4..8 no-scale path matches scalar reference", {
+  skip_if_not(
+    exists("rob_loc_scalar_impl", envir=asNamespace("robscale"), mode="function"),
+    "rob_loc_scalar_impl diagnostic not compiled"
+  )
+  tol <- 2 * sqrt(.Machine$double.eps)
+  max_diff <- 0
+  for (n in 4L:8L) {
+    for (s in c(42L, 57L, 99L, 123L, 200L, 314L, 628L, 777L, 1024L, 1618L,
+                22L, 33L, 44L, 55L, 66L, 77L, 88L, 99L, 111L, 222L)) {
+      set.seed(s)
+      x  <- rnorm(n)
+      v1 <- robscale:::rob_loc_scalar_impl(x)
+      v2 <- robLoc(x)
+      d  <- abs(v1 - v2)
+      if (d > max_diff) max_diff <- d
+    }
+  }
+  expect_lt(max_diff, tol,
+    label=sprintf("max |scalar-robLoc| over n=4..8 x 20 seeds = %.3e (tol=%.3e)", max_diff, tol))
+})
+
+test_that("0.35 — RL2 pre-condition: has_scale=TRUE path matches scalar reference at n=4..8,16,64,100", {
+  skip_if_not(
+    exists("rob_loc_scalar_impl", envir=asNamespace("robscale"), mode="function"),
+    "rob_loc_scalar_impl diagnostic not compiled"
+  )
+  tol <- 2 * sqrt(.Machine$double.eps)
+  max_diff <- 0
+  for (n in c(4L, 5L, 6L, 7L, 8L, 16L, 64L, 100L)) {
+    for (s in c(42L, 57L, 99L, 123L, 200L, 314L, 628L, 777L, 1024L, 1618L,
+                22L, 33L, 44L, 55L, 66L, 77L, 88L, 99L, 111L, 222L)) {
+      set.seed(s)
+      x    <- rnorm(n)
+      sv   <- mad(x)
+      if (sv == 0) next
+      # has_scale path: robLoc(x, scale=sv) must match scalar reference robLoc(x)
+      # (same scale => same result, within NR tolerance)
+      v_hs <- robLoc(x, scale = sv)
+      v_ns <- robscale:::rob_loc_scalar_impl(x)
+      d    <- abs(v_hs - v_ns)
+      if (d > max_diff) max_diff <- d
+    }
+  }
+  expect_lt(max_diff, 1e-5,  # NR vs scalar may differ by ~1e-7 due to MAD rounding
+    label=sprintf("max |has_scale-scalar| over n=4..8,16,64,100 x 20 seeds = %.3e", max_diff))
+})

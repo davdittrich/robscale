@@ -133,32 +133,28 @@ static double rob_loc_parallel_compute(const double* ROBSCALE_RESTRICT xp,
  * Portably optimized robLoc NR kernel (serial).
  *
  * OPT-L1: dispatch to fused AVX2 single-pass kernel when available.
- *   Scalar 3-pass fallback: scale → tanh → accumulate.
  * OPT-L2: RuntimeConfig::get() hoisted once before the NR loop.
- *   bulk_tanh_dispatched() skips the repeated dispatch check per iteration.
+ * OPT-RL2: scalar fallback is now single-pass (no tmp[] writes; accumulators
+ *   stay in registers). Eliminates the 3-pass scale->tanh->accumulate pattern.
  *
  * sum_dpsi guard: if Σ sech²(u_i) underflows (all |u_i| >> 1, degenerate
  * scale), the NR step blows up. Break early with the current t.
  */
 static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp,
                                               size_t n, double t, double s,
-                                              int maxit, double tol,
-                                              double* ROBSCALE_RESTRICT tmp) {
+                                              int maxit, double tol) {
   const double half_inv_s = 0.5 / s;
 
   // OPT-L1+L2: hoist SIMD dispatch check once before the NR loop.
-  // use_fused:     dispatch to rob_loc_nr_step_avx2 (fused single-pass kernel).
-  // use_avx2_tanh: same flag — if AVX2+n>=8, also use it for the 3-pass fallback
-  //               (only reached when use_fused=false, i.e., n<4 or non-AVX2 build).
+  // use_fused: dispatch to rob_loc_nr_step_avx2 (fused single-pass kernel).
+  //   Scalar fallback (n<4 or non-AVX2): single-pass std::tanh loop.
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
     defined(ROBSCALE_HAS_AVX2_DISPATCH)
   const bool use_fused = (n >= 4) &&  // OPT-RL1: lowered from n>=8 to n>=4
     (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
      robscale::qnsn::SIMDLevel::AVX2);
-  const bool use_avx2_tanh = use_fused;
 #else
-  const bool use_fused     = false;
-  const bool use_avx2_tanh = false;
+  const bool use_fused = false;
 #endif
 
   for (int k = 0; k < maxit; ++k) {
@@ -171,13 +167,10 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
     } else
 #endif
     {
-      // 3-pass scalar fallback
-      for (size_t i = 0; i < n; ++i)
-        tmp[i] = (xp[i] - t) * half_inv_s;
-      robscale::bulk_tanh_dispatched(tmp, (int)n, use_avx2_tanh);
+      // OPT-RL2: single-pass fused scalar — no tmp[] writes, accumulators in registers.
       sum_psi = 0.0; sum_dpsi = 0.0;
       for (size_t i = 0; i < n; ++i) {
-        double p = tmp[i];
+        double p = std::tanh((xp[i] - t) * half_inv_s);
         sum_psi  += p;
         sum_dpsi += 1.0 - p * p;
       }
@@ -207,9 +200,9 @@ static double rob_loc_core(const double* xp, size_t n,
   int minobs = has_scale ? 3 : 4;
   if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) return med;
 
-  // OPT-L4: pass buf[] (warm in L1/L2 after memcpy+median_select) instead of
-  // xp[] (potentially evicted from cache).  MAD is permutation-invariant, so
-  // mad_select(buf, ...) == mad_select(xp, ...) by construction.
+  // OPT-L4 + OPT-RL3: pass buf[] (warm in L1/L2 after memcpy+median_select) instead
+  // of xp[] (potentially evicted from cache).  Both MAD and NR sums are
+  // permutation-invariant, so buf and xp produce identical results.
   double s = has_scale ? scale_val : robscale::mad_select(buf, (int)n, med, dev);
   if (ROBSCALE_UNLIKELY(s == 0.0)) return med;
 
@@ -223,11 +216,11 @@ static double rob_loc_core(const double* xp, size_t n,
     const auto& cfg = robscale::qnsn::RuntimeConfig::get();
     if (n >= cfg.rob_scale_parallel_threshold &&
         cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2)
-      return rob_loc_parallel_compute(xp, n, med, s, maxit, tol);
+      return rob_loc_parallel_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
   }
 #endif
 
-  return rob_loc_compute(xp, n, med, s, maxit, tol, buf);
+  return rob_loc_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
 }
 
 /**
@@ -448,6 +441,7 @@ double rob_loc_serial_impl(Rcpp::NumericVector x) {
   double s = robscale::mad_select(buf, (int)n, med, dev);
   if (s == 0.0) return med;
 
-  // Call serial rob_loc_compute directly (no TBB dispatch)
-  return rob_loc_compute(xp, n, med, s, MAXIT, TOL, buf);
+  // Call serial rob_loc_compute directly (no TBB dispatch).
+  // Intentionally passes xp (original data order) — serial reference for cross-checking.
+  return rob_loc_compute(xp, n, med, s, MAXIT, TOL);
 }
