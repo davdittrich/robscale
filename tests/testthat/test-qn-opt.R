@@ -293,9 +293,9 @@ test_that("Q.22 minimum valid n=2: C_qn_fast correct", {
 # ---------------------------------------------------------------------------
 test_that("Q.NOINLINE.1: C_qn_fast_orig exists as exported function", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  # Fails if compileAttributes() was not run after adding the export annotation.
-  expect_true(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
-              label = "C_qn_fast_orig is exported")
+  # This test was valid for WU-Q1/Q2. After WU-Q3 removed C_qn_fast_orig,
+  # it is superseded by Q.RESTRICT.3 (expects FALSE). Skip to avoid conflict.
+  skip("C_qn_fast_orig removed in WU-Q3 — superseded by Q.RESTRICT.3")
 })
 
 test_that("Q.NOINLINE.2: C_qn_fast matches C_qn_fast_orig for all sizes", {
@@ -354,4 +354,37 @@ test_that("Q.TIERED.5: Inf propagates for n <= 16", {
   expect_true(is.na(C_qn_fast(c(1.0, Inf,  3.0))),  label = "+Inf n=3")
   expect_true(is.na(C_qn_fast(c(1.0, -Inf, 3.0))),  label = "-Inf n=3")
   expect_true(is.na(C_qn_fast(c(-Inf, rep(1.0, 8L)))), label = "-Inf n=9")
+})
+
+# ---------------------------------------------------------------------------
+# WU-Q3 regression guards (added before WU-Q3 implementation)
+# ---------------------------------------------------------------------------
+test_that("Q.RESTRICT.1: C_qn_fast matches C_qn_fast_orig at n=50, 200, 500", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
+              "C_qn_fast_orig not present — skip")
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(50L, 200L, 500L)) {
+    set.seed(n * 7L + 3L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
+                 label = paste("restrict n =", n))
+  }
+})
+
+test_that("Q.RESTRICT.2: sorted variant matches at n=100, 1000", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(100L, 1000L)) {
+    set.seed(n * 7L + 3L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
+                 label = paste("restrict sorted n =", n))
+  }
+})
+
+test_that("Q.RESTRICT.3: C_qn_fast_orig removed after WU-Q3", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  expect_false(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
+               label = "C_qn_fast_orig removed after WU-Q3")
 })

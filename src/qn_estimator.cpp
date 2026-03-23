@@ -71,7 +71,7 @@ inline T whimed_cpp(T* a, int32_t* iw, size_t n, int64_t target) {
 
 template <typename T>
 struct QnCountWorker : public WorkerBase {
-  const T* x;
+  const T* ROBSCALE_RESTRICT x;
   size_t n;
   double trial;
   uint64_t sumP;
@@ -95,13 +95,14 @@ struct QnCountWorker : public WorkerBase {
     if (i == 0) i = 1;
     if (i >= end) return;
 
-    size_t jP = std::upper_bound(x, x + i, static_cast<double>(x[i]) - trial) - x;
-    size_t jQ = std::lower_bound(x, x + i, static_cast<double>(x[i]) - trial) - x;
+    const T* ROBSCALE_RESTRICT lx = x;
+    size_t jP = std::upper_bound(lx, lx + i, static_cast<double>(lx[i]) - trial) - lx;
+    size_t jQ = std::lower_bound(lx, lx + i, static_cast<double>(lx[i]) - trial) - lx;
 
     for (; i < end; ++i) {
-      double target = static_cast<double>(x[i]) - trial;
-      while (jP < i && static_cast<double>(x[jP]) <= target) jP++;
-      while (jQ < i && static_cast<double>(x[jQ]) < target) jQ++;
+      double target = static_cast<double>(lx[i]) - trial;
+      while (jP < i && static_cast<double>(lx[jP]) <= target) jP++;
+      while (jQ < i && static_cast<double>(lx[jQ]) < target) jQ++;
       sumP += (i - jP);
       sumQ += (i - jQ);
     }
@@ -120,11 +121,11 @@ struct QnCountWorker : public WorkerBase {
 
 template <typename T>
 struct QnRefineWorker : public WorkerBase {
-  const T* x;
+  const T* ROBSCALE_RESTRICT x;
   size_t n;
   double trial;
   bool is_sumP;
-  int32_t* bounds;
+  int32_t* ROBSCALE_RESTRICT bounds;
 
   QnRefineWorker(const T* x, size_t n, double trial, bool is_sumP, int32_t* bounds)
       : x(x), n(n), trial(trial), is_sumP(is_sumP), bounds(bounds) {}
@@ -135,19 +136,21 @@ struct QnRefineWorker : public WorkerBase {
     if (i == 0) i = 1;
     if (i >= end) return;
 
-    size_t j = is_sumP ? (std::upper_bound(x, x + i, static_cast<double>(x[i]) - trial) - x)
-                       : (std::lower_bound(x, x + i, static_cast<double>(x[i]) - trial) - x);
+    const T* ROBSCALE_RESTRICT lx = x;
+    int32_t* ROBSCALE_RESTRICT lb = bounds;
+    size_t j = is_sumP ? (std::upper_bound(lx, lx + i, static_cast<double>(lx[i]) - trial) - lx)
+                       : (std::lower_bound(lx, lx + i, static_cast<double>(lx[i]) - trial) - lx);
 
     for (; i < end; ++i) {
-      double target = static_cast<double>(x[i]) - trial;
+      double target = static_cast<double>(lx[i]) - trial;
       if (is_sumP) {
-        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(x[j]) <= target)) j++;
+        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(lx[j]) <= target)) j++;
         int32_t jj_bound = static_cast<int32_t>(i - j);
-        if (jj_bound < bounds[i]) bounds[i] = jj_bound;
+        if (jj_bound < lb[i]) lb[i] = jj_bound;
       } else {
-        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(x[j]) < target)) j++;
+        while (ROBSCALE_UNLIKELY(j < i && static_cast<double>(lx[j]) < target)) j++;
         int32_t jj_bound = static_cast<int32_t>(i - j + 1);
-        if (jj_bound > bounds[i]) bounds[i] = jj_bound;
+        if (jj_bound > lb[i]) lb[i] = jj_bound;
       }
     }
   }
@@ -475,37 +478,6 @@ template double C_qn_impl<int>(const int*, size_t);
 // [[Rcpp::export]]
 double C_qn_fast(Rcpp::NumericVector x) {
   return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size()));
-}
-
-// Diagnostic export for WU-Q1 H2H benchmarking: pre-NOINLINE version with
-// large-n path inline. Remove after WU-Q3 commits.
-// [[Rcpp::export]]
-double C_qn_fast_orig(Rcpp::NumericVector x) {
-  using namespace robscale::qnsn;
-  const double* x_ptr = x.begin();
-  size_t n = static_cast<size_t>(x.size());
-  if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
-  if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
-    Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
-  }
-  const auto& config = RuntimeConfig::get();
-  if (n <= config.qn_exact_threshold) {
-    return qn_brute_force_exact(x_ptr, n);
-  }
-  // Inline large-n path (no NOINLINE) — mirrors pre-WU-Q1 C_qn_impl behaviour.
-  std::unique_ptr<double[]> sorted_x_buf;
-  try {
-    sorted_x_buf.reset(new double[n]);
-  } catch (const std::bad_alloc& e) {
-    Rcpp::stop("robscale Out of Memory: failed to allocate Qn sorted buffer.");
-  }
-  double* sorted_x = sorted_x_buf.get();
-  for (size_t i = 0; i < n; i++) {
-    if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
-    sorted_x[i] = x_ptr[i];
-  }
-  optimized_sort(sorted_x, sorted_x + n);
-  return qn_refinement_kernel(sorted_x, n);
 }
 
 // [[Rcpp::export]]

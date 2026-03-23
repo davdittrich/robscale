@@ -57,10 +57,6 @@ C_qn_fast <- function(x) {
     .Call(`_robscale_C_qn_fast`, x)
 }
 
-C_qn_fast_orig <- function(x) {
-    .Call(`_robscale_C_qn_fast_orig`, x)
-}
-
 C_qn_int_fast <- function(x) {
     .Call(`_robscale_C_qn_int_fast`, x)
 }
