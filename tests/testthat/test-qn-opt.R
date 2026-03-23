@@ -464,3 +464,33 @@ test_that("Q.AVX2.3: forward-fill result matches for all refinement path sizes",
                  label = paste("forward fill n =", n))
   }
 })
+
+# ---- WU-Q6: Workspace reuse for Qn in ensemble bootstrap ----
+
+test_that("Q.WORKSPACE.1: scale_robust n=200 n_boot=50 reference value unchanged", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  set.seed(42L)
+  x <- rnorm(200L)
+  result <- scale_robust(x, n_boot = 50L)
+  expect_equal(result, 0.973344584828327, tolerance = 1e-10,
+               label = "workspace n=200 seed=42")
+})
+
+test_that("Q.WORKSPACE.2: scale_robust n=100 n_boot=50 reference value unchanged", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  set.seed(42L)
+  x <- rnorm(100L)
+  result <- scale_robust(x, n_boot = 50L)
+  expect_equal(result, 1.036085388267853, tolerance = 1e-10,
+               label = "workspace n=100 seed=42")
+})
+
+test_that("Q.WORKSPACE.3: large n > sn_stack_threshold gives finite result", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # n=3000 exceeds sn_stack_threshold (2048); workspace path is bypassed (nullptr).
+  # Guard: no crash, result is finite.
+  set.seed(7L)
+  x <- rnorm(3000L)
+  result <- scale_robust(x, n_boot = 10L)
+  expect_true(is.finite(result), label = "large-n no crash")
+})

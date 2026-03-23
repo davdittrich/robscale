@@ -5,6 +5,7 @@
 #include "robust_core.h"
 #include "pdq_select.h"
 #include "qnsn_sort_utils.h"
+#include "qnsn_kernels.h"
 #include <cstring>
 #include <cmath>
 
@@ -14,6 +15,7 @@ namespace robscale::qnsn {
   template <typename T> double C_qn_impl(const T* x, size_t n);
   template <typename T> double C_sn_impl(const T* x, size_t n);
   template <typename T> double C_qn_impl_sorted(const T* x, size_t n);
+  template <typename T> double C_qn_impl_sorted(const T* x, size_t n, const QnWorkspace* ws);
   template <typename T> double C_sn_impl_sorted(const T* x, size_t n);
   // OPT-S7: workspace-accepting overload (Tier 3 only; workspace ignored for n <= sn_stack_threshold)
   template <typename T> double C_sn_impl_sorted(const T* x, size_t n, T* workspace);
@@ -188,6 +190,13 @@ inline double sn_sorted(const double* sorted_x, int n, double* workspace) {
 inline double qn_sorted(const double* sorted_x, int n) {
   if (n < 2) return 0.0;
   return robscale::qnsn::C_qn_impl_sorted<double>(sorted_x, static_cast<size_t>(n));
+}
+
+// OPT-Q6: workspace-accepting overload — eliminates per-bootstrap heap allocation
+// inside qn_refinement_kernel. ws == nullptr falls back to heap allocation.
+inline double qn_sorted(const double* sorted_x, int n, const robscale::qnsn::QnWorkspace* ws) {
+  if (n < 2) return 0.0;
+  return robscale::qnsn::C_qn_impl_sorted<double>(sorted_x, static_cast<size_t>(n), ws);
 }
 
 // robScale (M-scale): fused single-buffer approach.
