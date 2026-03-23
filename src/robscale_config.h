@@ -30,7 +30,7 @@
 
 // Fixed thresholds (not cache-sensitive; cache-sensitive thresholds are
 // derived from hw.l2_per_core at runtime in RuntimeConfig::calculate_thresholds)
-#define ROBSCALE_QN_EXACT_THRESHOLD    64
+#define ROBSCALE_QN_EXACT_THRESHOLD    40
 #define ROBSCALE_SN_STACK_THRESHOLD    2048
 #define ROBSCALE_SORT_BOOST_THRESHOLD  512
 

@@ -520,3 +520,43 @@ test_that("Q.BLKOFFS.2: result unchanged at n = 5000", {
   expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
                label = "block_offsets n=5000 sorted match")
 })
+
+# ---- WU-Q8: omp simd + threshold calibration + adversarial pivot check ----
+
+test_that("Q.OMPSIMD.1: right[] iota correctness at n=100 and n=500", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # Exercises the omp simd-annotated right[] initialisation in qn_refinement_kernel.
+  # Re-use reference values from Q.AVX2.1 (same seeds, same inputs).
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(1234L); x100 <- rnorm(100L)
+  expect_equal(C_qn_fast(x100), 0.939714366776843, tolerance = tol, label = "simd n=100")
+  set.seed(1234L); x500 <- rnorm(500L)
+  expect_equal(C_qn_fast(x500), 1.013671898596087, tolerance = tol, label = "simd n=500")
+})
+
+test_that("Q.THRESH.1: boundary straddle at new threshold (n=40 brute-force, n=41 refinement)", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # After OPT-Q8b threshold change from 64 to 40:
+  #   n=40 -> brute-force (n <= qn_exact_threshold=40)
+  #   n=41 -> refinement  (n >  qn_exact_threshold=40)
+  # Both must produce correct values matching C_qn_sorted.
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(1234L)
+  x40 <- rnorm(40L); x41 <- rnorm(41L)
+  expect_equal(C_qn_fast(x40), C_qn_sorted(sort(x40)), tolerance = tol,
+               label = "threshold straddle n=40")
+  expect_equal(C_qn_fast(x41), C_qn_sorted(sort(x41)), tolerance = tol,
+               label = "threshold straddle n=41")
+})
+
+test_that("Q.THRESH.2: sizes 41..64 match sorted variant after threshold change", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # Sizes 41..64 now use refinement path. Guard correctness at key sizes.
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(41L, 48L, 56L, 60L, 63L, 64L)) {
+    set.seed(n * 3L + 7L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
+                 label = paste("refinement path n =", n))
+  }
+})
