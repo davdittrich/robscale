@@ -310,3 +310,48 @@ test_that("Q.NOINLINE.2: C_qn_fast matches C_qn_fast_orig for all sizes", {
                  label = paste("NOINLINE equivalence n =", n))
   }
 })
+
+# ---------------------------------------------------------------------------
+# WU-Q2 regression guards (added before WU-Q2 implementation)
+# ---------------------------------------------------------------------------
+test_that("Q.TIERED.1: n <= 16 path matches C_qn_fast_orig for n=2..16", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
+              "C_qn_fast_orig not present — skip")
+  tol <- sqrt(.Machine$double.eps)
+  for (n in 2:16) {
+    set.seed(n * 53L + 11L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
+                 label = paste("tiered n =", n))
+  }
+})
+
+test_that("Q.TIERED.2: boundary straddle n=16 vs n=17 both correct", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- sqrt(.Machine$double.eps)
+  set.seed(1616L); x16 <- rnorm(16L)
+  set.seed(1717L); x17 <- rnorm(17L)
+  expect_equal(C_qn_fast(x16), C_qn_sorted(sort(x16)), tolerance = tol,
+               label = "n=16 fast vs sorted")
+  expect_equal(C_qn_fast(x17), C_qn_sorted(sort(x17)), tolerance = tol,
+               label = "n=17 fast vs sorted")
+})
+
+test_that("Q.TIERED.3: equal values at n=10 return 0 (tiny path)", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  expect_equal(C_qn_fast(rep(2.5, 10L)), 0.0, label = "all-equal n=10")
+})
+
+test_that("Q.TIERED.4: NaN propagates for n <= 16", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  expect_true(is.na(C_qn_fast(c(1.0, NaN, 3.0))),  label = "NaN n=3")
+  expect_true(is.na(C_qn_fast(c(NaN, rep(1.0, 8L)))), label = "NaN n=9")
+})
+
+test_that("Q.TIERED.5: Inf propagates for n <= 16", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  expect_true(is.na(C_qn_fast(c(1.0, Inf,  3.0))),  label = "+Inf n=3")
+  expect_true(is.na(C_qn_fast(c(1.0, -Inf, 3.0))),  label = "-Inf n=3")
+  expect_true(is.na(C_qn_fast(c(-Inf, rep(1.0, 8L)))), label = "-Inf n=9")
+})
