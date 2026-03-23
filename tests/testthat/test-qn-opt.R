@@ -494,3 +494,29 @@ test_that("Q.WORKSPACE.3: large n > sn_stack_threshold gives finite result", {
   result <- scale_robust(x, n_boot = 10L)
   expect_true(is.finite(result), label = "large-n no crash")
 })
+
+# ---- WU-Q7: Hoist block_offsets outside refinement loop (TBB path) ----
+
+test_that("Q.BLKOFFS.1: result at n > qn_parallel_threshold matches sorted variant", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # On USE_DIRECT_TBB builds this exercises the parallel block_offsets path.
+  # On non-TBB builds (Linux RcppParallel) this exercises the serial path, which
+  # the refactoring leaves unmodified. Test is valid in both cases.
+  cfg <- get_qnsn_config()
+  n_par <- cfg$qn_parallel_threshold + 500L
+  set.seed(42L)
+  x <- rnorm(n_par)
+  expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = 1e-10,
+               label = paste("block_offsets path n =", n_par))
+})
+
+test_that("Q.BLKOFFS.2: result unchanged at n = 5000", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- 1e-10
+  set.seed(99L)
+  x <- rnorm(5000L)
+  expect_equal(C_qn_fast(x), 1.008121378390264, tolerance = tol,
+               label = "block_offsets n=5000 reference")
+  expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
+               label = "block_offsets n=5000 sorted match")
+})
