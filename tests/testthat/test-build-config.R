@@ -17,7 +17,8 @@ test_that("robscale:::get_qnsn_config() returns cache-derived thresholds", {
   expect_lte(config$sort_boost_threshold, 8192L)
 
   # Fixed thresholds should remain constant
-  expect_equal(config$qn_exact_threshold, 64L)
+  # OPT-Q8b: threshold lowered from 64 to 40 (refinement faster above n=40)
+  expect_equal(config$qn_exact_threshold, 40L)
 })
 
 test_that("generated Makevars has no dead macros (source tree only)", {

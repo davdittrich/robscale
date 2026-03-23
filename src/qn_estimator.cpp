@@ -252,6 +252,9 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
   uint64_t k_target = static_cast<uint64_t>(h) * (h - 1) / 2;
 
   std::fill_n(left, n, 1);
+#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
+  #pragma omp simd
+#endif
   for (size_t i = 0; i < n; ++i) right[i] = static_cast<int32_t>(i);
 
   uint64_t nL = 0;
@@ -343,6 +346,10 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
 
     // --- Refine bounds ---
     if (k_target <= countWorker.sumP) {
+      // Guard: if sumP has not decreased below nR, the float-precision trial
+      // equals every active pair difference (all ties collapsed to one float).
+      // No refinement is possible; fall through to the direct O(nR-nL) selection.
+      if (countWorker.sumP >= nR) break;
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, true, right);
       if (n > config.qn_parallel_threshold) {
         size_t g = config.get_dynamic_grain_size(n);
@@ -355,6 +362,8 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
       } else refineWorker(1, n);
       nR = countWorker.sumP;
     } else if (k_target > countWorker.sumQ) {
+      // Guard: symmetric case — sumQ has not risen above nL.
+      if (countWorker.sumQ <= nL) break;
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, false, left);
       if (n > config.qn_parallel_threshold) {
 #ifdef USE_DIRECT_TBB
