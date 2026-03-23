@@ -257,6 +257,15 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
   uint64_t nL = 0;
   uint64_t nR = static_cast<uint64_t>(n) * (n - 1) / 2;
 
+  // OPT-Q7: hoist block_offsets allocation outside the refinement loop.
+  // num_blocks is constant (grain_size is a RuntimeConfig constant); allocating
+  // inside the loop wasted O(n/grain) vector construction per iteration.
+#ifdef USE_DIRECT_TBB
+  const size_t blk_g = config.grain_size;
+  const size_t num_blocks_cand = (n > 1) ? (n - 1 + blk_g - 1) / blk_g : 0;
+  std::vector<size_t> block_offsets(num_blocks_cand, 0);
+#endif
+
   while (nR - nL > n) {
     // --- Candidate generation: collect weighted medians ---
     size_t m = 0;
@@ -265,14 +274,13 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
     if (n > config.qn_parallel_threshold) {
       // Explicit block-index parallel_for: each block_idx maps to a fixed
       // [begin, end) range, so count phase and fill phase see identical splits.
-      size_t g = config.grain_size;
-      size_t num_blocks = (n - 1 + g - 1) / g;  // blocks covering [1, n)
-      std::vector<size_t> block_offsets(num_blocks, 0);
+      // Reset from previous iteration before count phase.
+      std::fill(block_offsets.begin(), block_offsets.end(), 0);
 
       // Count: how many candidates per block
-      tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
-        size_t begin = 1 + block_idx * g;
-        size_t end = std::min(begin + g, n);
+      tbb::parallel_for(size_t(0), num_blocks_cand, [&](size_t block_idx) {
+        size_t begin = 1 + block_idx * blk_g;
+        size_t end = std::min(begin + blk_g, n);
         size_t count = 0;
         for (size_t i = begin; i < end; ++i) {
           if (left[i] <= right[i]) count++;
@@ -282,7 +290,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
 
       // Prefix sum -> write offsets
       size_t current = 0;
-      for (size_t b = 0; b < num_blocks; ++b) {
+      for (size_t b = 0; b < num_blocks_cand; ++b) {
         size_t c = block_offsets[b];
         block_offsets[b] = current;
         current += c;
@@ -290,9 +298,9 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
       m = current;
 
       // Fill: each block writes at its deterministic offset
-      tbb::parallel_for(size_t(0), num_blocks, [&](size_t block_idx) {
-        size_t begin = 1 + block_idx * g;
-        size_t end = std::min(begin + g, n);
+      tbb::parallel_for(size_t(0), num_blocks_cand, [&](size_t block_idx) {
+        size_t begin = 1 + block_idx * blk_g;
+        size_t end = std::min(begin + blk_g, n);
         size_t o = block_offsets[block_idx];
         for (size_t i = begin; i < end; ++i) {
           if (left[i] <= right[i]) {
