@@ -153,26 +153,46 @@ struct QnRefineWorker : public WorkerBase {
   }
 };
 
-// Post-sort brute-force kernel: sorted_x is read-only, n <= 64.
+// Tiered brute-force: n <= 16 uses a tiny stack buffer (L1-resident);
+// n 17-64 uses the full 16 KB buffer isolated behind NOINLINE.
+constexpr size_t QN_MICRO_THRESHOLD = 16;
+constexpr size_t QN_MICRO_PAIRS     = QN_MICRO_THRESHOLD * (QN_MICRO_THRESHOLD - 1) / 2;
+
+// Tier 1: n <= 16. Stack buffer = 960 bytes (L1-resident).
 template <typename T>
-double qn_brute_force_kernel(const T* sorted_x, size_t n) {
+double qn_brute_force_tiny(const T* sorted_x, size_t n) {
   size_t num_pairs = n * (n - 1) / 2;
   size_t h_qn = n / 2 + 1;
   size_t k_target = h_qn * (h_qn - 1) / 2;
-
-  constexpr size_t QN_MAX_PAIRS =
-      ROBSCALE_QN_EXACT_THRESHOLD * (ROBSCALE_QN_EXACT_THRESHOLD - 1) / 2;
-  double diffs_buf[QN_MAX_PAIRS];
-
-  const auto& config = RuntimeConfig::get();
-  if (n > 16) {
-    Dispatcher::qn_brute_force(sorted_x, n, diffs_buf, config);
-  } else {
-    qn_brute_force_scalar(sorted_x, n, diffs_buf);
-  }
-
+  double diffs_buf[QN_MICRO_PAIRS];  // 120 doubles = 960 bytes
+  qn_brute_force_scalar(sorted_x, n, diffs_buf);
   robscale::floyd_rivest_select(diffs_buf, diffs_buf + k_target - 1, diffs_buf + num_pairs);
   return diffs_buf[k_target - 1] * CONST_QN * get_qn_factor(n);
+}
+
+// Tier 2: 17 <= n <= 64. Stack buffer = 16 KB. NOINLINE isolates the large frame
+// so qn_brute_force_tiny's register allocation is not polluted by this frame.
+template <typename T>
+ROBSCALE_NOINLINE double qn_brute_force_large(const T* sorted_x, size_t n) {
+  size_t num_pairs = n * (n - 1) / 2;
+  size_t h_qn = n / 2 + 1;
+  size_t k_target = h_qn * (h_qn - 1) / 2;
+  constexpr size_t QN_MAX_PAIRS =
+      ROBSCALE_QN_EXACT_THRESHOLD * (ROBSCALE_QN_EXACT_THRESHOLD - 1) / 2;
+  double diffs_buf[QN_MAX_PAIRS];  // 2016 doubles = 16 KB
+  const auto& config = RuntimeConfig::get();
+  Dispatcher::qn_brute_force(sorted_x, n, diffs_buf, config);
+  robscale::floyd_rivest_select(diffs_buf, diffs_buf + k_target - 1, diffs_buf + num_pairs);
+  return diffs_buf[k_target - 1] * CONST_QN * get_qn_factor(n);
+}
+
+// Dispatcher: routes to Tier 1 (n <= 16) or Tier 2 (17-64).
+template <typename T>
+double qn_brute_force_kernel(const T* sorted_x, size_t n) {
+  if (n <= QN_MICRO_THRESHOLD) {
+    return qn_brute_force_tiny(sorted_x, n);
+  }
+  return qn_brute_force_large(sorted_x, n);
 }
 
 // Original entry point: validate + copy + sort + kernel
