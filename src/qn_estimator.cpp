@@ -33,31 +33,31 @@ inline T whimed_cpp(T* a, int32_t* iw, size_t n, int64_t target) {
   while (l < r) {
     T pivot = a[l + (r - l) / 2];
     size_t i = l, j = l;
+    int64_t wleft = 0;
     while (j <= r) {
       if (a[j] < pivot) {
         std::swap(a[i], a[j]);
         std::swap(iw[i], iw[j]);
+        wleft += iw[i];  // post-swap: iw[i] is the swapped-in "less-than" element
         i++;
       }
       j++;
     }
-    int64_t wleft = 0;
-    for (size_t idx = l; idx < i; ++idx) wleft += iw[idx];
 
     if (wleft > t) {
       r = (i > l) ? i - 1 : l;
     } else {
       size_t i_eq = i, j_eq = i;
+      int64_t weq = 0;
       while (j_eq <= r) {
         if (a[j_eq] == pivot) {
           std::swap(a[i_eq], a[j_eq]);
           std::swap(iw[i_eq], iw[j_eq]);
+          weq += iw[i_eq];  // post-swap: iw[i_eq] is the swapped-in "equal" element
           i_eq++;
         }
         j_eq++;
       }
-      int64_t weq = 0;
-      for (size_t idx = i; idx < i_eq; ++idx) weq += iw[idx];
 
       if (wleft + weq > t) return pivot;
       else {

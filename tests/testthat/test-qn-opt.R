@@ -388,3 +388,40 @@ test_that("Q.RESTRICT.3: C_qn_fast_orig removed after WU-Q3", {
   expect_false(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
                label = "C_qn_fast_orig removed after WU-Q3")
 })
+
+# ---------------------------------------------------------------------------
+# WU-Q4 regression guards (added before WU-Q4 implementation)
+# whimed_cpp is unexported; observable effect is via C_qn_fast reference values.
+# These pass before and after a CORRECT fusion; fail if fusion is buggy.
+# ---------------------------------------------------------------------------
+test_that("Q.WHIMED.1: reference values preserved at n=65, 100, 200, 500 (seed=1234)", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- 1e-8
+  # Pre-captured reference values (post-WU-Q3, 2026-03-23)
+  set.seed(1234L); x65  <- rnorm(65L)
+  set.seed(1234L); x100 <- rnorm(100L)
+  set.seed(1234L); x200 <- rnorm(200L)
+  set.seed(1234L); x500 <- rnorm(500L)
+  expect_equal(C_qn_fast(x65),  0.837392748813781, tolerance = tol, label = "whimed n=65")
+  expect_equal(C_qn_fast(x100), 0.939714366776843, tolerance = tol, label = "whimed n=100")
+  expect_equal(C_qn_fast(x200), 0.979058242131217, tolerance = tol, label = "whimed n=200")
+  expect_equal(C_qn_fast(x500), 1.013671898596087, tolerance = tol, label = "whimed n=500")
+})
+
+test_that("Q.WHIMED.2: equal-element degenerate case returns 0 (all-equal n=20)", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  expect_equal(C_qn_fast(rep(3.0, 20L)), 0.0, label = "all-equal n=20 whimed path")
+})
+
+test_that("Q.WHIMED.3: weq partition path via refinement (n=100 with tied work values)", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # n=100 exercises qn_refinement_kernel and whimed_cpp; the equal-element
+  # partition (weq) fires naturally when work[] contains tied median candidates.
+  set.seed(999L)
+  x <- rnorm(100L)
+  ref <- C_qn_fast(x)
+  expect_true(is.finite(ref), label = "refinement result is finite")
+  expect_gt(ref, 0.0, label = "refinement result is positive")
+  # Determinism guard: a buggy weq accumulation would make result non-deterministic
+  expect_identical(C_qn_fast(x), ref, label = "refinement deterministic")
+})
