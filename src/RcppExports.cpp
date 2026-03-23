@@ -178,17 +178,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// C_qn_fast_orig
-double C_qn_fast_orig(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_C_qn_fast_orig(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(C_qn_fast_orig(x));
-    return rcpp_result_gen;
-END_RCPP
-}
 // C_qn_int_fast
 double C_qn_int_fast(Rcpp::IntegerVector x);
 RcppExport SEXP _robscale_C_qn_int_fast(SEXP xSEXP) {
@@ -345,7 +334,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_mad_impl_auto", (DL_FUNC) &_robscale_mad_impl_auto, 2},
     {"_robscale_mad_impl_center", (DL_FUNC) &_robscale_mad_impl_center, 3},
     {"_robscale_C_qn_fast", (DL_FUNC) &_robscale_C_qn_fast, 1},
-    {"_robscale_C_qn_fast_orig", (DL_FUNC) &_robscale_C_qn_fast_orig, 1},
     {"_robscale_C_qn_int_fast", (DL_FUNC) &_robscale_C_qn_int_fast, 1},
     {"_robscale_get_qnsn_config", (DL_FUNC) &_robscale_get_qnsn_config, 0},
     {"_robscale_C_get_qn_factor", (DL_FUNC) &_robscale_C_get_qn_factor, 1},
