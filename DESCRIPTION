@@ -24,8 +24,8 @@ BugReports: https://github.com/davdittrich/robscale/issues
 Encoding: UTF-8
 Imports: Rcpp (>= 1.0.0), RcppParallel (>= 5.0.0)
 LinkingTo: Rcpp, RcppParallel, BH
-Suggests: collapse, GiniDistance, Hmisc, revss, robustbase, testthat
-    (>= 3.0.0)
+Suggests: collapse, devtools, GiniDistance, Hmisc, revss, robustbase,
+    testthat (>= 3.0.0)
 SystemRequirements: GNU make, TBB
 Config/testthat/edition: 3
 NeedsCompilation: yes

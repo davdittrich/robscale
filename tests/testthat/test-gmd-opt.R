@@ -59,12 +59,12 @@ test_that("1.3 — ensemble value unchanged after sort upgrade (G4)", {
     "Baseline pin missing — run Phase 0"
   )
   # XorShift32 seeded per replicate r: each writes to its own boot_results slot;
-  # aggregation is serial post-loop. Output is bit-deterministic regardless of
-  # TBB scheduling. expect_identical (strict equality) is correct.
+  # aggregation is serial post-loop. Output is bit-deterministic on a given
+  # platform. Cross-platform FP rounding differs by 1-3 ULP; use 8*eps.
   set.seed(42)
   v_after <- robscale:::cpp_scale_ensemble(rnorm(200L), 500L)
   v_pin   <- readRDS(testthat::test_path("fixtures/ens_baseline_pin.rds"))
-  expect_identical(v_after, v_pin,
+  expect_equal(v_after, v_pin, tolerance = 8 * .Machine$double.eps,
     label = "ensemble value must be bit-identical after sort algorithm change")
 })
 

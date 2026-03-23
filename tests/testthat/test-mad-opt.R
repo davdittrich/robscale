@@ -13,10 +13,12 @@ test_that("mad_scaled pin unchanged after OPT-M1..M7", {
   pin <- readRDS(testthat::test_path("fixtures/mad_baseline_pin.rds"))
 
   set.seed(99)
-  expect_identical(mad_scaled(rnorm(500)), pin$mad_auto_500)
+  expect_equal(mad_scaled(rnorm(500)), pin$mad_auto_500,
+               tolerance = 8 * .Machine$double.eps)
 
   set.seed(42)
-  expect_identical(mad_scaled(rnorm(100), center = 0), pin$mad_center_100)
+  expect_equal(mad_scaled(rnorm(100), center = 0), pin$mad_center_100,
+               tolerance = 8 * .Machine$double.eps)
 })
 
 # Test 1.2: NOINLINE frame boundary — n=64 and n=65 both correct (OPT-M1)
@@ -60,5 +62,5 @@ test_that("ensemble scale_robust pin unchanged after ensemble MAD optimization",
   pin <- readRDS(testthat::test_path("fixtures/mad_baseline_pin.rds"))
   set.seed(77)
   result <- scale_robust(rnorm(10), n_boot = 50)
-  expect_identical(result, pin$ens_n10)
+  expect_equal(result, pin$ens_n10, tolerance = 8 * .Machine$double.eps)
 })
