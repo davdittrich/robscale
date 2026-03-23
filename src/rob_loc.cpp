@@ -275,6 +275,95 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
 // Diagnostic exports — Phase 3+4 TDD gates
 // ---------------------------------------------------------------------------
 
+// OPT-RL0: H2H baseline — verbatim snapshot of robLoc dispatch before RL1..RL3.
+//
+// Frozen behaviors (for H2H comparison against optimised rob_loc_impl):
+//   - use_fused threshold: n >= 8  (RL1 changes to n >= 4)
+//   - scalar fallback:    3-pass via buf[]  (RL2 replaces with single-pass)
+//   - NR data source:     xp (cold original)  (RL3 changes to warm buf)
+//
+// Does NOT include TBB dispatch (gate sizes n <= 1000 are all below the ≥ 4096
+// parallel threshold, so omitting it produces an identical result for all gate inputs).
+//
+// Remove after WU-RL3 gate passes; run Rcpp::compileAttributes() afterwards.
+// [[Rcpp::export]]
+double rob_loc_fast_orig(Rcpp::NumericVector x, bool has_scale, double scale_val,
+                         int maxit, double tol) {
+  size_t n = (size_t)x.size();
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
+  const double* xp = x.begin();
+
+  // Arena setup — mirrors rob_loc_impl (micro ≤ 64, stack ≤ 2048, heap)
+  constexpr size_t MICRO_SIZE = 64;
+  constexpr size_t STACK_SIZE = 2048;
+  double micro_buf[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles (n*2 at n ≤ 64)
+  double stack_buf[STACK_SIZE * 2];
+  std::unique_ptr<double[]> heap_buf;
+  double* buf;
+  double* dev;
+
+  if (n <= MICRO_SIZE) {
+    buf = micro_buf;      dev = micro_buf  + n;
+  } else if (ROBSCALE_LIKELY(n <= STACK_SIZE)) {
+    buf = stack_buf;      dev = stack_buf  + n;
+  } else {
+    heap_buf.reset(new double[n * 2]);
+    buf = heap_buf.get(); dev = heap_buf.get() + n;
+  }
+
+  // Median (OPT-L4: warm buf, not cold xp)
+  std::memcpy(buf, xp, n * sizeof(double));
+  double med = robscale::median_select(buf, n);
+
+  int minobs = has_scale ? 3 : 4;
+  if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) return med;
+
+  double s = has_scale ? scale_val : robscale::mad_select(buf, (int)n, med, dev);
+  if (ROBSCALE_UNLIKELY(s == 0.0)) return med;
+
+  // NR iteration — FROZEN pre-RL1..RL3 state
+  const double half_inv_s = 0.5 / s;
+  double t = med;
+
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const bool use_fused = (n >= 8) &&  // FROZEN: n >= 8  (RL1 changes to n >= 4)
+    (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool use_fused = false;
+#endif
+
+  for (int k = 0; k < maxit; ++k) {
+    double sum_psi, sum_dpsi;
+
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+    if (use_fused) {
+      rob_loc_nr_step_avx2(xp, (int)n, t, half_inv_s, &sum_psi, &sum_dpsi); // FROZEN: xp
+    } else
+#endif
+    {
+      // 3-pass scalar — FROZEN (RL2 replaces with single-pass; RL3 uses buf not xp)
+      for (size_t i = 0; i < n; ++i)
+        buf[i] = (xp[i] - t) * half_inv_s;              // FROZEN: reads xp
+      robscale::bulk_tanh_dispatched(buf, (int)n, false);
+      sum_psi = 0.0; sum_dpsi = 0.0;
+      for (size_t i = 0; i < n; ++i) {
+        double p = buf[i];
+        sum_psi  += p;
+        sum_dpsi += 1.0 - p * p;
+      }
+    }
+
+    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
+    double v = 2.0 * s * sum_psi / sum_dpsi;
+    t += v;
+    if (std::abs(v) <= tol) break;
+  }
+  return t;
+}
+
 // Phase 3 gate (test 0.3): always uses scalar 3-pass NR path.
 // robLoc() dispatches to rob_loc_nr_step_avx2 when AVX2 is present.
 // Assert: |rob_loc_scalar_impl(x) - robLoc(x)| < 2*sqrt(eps).
