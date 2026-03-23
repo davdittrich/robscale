@@ -425,3 +425,42 @@ test_that("Q.WHIMED.3: weq partition path via refinement (n=100 with tied work v
   # Determinism guard: a buggy weq accumulation would make result non-deterministic
   expect_identical(C_qn_fast(x), ref, label = "refinement deterministic")
 })
+
+# ---------------------------------------------------------------------------
+# WU-Q5 regression guards (added before WU-Q5 implementation)
+# j-reversal + AVX2 fill: output-preserving by design — guards detect bugs.
+# ---------------------------------------------------------------------------
+test_that("Q.AVX2.1: reference values preserved at n=100,200,500 after j-reversal", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- 1e-8
+  set.seed(1234L); x100 <- rnorm(100L)
+  set.seed(1234L); x200 <- rnorm(200L)
+  set.seed(1234L); x500 <- rnorm(500L)
+  expect_equal(C_qn_fast(x100), 0.939714366776843, tolerance = tol, label = "avx2 n=100")
+  expect_equal(C_qn_fast(x200), 0.979058242131217, tolerance = tol, label = "avx2 n=200")
+  expect_equal(C_qn_fast(x500), 1.013671898596087, tolerance = tol, label = "avx2 n=500")
+})
+
+test_that("Q.AVX2.2: sorted variant matches C_qn_fast at n=200, 500", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(200L, 500L)) {
+    set.seed(n * 7L + 5L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
+                 label = paste("avx2 sorted n =", n))
+  }
+})
+
+test_that("Q.AVX2.3: forward-fill result matches for all refinement path sizes", {
+  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
+  # Tests that j-reversal produces the same multiset of diffs as the original.
+  # A reordering bug would show up as a wrong order statistic.
+  tol <- sqrt(.Machine$double.eps)
+  for (n in c(65L, 100L, 200L, 500L, 1000L)) {
+    set.seed(n * 11L + 7L)
+    x <- rnorm(n)
+    expect_equal(C_qn_fast(x), C_qn_sorted(sort(x)), tolerance = tol,
+                 label = paste("forward fill n =", n))
+  }
+})

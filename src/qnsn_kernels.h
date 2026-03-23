@@ -27,6 +27,27 @@ void qn_brute_force_scalar(const T * ROBSCALE_RESTRICT sorted_x, size_t n, doubl
 }
 
 #ifdef ROBSCALE_HAS_AVX2_DISPATCH
+// Forward diff fill: compute dst[k] = xi - src[k] for k = 0..len-1.
+// Requires forward-sequential src reads (ascending index).
+template <typename T>
+ROBSCALE_TARGET_AVX2
+inline void qn_fill_diffs_avx2(double xi, const T* ROBSCALE_RESTRICT src,
+                                double* ROBSCALE_RESTRICT dst, size_t len) {
+  __m256d v_xi = _mm256_set1_pd(xi);
+  size_t k = 0;
+  for (; k + 4 <= len; k += 4) {
+    __m256d v;
+    if constexpr (std::is_same_v<T, double>) {
+      v = _mm256_loadu_pd(src + k);
+    } else {
+      __m128i vi = _mm_loadu_si128(reinterpret_cast<const __m128i*>(src + k));
+      v = _mm256_cvtepi32_pd(vi);
+    }
+    _mm256_storeu_pd(dst + k, _mm256_sub_pd(v_xi, v));
+  }
+  for (; k < len; k++) dst[k] = xi - static_cast<double>(src[k]);
+}
+
 template <typename T>
 ROBSCALE_TARGET_AVX2
 void qn_brute_force_avx2(const T * ROBSCALE_RESTRICT sorted_x, size_t n, double * ROBSCALE_RESTRICT diffs) {
