@@ -48,9 +48,7 @@ static void ensemble_one_replicate(
   if (n <= 16) {
     robscale::small_sort(resample, n);
   } else {
-    const size_t boost_thresh =
-      robscale::qnsn::RuntimeConfig::get().sort_boost_threshold;
-    if (static_cast<size_t>(n) <= boost_thresh)
+    if (static_cast<size_t>(n) <= ROBSCALE_SORT_BOOST_THRESHOLD)
       std::sort(resample, resample + n);
     else
       boost::sort::spreadsort::float_sort(resample, resample + n);
