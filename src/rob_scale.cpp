@@ -372,3 +372,142 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
   return rob_scale_core(xp, n, arena, arena + n,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
+
+// ---------------------------------------------------------------------------
+// WU-RS0 diagnostic exports: frozen 4-wide H2H baseline.
+// C_rob_scale_orig: frozen 4-wide path (never modified — baseline for WU-RS1).
+// C_rob_scale_fast: thin wrapper → production rob_scale_impl.
+// Both are removed in WU-RS2a once the H2H gate has been cleared.
+// ---------------------------------------------------------------------------
+
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+/**
+ * rob_scale_fused_sum_avx2_orig — frozen private copy of the 4-wide kernel.
+ * WU-RS1 modifies rob_scale_fused_sum_avx2; this copy is NEVER modified.
+ * Identical code to the production kernel at WU-RS0 commit time.
+ */
+ROBSCALE_TARGET_AVX2
+static double rob_scale_fused_sum_avx2_orig(
+    const double* ROBSCALE_RESTRICT data,
+    int n, double data_offset, double half_inv_sc) {
+  const __m256d off4  = _mm256_set1_pd(data_offset);
+  const __m256d hinv4 = _mm256_set1_pd(half_inv_sc);
+  __m256d acc = _mm256_setzero_pd();
+  int i = 0;
+  for (; i + 4 <= n; i += 4) {
+    __m256d d = _mm256_loadu_pd(data + i);
+    __m256d t = ROBSCALE_TANH4_AVX2(
+        _mm256_mul_pd(_mm256_sub_pd(d, off4), hinv4));
+    acc = _mm256_fmadd_pd(t, t, acc);
+  }
+  __m128d lo   = _mm256_castpd256_pd128(acc);
+  __m128d hi   = _mm256_extractf128_pd(acc, 1);
+  __m128d sum2 = _mm_add_pd(lo, hi);
+  __m128d sum1 = _mm_hadd_pd(sum2, sum2);
+  double sum_rho = _mm_cvtsd_f64(sum1);
+  for (; i < n; ++i) {
+    double t = std::tanh((data[i] - data_offset) * half_inv_sc);
+    sum_rho += t * t;
+  }
+  return sum_rho;
+}
+#endif // ROBSCALE_HAS_SLEEF && ROBSCALE_HAS_AVX2_DISPATCH
+
+/**
+ * rob_scale_compute_orig — frozen copy of rob_scale_compute.
+ * Calls rob_scale_fused_sum_avx2_orig so WU-RS1's kernel change cannot
+ * contaminate the H2H baseline.
+ */
+static double rob_scale_compute_orig(
+    const double* ROBSCALE_RESTRICT data,
+    size_t n, double data_offset, double s,
+    int maxit, double tol,
+    double* ROBSCALE_RESTRICT tmp) {
+  const double inv_n = 1.0 / (double)n;
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const bool use_fused = (n >= 4) &&
+    (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool use_fused = false;
+#endif
+  auto rho_sum = [&](double sc) -> double {
+    const double hisc = 0.5 * robscale::INV_RHO_SCALE_CONST / sc;
+    if (use_fused) {
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+      return rob_scale_fused_sum_avx2_orig(data, (int)n, data_offset, hisc);
+#endif
+    }
+    for (size_t i = 0; i < n; ++i) tmp[i] = (data[i] - data_offset) * hisc;
+    robscale::bulk_tanh(tmp, (int)n);
+    double sr = 0.0;
+    for (size_t i = 0; i < n; ++i) sr += tmp[i] * tmp[i];
+    return sr;
+  };
+  return aitken_iterate(rho_sum, s, maxit, tol, inv_n);
+}
+
+// [[Rcpp::export]]
+double C_rob_scale_orig(Rcpp::NumericVector x) {
+  // Self-contained frozen 4-wide path. Remove with WU-RS2a commit.
+  // Mirrors rob_scale_impl(x, false, 0.0, 1e-4, 80, 1.4901161e-8, 0) but
+  // calls rob_scale_compute_orig at the serial dispatch point so WU-RS1's
+  // modification of rob_scale_fused_sum_avx2 does not affect this baseline.
+  size_t n = (size_t)x.size();
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
+  const double* xp = x.begin();
+
+  // Arena allocation — mirrors rob_scale_impl dispatch thresholds exactly.
+  double arena_small[ROBSCALE_MICRO_BUFFER_SIZE];
+  constexpr size_t SCALE_STACK_SIZE = 2048;
+  double buf_stack_o[SCALE_STACK_SIZE * 2];
+  std::unique_ptr<double[]> heap_o;
+  double* w; double* dev;
+  if (n <= ROBSCALE_MICRO_BUFFER_SIZE / 2) {
+    w = arena_small; dev = arena_small + n;
+  } else if (n <= SCALE_STACK_SIZE) {
+    w = buf_stack_o; dev = buf_stack_o + n;
+  } else {
+    heap_o.reset(new double[n * 2]);
+    w = heap_o.get(); dev = w + n;
+  }
+
+  // Replicate rob_scale_core(xp, n, w, dev, has_loc=false, 0, 1e-4, 80, tol, fallback=0).
+  constexpr double implbound = 1e-4;
+  constexpr size_t minobs = 4; // has_loc=false
+  const bool is_small_o = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
+
+  std::memcpy(w, xp, n * sizeof(double));
+  double t = is_small_o ? robscale::median_net(w, n)
+                        : robscale::adaptive_robscale_median_select(w, n);
+  for (size_t i = 0; i < n; ++i) dev[i] = std::abs(w[i] - t);
+  double s0 = robscale::MAD_CONSISTENCY *
+      (is_small_o ? robscale::median_net(dev, n)
+                  : robscale::adaptive_robscale_median_select(dev, n));
+
+  // n < minobs: early exit (same as rob_scale_core; fallback=0 → no R_NaReal).
+  if (ROBSCALE_UNLIKELY(n < minobs)) {
+    if (s0 <= implbound)
+      return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+    return s0;
+  }
+
+  // s0 checks for n >= minobs (fallback=0: no R_NaReal path).
+  if (ROBSCALE_UNLIKELY(s0 == 0.0))
+    return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+
+  // Serial path with frozen kernel (bypasses parallel dispatch).
+  // For H2H gate sizes n <= 1000, the parallel threshold (~4096+) is not
+  // reached, so this matches C_rob_scale_fast exactly for gate-relevant sizes.
+  return rob_scale_compute_orig(xp, n, t, s0, 80, 1.4901161e-8, w);
+}
+
+// [[Rcpp::export]]
+double C_rob_scale_fast(Rcpp::NumericVector x) {
+  // Thin wrapper → production rob_scale_impl (has_loc=false, default params).
+  // Always reflects the current production path; after WU-RS1 calls 8-wide kernel.
+  return rob_scale_impl(x, false, 0.0, 1e-4, 80, 1.4901161e-8, 0);
+}

@@ -1,0 +1,115 @@
+## bench/rob_scale_gate_check.R
+## H2H benchmark gate for robScale() WU-RS1 (8-wide AVX2).
+##
+## Usage:
+##   Rscript bench/rob_scale_gate_check.R       # H2H mode (WU-RS0 baseline check)
+##   Rscript bench/rob_scale_gate_check.R SOLO  # SOLO mode (vs saved baseline)
+##
+## Gate criterion: median(C_rob_scale_fast) / median(C_rob_scale_orig) <= 1.05
+## at ALL sizes. Larger ratio = regression.
+##
+## Sub-µs noise protocol for n <= 16:
+##   A single ratio > 1.05 may be timer quantisation. Require 3 consecutive
+##   runs all showing ratio > 1.05 before declaring a failure.
+
+library(robscale)
+library(bench)
+
+RATIO_LIMIT <- 1.05
+MODE <- if (length(commandArgs(trailingOnly = TRUE)) > 0 &&
+            toupper(commandArgs(trailingOnly = TRUE)[1]) == "SOLO") "SOLO" else "H2H"
+
+cat("=== rob_scale gate check ===\n")
+cat("Mode:", MODE, "\n")
+cat("Gate: ratio <=", RATIO_LIMIT, "\n\n")
+
+sizes <- c(4, 5, 7, 8, 10, 15, 16, 17, 30, 50, 64, 65, 100, 200, 500, 1000)
+
+results <- lapply(sizes, function(n) {
+  set.seed(42)
+  x <- rnorm(n)
+  min_iter <- if (n <= 16) 1000L else if (n <= 100) 500L else 200L
+
+  if (MODE == "H2H") {
+    bm <- bench::mark(
+      fast = robscale:::C_rob_scale_fast(x),
+      orig = robscale:::C_rob_scale_orig(x),
+      min_iterations = min_iter,
+      max_time = 30,
+      check = FALSE
+    )
+    # Row 1 = fast, Row 2 = orig (bench::mark preserves input order)
+    med_fast <- as.numeric(bm$median[1])
+    med_orig <- as.numeric(bm$median[2])
+    ratio <- med_fast / med_orig
+  } else {
+    # SOLO mode: compare against saved baseline
+    baseline_file <- "bench/rob_scale_perf_baseline.rds"
+    if (!file.exists(baseline_file)) {
+      cat("ERROR: baseline file not found:", baseline_file, "\n")
+      return(list(n = n, ratio = NA, pass = FALSE))
+    }
+    baseline <- readRDS(baseline_file)
+    baseline_n <- Filter(function(b) b$n == n, baseline)
+    if (length(baseline_n) == 0) {
+      cat("WARNING: no baseline for n=", n, "\n")
+      return(list(n = n, ratio = NA, pass = TRUE))
+    }
+    bm <- bench::mark(
+      fast = robscale:::C_rob_scale_fast(x),
+      min_iterations = min_iter,
+      max_time = 30,
+      check = FALSE
+    )
+    med_fast <- as.numeric(bm$median[1])
+    med_baseline <- baseline_n[[1]]$median_ns / 1e9  # convert ns back to seconds
+    ratio <- med_fast / med_baseline
+    med_orig <- med_baseline
+  }
+
+  list(n = n,
+       med_fast_ns = med_fast * 1e9,
+       med_orig_ns = med_orig * 1e9,
+       ratio = ratio,
+       pass = ratio <= RATIO_LIMIT,
+       sub_us = (n <= 16))
+})
+
+# Print results table
+cat(sprintf("%-6s  %-12s  %-12s  %-8s  %s\n",
+            "n", "fast (ns)", "orig/base (ns)", "ratio", "status"))
+cat(strrep("-", 58), "\n")
+
+all_pass <- TRUE
+sub_us_fails <- c()
+
+for (r in results) {
+  status <- if (is.na(r$ratio)) "N/A" else if (r$pass) "PASS" else "FAIL"
+  if (!is.na(r$ratio) && !r$pass) {
+    all_pass <- FALSE
+    if (r$sub_us) sub_us_fails <- c(sub_us_fails, r$n)
+  }
+  cat(sprintf("%-6d  %12.1f  %12.1f  %8.4f  %s%s\n",
+              r$n, r$med_fast_ns, r$med_orig_ns, r$ratio,
+              status,
+              if (r$sub_us) " [sub-µs: apply 3-run protocol]" else ""))
+}
+
+cat(strrep("-", 58), "\n")
+cat("Overall:", if (all_pass) "PASS" else "FAIL", "\n")
+
+if (length(sub_us_fails) > 0) {
+  cat("\nNOTE: Failures at n =", paste(sub_us_fails, collapse = ", "),
+      "are at sub-µs scale.\n")
+  cat("Sub-µs protocol: run this script 3 times and check if ALL 3 show\n")
+  cat("ratio > 1.05 at these sizes before declaring a real failure.\n")
+}
+
+if (!all_pass) {
+  cat("\nGATE FAILED: ratio > 1.05 detected.\n")
+  cat("For compile-time changes (WU-RS1): apply sub-µs protocol for n<=16.\n")
+  cat("For other sizes: inspect assembly for spill (see plan WU-RS1 section).\n")
+  quit(status = 1)
+} else {
+  cat("\nGate passed. All ratios <=", RATIO_LIMIT, "\n")
+}
