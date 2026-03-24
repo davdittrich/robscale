@@ -220,24 +220,22 @@ static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
 /**
  * Portably optimized robScale kernel.
  * Non-static: also called by estimators_internal.h for the ensemble.
+ * use_avx2: pre-cached AVX2 flag (OPT-E); eliminates repeated TLS lookups.
  */
+ROBSCALE_HIDDEN
 double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
                          size_t n, double data_offset, double s,
                          int maxit, double tol,
-                         double* ROBSCALE_RESTRICT tmp) {
+                         double* ROBSCALE_RESTRICT tmp,
+                         bool use_avx2) {
   const double inv_n = 1.0 / (double)n;
 
-  // Select the fused AVX2 path once, outside the hot loop.
-  // Condition: SLEEF+AVX2 compiled in, n large enough for vectorisation,
-  // and AVX2 confirmed at runtime.
+  // OPT-E: use pre-cached AVX2 flag instead of querying RuntimeConfig here.
   // Threshold n>=4: AVX2 processes 4 doubles/cycle; below 4 the setup cost
-  // exceeds the kernel benefit.  Previously n>=8 left n=4..7 on the slower
-  // scalar path and was the main driver of erratic small-n timing.
+  // exceeds the kernel benefit.
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
     defined(ROBSCALE_HAS_AVX2_DISPATCH)
-  const bool use_fused = (n >= 4) &&
-    (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
-     robscale::qnsn::SIMDLevel::AVX2);
+  const bool use_fused = (n >= 4) && use_avx2;
 #else
   const bool use_fused = false;
 #endif
@@ -252,9 +250,9 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
       return rob_scale_fused_sum_avx2(data, (int)n, data_offset, hisc);
 #endif
     }
-    // 3-pass fallback
+    // 3-pass fallback: use dispatched tanh to avoid a second TLS lookup.
     for (size_t i = 0; i < n; ++i) tmp[i] = (data[i] - data_offset) * hisc;
-    robscale::bulk_tanh(tmp, (int)n);
+    robscale::bulk_tanh_dispatched(tmp, (int)n, use_avx2);
     double sr = 0.0;
     for (size_t i = 0; i < n; ++i) sr += tmp[i] * tmp[i];
     return sr;
@@ -278,24 +276,39 @@ static double rob_scale_core(const double* xp, size_t n,
   // per call, ~6 ns total (median + MAD), on a ~50–200 ns small-n call.
   const bool is_small = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
 
+  // OPT-E: cache RuntimeConfig once — used for both the parallel threshold
+  // check (below) and the use_avx2 flag passed to rob_scale_compute.
+  // Eliminates a second TLS lookup on every rob_scale_core call.
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const auto& cfg = robscale::qnsn::RuntimeConfig::get();
+  const bool avx2 = (cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+
   double t, s_init;
   if (has_loc) {
     t = loc_val;
-    for (size_t i = 0; i < n; ++i) dev[i] = std::abs(xp[i] - t);
+    // OPT-3: SIMD-annotated abs-diff kernel (no scalar loop).
+    // OPT-F: deviations stored in w[] (offset=0 dispatch below).
+    robscale::bulk_abs_diff(w, xp, (int)n, t);
     s_init = robscale::MAD_CONSISTENCY *
-        (is_small ? robscale::median_net(dev, n)
-                  : robscale::adaptive_robscale_median_select(dev, n));
+        (is_small ? robscale::median_net(w, n)
+                  : robscale::adaptive_robscale_median_select(w, n));
   } else {
     std::memcpy(w, xp, n * sizeof(double));
     t = is_small ? robscale::median_net(w, n)
                  : robscale::adaptive_robscale_median_select(w, n);
-    // After median selection, w[] is permuted but holds the same multiset as
-    // xp[].  Reading deviations from warm w[] instead of cold xp[] avoids an
-    // extra scan of the original data; MAD is permutation-invariant.
-    for (size_t i = 0; i < n; ++i) dev[i] = std::abs(w[i] - t);
+    // OPT-3: compute deviations from original xp (not permuted w); no aliasing.
+    // OPT-F: overwrite w[] with |xp[i]-t| so rob_scale_compute gets
+    // pre-subtracted data with offset=0, saving one VSUB per element per
+    // iteration in the AVX2 kernel.  MAD is permutation-invariant, so using
+    // xp[] here gives the same MAD as using the permuted w[].
+    robscale::bulk_abs_diff(w, xp, (int)n, t);
     s_init = robscale::MAD_CONSISTENCY *
-        (is_small ? robscale::median_net(dev, n)
-                  : robscale::adaptive_robscale_median_select(dev, n));
+        (is_small ? robscale::median_net(w, n)
+                  : robscale::adaptive_robscale_median_select(w, n));
   }
 
   int minobs = has_loc ? 3 : 4;
@@ -328,15 +341,15 @@ static double rob_scale_core(const double* xp, size_t n,
      defined(ROBSCALE_HAS_OMP_PARALLEL)) && \
     defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
     defined(ROBSCALE_HAS_AVX2_DISPATCH)
-  {
-    const auto& cfg = robscale::qnsn::RuntimeConfig::get();
-    if (n >= cfg.rob_scale_parallel_threshold &&
-        cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2)
-      return rob_scale_parallel_compute(xp, n, t, s_init, maxit, tol);
-  }
+  // OPT-6: UNLIKELY — parallel threshold only crossed for large n (rare path).
+  if (ROBSCALE_UNLIKELY(n >= cfg.rob_scale_parallel_threshold && avx2))
+    return rob_scale_parallel_compute(xp, n, t, s_init, maxit, tol);
 #endif
 
-  return rob_scale_compute(xp, n, t, s_init, maxit, tol, w);
+  // OPT-F: pass w[] (abs-deviations) with data_offset=0 — eliminates one VSUB
+  // per element per iteration in the AVX2 fused kernel.
+  // dev[] serves as tmp scratch for the 3-pass scalar fallback.
+  return rob_scale_compute(w, n, 0.0, s_init, maxit, tol, dev, avx2);
 }
 
 /**
@@ -349,7 +362,8 @@ static double rob_scale_impl_small(const double* xp, size_t n,
                                    bool has_loc, double loc_val,
                                    double implbound, int maxit,
                                    double tol, int fallback) {
-  double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
+  // OPT-5: 32-byte alignment for AVX2 load/store paths.
+  alignas(32) double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
   return rob_scale_core(xp, n, arena, arena + n,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
@@ -369,7 +383,8 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
 
   // Large-n: stack or heap arena
   constexpr size_t SCALE_STACK_SIZE = 2048;
-  double buf_stack[SCALE_STACK_SIZE * 2];
+  // OPT-5: 32-byte alignment for AVX2 load/store paths.
+  alignas(32) double buf_stack[SCALE_STACK_SIZE * 2];
   std::unique_ptr<double[]> heap;
   double* arena;
 

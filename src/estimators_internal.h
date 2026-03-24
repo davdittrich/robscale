@@ -22,10 +22,13 @@ namespace robscale::qnsn {
 }
 
 // rob_scale_compute: promoted from static in rob_scale.cpp
+// use_avx2: pre-cached AVX2 flag (OPT-E); default false keeps old callers working.
+ROBSCALE_HIDDEN
 double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
                          size_t n, double data_offset, double s,
                          int maxit, double tol,
-                         double* ROBSCALE_RESTRICT tmp);
+                         double* ROBSCALE_RESTRICT tmp,
+                         bool use_avx2 = false);
 
 namespace robscale { namespace internal {
 
@@ -217,8 +220,16 @@ inline double rob_scale(const double* x, double* buf, int n) {
     return robscale::adm_core(x, n, t, ADM_CONSISTENCY);
   }
 
+  // OPT-E: cache AVX2 flag once; avoids a TLS lookup inside rob_scale_compute.
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
   // Newton-Raphson iteration: buf is reused as scratch (written before read)
-  return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, buf);
+  return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, buf, avx2);
 }
 
 }} // namespace robscale::internal

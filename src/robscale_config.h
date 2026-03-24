@@ -90,6 +90,19 @@
   #define ROBSCALE_NOINLINE
 #endif
 
+/**
+ * Mark non-static, non-exported internal functions as hidden.
+ * On Linux/ELF, default visibility causes calls to go through the PLT
+ * (Procedure Linkage Table), adding ~5-10 ns per call.  R packages compile
+ * to a single .so — internal functions are never interposed at runtime.
+ * hidden visibility lets the linker emit direct calls.
+ */
+#if defined(__GNUC__) || defined(__clang__)
+#  define ROBSCALE_HIDDEN __attribute__((visibility("hidden")))
+#else
+#  define ROBSCALE_HIDDEN
+#endif
+
 
 // --- Common Statistical Constants ---
 

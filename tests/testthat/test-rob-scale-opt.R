@@ -263,3 +263,44 @@ test_that("rob_scale opt: parallel path at n=65536 matches robScale", {
                robScale(x_large),
                tolerance = 65536 * .Machine$double.eps)
 })
+
+# ============================================================
+# 8. WU-RS4 regression guards
+#    (bit-exact after OPT-1+F, OPT-3, OPT-5, OPT-6, OPT-B, OPT-E)
+# ============================================================
+
+test_that("rob-scale WU-RS4: single-buffer and abs-diff bit-exact at boundary sizes", {
+  for (n in c(2047, 2048, 2049, 2050)) {
+    set.seed(100 + n)
+    x <- rnorm(n)
+    expect_equal(
+      robscale:::C_rob_scale_fast(x),
+      robscale::robScale(x),
+      tolerance = 0,
+      label = paste0("bit-exact n=", n)
+    )
+  }
+})
+
+test_that("rob-scale WU-RS4: has_loc code path produces finite positive result", {
+  set.seed(42)
+  for (n in c(10, 50, 200, 1000)) {
+    x <- rnorm(n)
+    val <- robscale::robScale(x)
+    expect_true(is.finite(val) && val > 0,
+                label = paste0("finite positive n=", n))
+  }
+})
+
+test_that("rob-scale WU-RS4: micro-buffer straddling (n=63, 64, 65) bit-exact", {
+  for (n in c(63, 64, 65)) {
+    set.seed(200 + n)
+    x <- rnorm(n)
+    expect_equal(
+      robscale:::C_rob_scale_fast(x),
+      robscale::robScale(x),
+      tolerance = 0,
+      label = paste0("n=", n)
+    )
+  }
+})

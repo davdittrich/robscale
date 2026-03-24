@@ -74,6 +74,16 @@ static void ensemble_one_replicate(
     double* boot_row,
     double* resample, double* work1, double* work2) {
 
+  // OPT-E: cache AVX2 flag once per replicate; passed to rob_scale_compute
+  // so it doesn't call RuntimeConfig::get() itself (eliminates 1 TLS lookup).
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+
   XorShift32 rng(static_cast<uint32_t>(r + 12345));
   for (int i = 0; i < n; ++i) {
     resample[i] = xp[rng.next() % n];
@@ -180,7 +190,7 @@ static void ensemble_one_replicate(
         boot_row[6] = robscale::adm_core_sorted(resample, n, t, robscale::ADM_CONSISTENCY);
       } else {
         boot_row[6] = rob_scale_compute(resample, static_cast<size_t>(n),
-                                         t, s_init, 80, 1.4901161e-8, work1);
+                                         t, s_init, 80, 1.4901161e-8, work1, avx2);
       }
     }
   }

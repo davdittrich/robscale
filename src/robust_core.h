@@ -76,7 +76,7 @@ constexpr double ARE_SD_C4      = 1.00;
 // Bulk tanh: vectorized via Accelerate (macOS), SLEEF (Linux), or OpenMP SIMD
 // Scalar fallback only for n<8: at n<8 SIMD setup overhead exceeds the gain
 // (fewer than 2 full AVX2 vectors). For n>=8, use SIMD path.
-inline void bulk_tanh(double* inout, int n) {
+ROBSCALE_HIDDEN inline void bulk_tanh(double* inout, int n) {
   if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
     return;
@@ -104,7 +104,7 @@ inline void bulk_tanh(double* inout, int n) {
 // OPT-L2: dispatch variant accepting a pre-hoisted AVX2 flag, avoiding a
 // repeated RuntimeConfig::get() (TLS read) on each NR iteration.
 // CPUID features are invariant for process lifetime; hoisting is safe.
-inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
+ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
   if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
     return;
@@ -139,7 +139,7 @@ inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
 // 4-wide dual-accumulator unroll: breaks the single-accumulator 4-cycle
 // latency chain; four independent chains fill one 256-bit AVX2 register
 // (4 doubles) per fused-load+abs+add cycle.
-ROBSCALE_TARGET_AVX2
+ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
 ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
                                 double center, double constant) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
@@ -160,7 +160,7 @@ ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
 //   lower_sum = sum(x[0..k-1]), upper_sum = sum(x[k+(n&1)..n-1]), k = n/2.
 // Two independent SIMD-friendly accumulation loops: no branches, no abs().
 // center parameter retained for API symmetry and precondition visibility.
-ROBSCALE_TARGET_AVX2
+ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
 ROBSCALE_INLINE double adm_core_sorted(const double* ROBSCALE_RESTRICT x, int n,
                                        double center, double constant) {
   if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;  // n=0: avoid 1.0/0=Inf; n=1: trivially 0
@@ -175,7 +175,7 @@ ROBSCALE_INLINE double adm_core_sorted(const double* ROBSCALE_RESTRICT x, int n,
 // Absolute-deviation kernel (in-place): w[i] = |w[i] - center|.
 // Single-pointer; RESTRICT valid since no other pointer aliases w in the caller.
 // Used by mad_impl_auto paths and mad_from_data.
-ROBSCALE_INLINE void bulk_abs_diff_inplace(
+ROBSCALE_HIDDEN ROBSCALE_INLINE void bulk_abs_diff_inplace(
     double* ROBSCALE_RESTRICT w, int n, double center) {
 #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
   #pragma omp simd
@@ -187,7 +187,7 @@ ROBSCALE_INLINE void bulk_abs_diff_inplace(
 // Absolute-deviation kernel (out-of-place): dst[i] = |src[i] - center|.
 // dst and src guaranteed non-aliasing by caller; RESTRICT enables SIMD.
 // Used by mad_impl_center paths and the ensemble MAD block.
-ROBSCALE_INLINE void bulk_abs_diff(
+ROBSCALE_HIDDEN ROBSCALE_INLINE void bulk_abs_diff(
     double* ROBSCALE_RESTRICT dst,
     const double* ROBSCALE_RESTRICT src,
     int n, double center) {
@@ -199,13 +199,13 @@ ROBSCALE_INLINE void bulk_abs_diff(
 }
 
 // Median of pre-sorted array
-ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
+ROBSCALE_HIDDEN ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
   if (n & 1) return x[n / 2];
   return (x[(n / 2) - 1] + x[n / 2]) * 0.5;
 }
 
 // Selection based median
-ROBSCALE_INLINE double median_select(double* x, size_t n) {
+ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD) {
     return robscale::median_net(x, n);
@@ -230,7 +230,7 @@ inline double lowmedian_select(double* x, size_t n) {
 }
 
 // MAD via selection
-inline double mad_select(const double* x, int n, double med, double* dev) {
+ROBSCALE_HIDDEN inline double mad_select(const double* x, int n, double med, double* dev) {
   for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
   return robscale::MAD_CONSISTENCY * median_select(dev, static_cast<size_t>(n));
 }
