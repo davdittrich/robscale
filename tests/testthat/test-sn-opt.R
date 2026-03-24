@@ -170,25 +170,6 @@ test_that("S.9 C_sn_sorted sorted-variant: matches sn() on sorted input", {
 })
 
 # ---------------------------------------------------------------------------
-# S.10 — Optional: C_sn_fast_orig diagnostic export (OPT-S4)
-#         Skip gracefully when not present (Phases S0..S3)
-# ---------------------------------------------------------------------------
-test_that("S.10 C_sn_fast_orig diagnostic export (skip if absent)", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  if (!exists("C_sn_fast_orig", mode = "function")) {
-    skip("C_sn_fast_orig diagnostic export not present (added in OPT-S4)")
-  }
-  tol <- sqrt(.Machine$double.eps)
-  for (n in c(5L, 50L, 500L)) {
-    set.seed(700L + n)
-    x <- rnorm(n)
-    expect_equal(C_sn_fast_orig(x), sn(x),
-                 tolerance = tol,
-                 label = paste("C_sn_fast_orig n =", n))
-  }
-})
-
-# ---------------------------------------------------------------------------
 # S.11 — OPT-S7: workspace-reuse variant produces identical results
 #   C_sn_impl_sorted workspace overload must return bitwise-identical results
 #   to the no-workspace path at n=100 (stack path, workspace ignored) and

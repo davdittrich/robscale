@@ -289,43 +289,8 @@ test_that("Q.22 minimum valid n=2: C_qn_fast correct", {
 })
 
 # ---------------------------------------------------------------------------
-# WU-Q1 regression guards (added before WU-Q1 implementation)
-# ---------------------------------------------------------------------------
-test_that("Q.NOINLINE.1: C_qn_fast_orig exists as exported function", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  # This test was valid for WU-Q1/Q2. After WU-Q3 removed C_qn_fast_orig,
-  # it is superseded by Q.RESTRICT.3 (expects FALSE). Skip to avoid conflict.
-  skip("C_qn_fast_orig removed in WU-Q3 — superseded by Q.RESTRICT.3")
-})
-
-test_that("Q.NOINLINE.2: C_qn_fast matches C_qn_fast_orig for all sizes", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
-              "C_qn_fast_orig not present (WU-Q1 not implemented)")
-  tol <- sqrt(.Machine$double.eps)
-  for (n in c(2L, 5L, 10L, 16L, 17L, 64L, 65L, 100L)) {
-    set.seed(n * 37L + 7L)
-    x <- rnorm(n)
-    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
-                 label = paste("NOINLINE equivalence n =", n))
-  }
-})
-
-# ---------------------------------------------------------------------------
 # WU-Q2 regression guards (added before WU-Q2 implementation)
 # ---------------------------------------------------------------------------
-test_that("Q.TIERED.1: n <= 16 path matches C_qn_fast_orig for n=2..16", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
-              "C_qn_fast_orig not present — skip")
-  tol <- sqrt(.Machine$double.eps)
-  for (n in 2:16) {
-    set.seed(n * 53L + 11L)
-    x <- rnorm(n)
-    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
-                 label = paste("tiered n =", n))
-  }
-})
 
 test_that("Q.TIERED.2: boundary straddle n=16 vs n=17 both correct", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
@@ -359,19 +324,6 @@ test_that("Q.TIERED.5: Inf propagates for n <= 16", {
 # ---------------------------------------------------------------------------
 # WU-Q3 regression guards (added before WU-Q3 implementation)
 # ---------------------------------------------------------------------------
-test_that("Q.RESTRICT.1: C_qn_fast matches C_qn_fast_orig at n=50, 200, 500", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  skip_if_not(exists("C_qn_fast_orig", envir = asNamespace("robscale"), inherits = FALSE),
-              "C_qn_fast_orig not present — skip")
-  tol <- sqrt(.Machine$double.eps)
-  for (n in c(50L, 200L, 500L)) {
-    set.seed(n * 7L + 3L)
-    x <- rnorm(n)
-    expect_equal(C_qn_fast(x), C_qn_fast_orig(x), tolerance = tol,
-                 label = paste("restrict n =", n))
-  }
-})
-
 test_that("Q.RESTRICT.2: sorted variant matches at n=100, 1000", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
   tol <- sqrt(.Machine$double.eps)

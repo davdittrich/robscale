@@ -189,26 +189,6 @@ test_that("Symmetric Q1 known result: n=20, x=1:20", {
 })
 
 # ---------------------------------------------------------------------------
-# Test I.10: iqr_sorted exists and is correct (via diagnostic export) (OPT-I7)
-# RED until Phase 6 adds iqr_sorted_impl. Removed diagnostic before Phase 6 commit.
-# ---------------------------------------------------------------------------
-test_that("iqr_sorted_impl: O(1) sorted IQR matches iqr_scaled on sorted input", {
-  tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  # Skip gracefully if diagnostic export not yet present (Phases 0-5)
-  if (!exists("iqr_sorted_impl", mode = "function")) {
-    skip("iqr_sorted_impl diagnostic export not present yet (Phase 6 adds it)")
-  }
-  for (n in c(2L, 3L, 4L, 5L, 16L, 17L, 100L, 1000L)) {
-    set.seed(500L + n)
-    x <- sort(rnorm(n))
-    expect_equal(iqr_sorted_impl(x),
-                 iqr_scaled(x),
-                 tolerance = sqrt(.Machine$double.eps),
-                 label = paste("iqr_sorted, sorted n =", n))
-  }
-})
-
-# ---------------------------------------------------------------------------
 # Test I.11: Ensemble pin unchanged after all IQR changes (OPT-I8)
 # scale_robust() ensemble path calls estimators_internal::iqr() via
 # compute_all_estimators() for n=10 (below auto_switch threshold of 20).

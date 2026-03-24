@@ -69,25 +69,6 @@ test_that("1.3 — ensemble value unchanged after sort upgrade (G4)", {
     label = "ensemble value must be bit-identical after sort algorithm change")
 })
 
-test_that("1.4 — G5 scale precompute: |before - after| <= 4 ULP", {
-  skip_if_not(
-    exists("gmd_scalar_kernel_impl",
-           envir = asNamespace("robscale"), mode = "function"),
-    "Diagnostic export gmd_scalar_kernel_impl not compiled (added in Phase 4)"
-  )
-  # constant * 2.0 * sum / (n*(n-1)) vs (constant * 2.0 / (n*(n-1))) * sum
-  # differ by at most 1 ULP (one FP rounding step). 4x headroom.
-  tol <- 4 * .Machine$double.eps
-  set.seed(55)
-  for (n in c(2L, 3L, 5L, 10L, 17L, 33L)) {
-    x <- rnorm(n)
-    v_current <- gmd(x)
-    v_precomp <- robscale:::gmd_scalar_kernel_impl(x)
-    expect_equal(v_current, v_precomp, tolerance = tol,
-      label = sprintf("scale precompute ULP n=%d", n))
-  }
-})
-
 test_that("1.5 — gmd() frame-split boundary: n=127..2049 correct", {
   tol <- sqrt(.Machine$double.eps)
   gmd_ref <- function(x, k = 0.886226925452758) {

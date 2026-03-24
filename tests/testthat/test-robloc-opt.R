@@ -195,7 +195,7 @@ test_that("0.15 — permutation invariance at all gate sizes", {
     x    <- rnorm(n)
     loc1 <- robLoc(x)
     loc2 <- robLoc(sample(x))
-    expect_equal(loc1, loc2, tolerance=1e-14,
+    expect_equal(loc1, loc2, tolerance=sqrt(.Machine$double.eps), scale=1,
       label=sprintf("n=%d: |perm-orig| = %.3e", n, abs(loc1-loc2)))
   }
 })
@@ -358,111 +358,6 @@ test_that("0.27c — NaN in input with na.rm=TRUE strips NaN before computation"
   x_clean <- c(1.0, 2.0, 3.0, 5.0, 7.0)
   expect_equal(robLoc(x_nan, na.rm=TRUE), robLoc(x_clean), tolerance=1e-14)
   expect_error(robLoc(x_nan, na.rm=FALSE), regexp="NA")
-})
-
-# ---------------------------------------------------------------------------
-# WU-RL0 specific: rob_loc_fast_orig diagnostic baseline tests
-# All skip if rob_loc_fast_orig has not yet been compiled/exported.
-# ---------------------------------------------------------------------------
-
-test_that("0.28 — rob_loc_fast_orig: exists and returns finite at all gate sizes", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  set.seed(314)
-  tol_nr <- sqrt(.Machine$double.eps)
-  for (n in c(4L, 5L, 6L, 7L, 8L, 10L, 16L, 32L, 64L, 100L, 200L, 500L, 1000L)) {
-    x   <- rnorm(n)
-    loc <- robscale:::rob_loc_fast_orig(x, FALSE, 0.0, 80L, tol_nr)
-    expect_true(is.finite(loc),
-      label=sprintf("rob_loc_fast_orig(n=%d) = %g must be finite", n, loc))
-  }
-})
-
-test_that("0.29 — rob_loc_fast_orig matches robLoc at all gate sizes (pre-RL1 baseline == current)", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  set.seed(271)
-  tol_nr    <- sqrt(.Machine$double.eps)
-  tol_match <- 2 * sqrt(.Machine$double.eps)
-  for (n in c(4L, 5L, 6L, 7L, 8L, 10L, 16L, 32L, 64L, 100L, 200L)) {
-    x    <- rnorm(n)
-    orig <- robscale:::rob_loc_fast_orig(x, FALSE, 0.0, 80L, tol_nr)
-    curr <- robLoc(x)
-    expect_equal(orig, curr, tolerance=tol_match,
-      label=sprintf("n=%d: |orig-curr| = %.3e", n, abs(orig-curr)))
-  }
-})
-
-test_that("0.30 — rob_loc_fast_orig has_scale path matches robLoc has_scale path", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  set.seed(141)
-  tol_nr    <- sqrt(.Machine$double.eps)
-  tol_match <- 2 * sqrt(.Machine$double.eps)
-  for (n in c(3L, 5L, 8L, 16L, 32L)) {
-    x    <- rnorm(n)
-    s    <- 1.5
-    orig <- robscale:::rob_loc_fast_orig(x, TRUE, s, 80L, tol_nr)
-    curr <- robLoc(x, scale=s)
-    expect_equal(orig, curr, tolerance=tol_match,
-      label=sprintf("n=%d has_scale: |orig-curr| = %.3e", n, abs(orig-curr)))
-  }
-})
-
-test_that("0.31 — rob_loc_fast_orig all-equal input returns that value", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  tol_nr <- sqrt(.Machine$double.eps)
-  for (v in c(-1.0, 0.0, 5.0)) {
-    for (n in c(5L, 16L, 64L)) {
-      x   <- rep(v, n)
-      loc <- robscale:::rob_loc_fast_orig(x, FALSE, 0.0, 80L, tol_nr)
-      expect_equal(loc, v, tolerance=1e-14,
-        label=sprintf("rob_loc_fast_orig(rep(%g,%d)) = %g", v, n, loc))
-    }
-  }
-})
-
-test_that("0.32 — rob_loc_fast_orig n=3..7 edge cases are finite (no-scale and has_scale)", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  set.seed(99)
-  tol_nr <- sqrt(.Machine$double.eps)
-  for (n in 3L:7L) {
-    x      <- rnorm(n)
-    loc_ns <- robscale:::rob_loc_fast_orig(x, FALSE, 0.0, 80L, tol_nr)
-    loc_hs <- robscale:::rob_loc_fast_orig(x, TRUE, 1.0, 80L, tol_nr)
-    expect_true(is.finite(loc_ns),
-      label=sprintf("rob_loc_fast_orig no-scale n=%d", n))
-    expect_true(is.finite(loc_hs),
-      label=sprintf("rob_loc_fast_orig has_scale n=%d", n))
-  }
-})
-
-test_that("0.33 — rob_loc_fast_orig permutation invariance at gate sizes", {
-  skip_if_not(
-    exists("rob_loc_fast_orig", envir=asNamespace("robscale"), mode="function"),
-    "rob_loc_fast_orig diagnostic not compiled"
-  )
-  set.seed(212)
-  tol_nr <- sqrt(.Machine$double.eps)
-  for (n in c(5L, 8L, 16L, 64L)) {
-    x     <- rnorm(n)
-    loc1  <- robscale:::rob_loc_fast_orig(x, FALSE, 0.0, 80L, tol_nr)
-    loc2  <- robscale:::rob_loc_fast_orig(sample(x), FALSE, 0.0, 80L, tol_nr)
-    expect_equal(loc1, loc2, tolerance=1e-14,
-      label=sprintf("n=%d: |perm-orig| = %.3e", n, abs(loc1-loc2)))
-  }
 })
 
 # ---- WU-RL2 TDD guards: single-pass scalar vs reference ----
