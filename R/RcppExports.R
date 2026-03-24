@@ -85,16 +85,12 @@ rob_loc_serial_impl <- function(x) {
     .Call(`_robscale_rob_loc_serial_impl`, x)
 }
 
-C_rob_scale_orig <- function(x) {
-    .Call(`_robscale_C_rob_scale_orig`, x)
+rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
+    .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
 }
 
 C_rob_scale_fast <- function(x) {
     .Call(`_robscale_C_rob_scale_fast`, x)
-}
-
-rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
-    .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
 }
 
 sd_c4_impl <- function(x) {
