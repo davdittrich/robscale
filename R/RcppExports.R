@@ -17,6 +17,10 @@ C_adm_fast <- function(x) {
     .Call(`_robscale_C_adm_fast`, x)
 }
 
+C_adm_core_sorted <- function(x) {
+    .Call(`_robscale_C_adm_core_sorted`, x)
+}
+
 rob_scale_diag_impl <- function(x_r, maxit = 80L, tol = 1.4901161193847656e-8) {
     .Call(`_robscale_rob_scale_diag_impl`, x_r, maxit, tol)
 }

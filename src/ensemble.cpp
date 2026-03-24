@@ -175,7 +175,9 @@ static void ensemble_one_replicate(
       for (int i = 0; i < n; ++i) work2[i] = std::abs(resample[i] - t);
       double s_init = robscale::MAD_CONSISTENCY * robscale::median_select(work2, static_cast<size_t>(n));
       if (s_init <= robscale::IMPLOSION_BOUND) {
-        boot_row[6] = robscale::adm_core(resample, n, t, robscale::ADM_CONSISTENCY);
+        // resample is provably sorted (sort happens unconditionally before all estimators).
+        // adm_core_sorted exploits sorted input: no abs(), two pure-addition loops.
+        boot_row[6] = robscale::adm_core_sorted(resample, n, t, robscale::ADM_CONSISTENCY);
       } else {
         boot_row[6] = rob_scale_compute(resample, static_cast<size_t>(n),
                                          t, s_init, 80, 1.4901161e-8, work1);

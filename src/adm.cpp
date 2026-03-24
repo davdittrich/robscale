@@ -87,3 +87,18 @@ double C_adm_orig(Rcpp::NumericVector x) {
 double C_adm_fast(Rcpp::NumericVector x) {
   return adm_impl_auto(x, robscale::ADM_CONSISTENCY);
 }
+
+// ------------------------------------------------------------
+// WU-ADM3: diagnostic export for adm_core_sorted benchmarking
+// ------------------------------------------------------------
+
+// C_adm_core_sorted: benchmarks adm_core_sorted vs adm_core on sorted input.
+// Caller MUST pass a sorted vector; center is derived as median_sorted.
+// Remove after WU-ADM3 validation is complete (cleanup in WU-ADM4).
+// [[Rcpp::export]]
+double C_adm_core_sorted(Rcpp::NumericVector x) {
+  int n = x.size();
+  if (n == 0) return 0.0;
+  double med = robscale::median_sorted(x.begin(), static_cast<size_t>(n));
+  return robscale::adm_core_sorted(x.begin(), n, med, robscale::ADM_CONSISTENCY);
+}

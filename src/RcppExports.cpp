@@ -57,6 +57,17 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// C_adm_core_sorted
+double C_adm_core_sorted(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_adm_core_sorted(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_adm_core_sorted(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // rob_scale_diag_impl
 Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r, int maxit, double tol);
 RcppExport SEXP _robscale_rob_scale_diag_impl(SEXP x_rSEXP, SEXP maxitSEXP, SEXP tolSEXP) {
@@ -357,6 +368,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_C_adm_orig", (DL_FUNC) &_robscale_C_adm_orig, 1},
     {"_robscale_C_adm_fast", (DL_FUNC) &_robscale_C_adm_fast, 1},
+    {"_robscale_C_adm_core_sorted", (DL_FUNC) &_robscale_C_adm_core_sorted, 1},
     {"_robscale_rob_scale_diag_impl", (DL_FUNC) &_robscale_rob_scale_diag_impl, 3},
     {"_robscale_bench_median_net_impl", (DL_FUNC) &_robscale_bench_median_net_impl, 1},
     {"_robscale_bench_fr_select_impl", (DL_FUNC) &_robscale_bench_fr_select_impl, 1},

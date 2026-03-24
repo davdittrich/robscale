@@ -169,3 +169,51 @@ test_that("adm opt: WU-ADM2 — C_adm_fast correct at n=2049 (first heap allocat
   set.seed(2049); x <- rnorm(2049)
   expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(2049))
 })
+
+# ============================================================
+# WU-ADM3: adm_core_sorted correctness (RED tests — will error before
+# C_adm_core_sorted is exported; pass after implementation).
+# ============================================================
+
+# Helper: compute ADM reference from unsorted x (uses adm_core path)
+adm_ref_sorted <- function(x) {
+  xs <- sort(x)
+  robscale:::C_adm_core_sorted(xs)
+}
+
+test_that("adm opt: WU-ADM3 — C_adm_core_sorted matches adm() at n=1..5,8,9,16,17,100", {
+  for (n in c(1L, 2L, 3L, 4L, 5L, 8L, 9L, 16L, 17L, 100L)) {
+    set.seed(200L + n); x <- rnorm(n)
+    expect_equal(adm_ref_sorted(x), adm(x), tolerance = tol_n(n),
+                 label = paste0("adm_core_sorted vs adm() at n=", n))
+  }
+})
+
+test_that("adm opt: WU-ADM3 — adm_core_sorted n=1 returns 0.0", {
+  expect_equal(robscale:::C_adm_core_sorted(1.0), 0.0)
+})
+
+test_that("adm opt: WU-ADM3 — adm_core_sorted correct for odd n (n=5)", {
+  x <- sort(c(1.0, 2.0, 3.0, 4.0, 5.0))
+  # med=3, lower=[1,2]->3, upper=[4,5]->9, (9-3)/5=1.2; consistency*1.2
+  expect_equal(robscale:::C_adm_core_sorted(x),
+               adm(x), tolerance = tol_n(5))
+})
+
+test_that("adm opt: WU-ADM3 — adm_core_sorted correct for even n (n=4)", {
+  x <- sort(c(1.0, 2.0, 4.0, 5.0))
+  # med=3 (avg 2,4), lower=[1,2]->3, upper=[4,5]->9, (9-3)/4=1.5; consistency*1.5
+  expect_equal(robscale:::C_adm_core_sorted(x),
+               adm(x), tolerance = tol_n(4))
+})
+
+test_that("adm opt: WU-ADM3 — adm_core_sorted correct for tied values", {
+  x <- sort(c(1.0, 3.0, 3.0, 5.0))
+  expect_equal(robscale:::C_adm_core_sorted(x),
+               adm(x), tolerance = tol_n(4))
+})
+
+test_that("adm opt: WU-ADM3 — adm_core_sorted correct for all-equal input", {
+  x <- rep(3.7, 10)
+  expect_equal(robscale:::C_adm_core_sorted(x), 0.0, tolerance = tol_n(10))
+})
