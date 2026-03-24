@@ -383,6 +383,9 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
   std::unique_ptr<double[]> diffs(new double[nR - nL]);
 
   bool filled_parallel = false;
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  const bool use_avx2 = (config.hw.simd_level >= SIMDLevel::AVX2);
+#endif
 #ifdef USE_DIRECT_TBB
   if (n > config.qn_parallel_threshold) {
     // Explicit block-index parallel_for — same pattern as candidate generation.
@@ -419,8 +422,15 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
           size_t base = static_cast<size_t>(static_cast<int32_t>(i) - right[i]);
           size_t len  = static_cast<size_t>(right[i] - left[i] + 1);
           double xi   = static_cast<double>(sorted_x[i]);
-          for (size_t k = 0; k < len; k++)
-            diffs[o + k] = xi - static_cast<double>(sorted_x[base + k]);
+#if defined(ROBSCALE_HAS_AVX2_DISPATCH)
+          if (use_avx2 && len >= 4) {
+            qn_fill_diffs_avx2(xi, sorted_x + base, diffs.get() + o, len);
+          } else
+#endif
+          {
+            for (size_t k = 0; k < len; k++)
+              diffs[o + k] = xi - static_cast<double>(sorted_x[base + k]);
+          }
           o += len;
         }
       }
