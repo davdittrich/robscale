@@ -182,8 +182,8 @@ static void ensemble_one_replicate(
       boot_row[6] = 0.0;
     } else {
       double t = robscale::median_sorted(resample, static_cast<size_t>(n));
-      for (int i = 0; i < n; ++i) work2[i] = std::abs(resample[i] - t);
-      double s_init = robscale::MAD_CONSISTENCY * robscale::median_select(work2, static_cast<size_t>(n));
+      // OPT-2: vshaped_mad exploits sorted resample — O(log n) vs O(n) median_select
+      double s_init = robscale::MAD_CONSISTENCY * vshaped_mad(resample, n, t, work2);
       if (s_init <= robscale::IMPLOSION_BOUND) {
         // resample is provably sorted (sort happens unconditionally before all estimators).
         // adm_core_sorted exploits sorted input: no abs(), two pure-addition loops.
