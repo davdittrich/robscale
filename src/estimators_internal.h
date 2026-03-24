@@ -3,6 +3,7 @@
 
 #include "robscale_config.h"
 #include "robust_core.h"
+#include "vshaped_mad.h"
 #include "pdq_select.h"
 #include "qnsn_sort_utils.h"
 #include "qnsn_kernels.h"
@@ -230,6 +231,31 @@ inline double rob_scale(const double* x, double* buf, int n) {
 #endif
   // Newton-Raphson iteration: buf is reused as scratch (written before read)
   return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, buf, avx2);
+}
+
+// robScale on pre-sorted input (WU-RS9 / OPT-9).
+// Requires: sorted_x[0..n-1] sorted ascending. buf must be >= n doubles.
+// Uses O(1) median_sorted, O(log n) vshaped_mad, then standard rob_scale_compute.
+// Numerically equivalent to rob_scale(sorted_x, buf, n) when input is sorted.
+// Called by ensemble_one_replicate where resample is already sorted.
+inline double rob_scale_sorted(const double* ROBSCALE_RESTRICT sorted_x,
+                                size_t n, double* ROBSCALE_RESTRICT buf) {
+  if (n < 4) return 0.0;
+  const double t      = robscale::median_sorted(sorted_x, n);
+  const double mad_raw = robscale::vshaped_mad(sorted_x, static_cast<int>(n), t, buf);
+  const double s_init = robscale::MAD_CONSISTENCY * mad_raw;
+  if (s_init <= robscale::IMPLOSION_BOUND) {
+    return robscale::adm_core_sorted(sorted_x, static_cast<int>(n), t,
+                                     robscale::ADM_CONSISTENCY);
+  }
+#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
+    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+  return rob_scale_compute(sorted_x, n, t, s_init, 80, 1.4901161e-8, buf, avx2);
 }
 
 }} // namespace robscale::internal

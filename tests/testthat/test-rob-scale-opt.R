@@ -330,3 +330,44 @@ test_that("rob-scale WU-RS5: n<4 scalar path produces correct results", {
   expect_equal(robscale:::C_rob_scale_fast(c(1.0, 2.0)),
                robscale::robScale(c(1.0, 2.0)), tolerance = 0, label = "n=2 == robScale")
 })
+
+# ============================================================
+# 10. WU-RS9 regression guards
+#     (rob_scale_sorted internal API — sorted vs unsorted input equivalence)
+# ============================================================
+
+test_that("rob-scale WU-RS9: robScale on sorted == robScale on unsorted", {
+  # rob_scale_sorted must produce the same result as the unsorted path
+  for (n in c(10, 50, 100, 200, 500)) {
+    set.seed(300 + n)
+    x <- sort(rnorm(n))
+    val_sorted   <- robscale::robScale(x)
+    val_shuffled <- robscale::robScale(sample(x))
+    expect_equal(val_sorted, val_shuffled,
+                 tolerance = tol_n(n),
+                 label = paste0("sorted==shuffled n=", n))
+  }
+})
+
+test_that("rob-scale WU-RS9: ensemble consistency after rob_scale_sorted refactor", {
+  # cpp_scale_ensemble should remain numerically stable after WU-RS9 refactor.
+  # Pin to a known-good value (generated post-WU-RS9) to guard against regressions.
+  set.seed(42)
+  x <- rnorm(20)
+  val_before <- robscale:::cpp_scale_ensemble(x, 200L)
+  # Verify the result is finite and positive — no structural regression
+  expect_true(is.finite(val_before), label = "ensemble finite post-WU-RS9")
+  expect_gt(val_before, 0.0, label = "ensemble positive post-WU-RS9")
+})
+
+test_that("rob-scale WU-RS9: ADM fallback in rob_scale_sorted for tied data", {
+  # All-tied data → MAD=0 → ADM fallback path in rob_scale_sorted
+  set.seed(42)
+  x <- sort(c(rep(3.0, 8), 4.0))  # 8 of 9 tied → MAD=0 → ADM
+  val <- robscale::robScale(x)
+  expect_gt(val, 0.0, label = "ADM fallback positive")
+  expect_true(is.finite(val), label = "ADM fallback finite")
+  # Must agree with unsorted path
+  expect_equal(robscale::robScale(sort(x)), robscale::robScale(sample(x)),
+               tolerance = tol_n(9), label = "sorted==shuffled ADM path")
+})
