@@ -33,8 +33,8 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
-  if (n <= 64) {
-    double buf_micro[64];
+  if (n <= static_cast<int>(ROBSCALE_MICRO_BUFFER_SIZE)) {
+    double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
     const double* xp = x.begin();
     std::memcpy(buf_micro, xp, n * sizeof(double));
     double med = robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
@@ -64,8 +64,8 @@ double mad_impl_center(Rcpp::NumericVector x, double center, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
-  if (n <= 64) {
-    double buf_micro[64];
+  if (n <= static_cast<int>(ROBSCALE_MICRO_BUFFER_SIZE)) {
+    double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
     const double* xp = x.begin();
     robscale::bulk_abs_diff(buf_micro, xp, n, center);
     return constant * robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
