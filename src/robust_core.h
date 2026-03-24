@@ -132,15 +132,26 @@ inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
 }
 
 // ADM core: constant * mean(|x - center|)
-ROBSCALE_INLINE double adm_core(const double* x, int n, double center, double constant) {
-  double sum = 0.0;
-#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
-  #pragma omp simd reduction(+:sum)
-#endif
-  for (int i = 0; i < n; ++i) {
-    sum += std::abs(x[i] - center);
+// ROBSCALE_TARGET_AVX2: enables 256-bit AVX2 auto-vectorisation for this
+// function without requiring a global -mavx2 flag (safe on CRAN).
+// ROBSCALE_RESTRICT: eliminates aliasing analysis so the vectoriser can
+// freely reorder loads.
+// 4-wide dual-accumulator unroll: breaks the single-accumulator 4-cycle
+// latency chain; four independent chains fill one 256-bit AVX2 register
+// (4 doubles) per fused-load+abs+add cycle.
+ROBSCALE_TARGET_AVX2
+ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
+                                double center, double constant) {
+  double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
+  int i = 0;
+  for (; i + 3 < n; i += 4) {
+    s0 += std::abs(x[i]   - center);
+    s1 += std::abs(x[i+1] - center);
+    s2 += std::abs(x[i+2] - center);
+    s3 += std::abs(x[i+3] - center);
   }
-  return constant * sum / n;
+  for (; i < n; ++i) s0 += std::abs(x[i] - center);
+  return constant * (s0 + s1 + s2 + s3) * (1.0 / n);
 }
 
 // Absolute-deviation kernel (in-place): w[i] = |w[i] - center|.
