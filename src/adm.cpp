@@ -44,3 +44,46 @@ double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   }
   return adm_large_n(x.begin(), n, constant);
 }
+
+// ------------------------------------------------------------
+// WU-ADM0: diagnostic exports for H2H benchmarking
+// ------------------------------------------------------------
+
+// C_adm_orig: frozen baseline — self-contained, calls no external symbol
+// that any later WU modifies.  The adm_core_frozen lambda inlines the
+// original single-accumulator loop so this function remains immune to
+// changes made to robscale::adm_core in WU-ADM1 onwards.
+// [[Rcpp::export]]
+double C_adm_orig(Rcpp::NumericVector x) {
+  int n = x.size();
+  if (n == 0) return 0.0;
+  const double* xp = x.begin();
+  auto adm_core_frozen = [](const double* px, int pn, double center,
+                             double constant) -> double {
+    double sum = 0.0;
+    for (int i = 0; i < pn; ++i) sum += std::abs(px[i] - center);
+    return constant * sum / pn;
+  };
+  if (n <= 64) {
+    double buf[64];
+    std::memcpy(buf, xp, n * sizeof(double));
+    double med = robscale::median_select(buf, n);
+    return adm_core_frozen(buf, n, med, robscale::ADM_CONSISTENCY);
+  }
+  constexpr int FROZEN_STACK_SIZE = 1024;
+  double buf_stack[FROZEN_STACK_SIZE];
+  std::unique_ptr<double[]> heap;
+  double* buf = (n <= FROZEN_STACK_SIZE)
+    ? buf_stack
+    : (heap.reset(new double[n]), heap.get());
+  std::memcpy(buf, xp, n * sizeof(double));
+  double med = robscale::median_select(buf, n);
+  return adm_core_frozen(buf, n, med, robscale::ADM_CONSISTENCY);
+}
+
+// C_adm_fast: thin wrapper — always calls the current adm_impl_auto so
+// it automatically picks up any kernel improvements from later WUs.
+// [[Rcpp::export]]
+double C_adm_fast(Rcpp::NumericVector x) {
+  return adm_impl_auto(x, robscale::ADM_CONSISTENCY);
+}
