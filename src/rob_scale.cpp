@@ -53,13 +53,24 @@ static double rob_scale_fused_sum_avx2(const double* ROBSCALE_RESTRICT data,
                                         double half_inv_sc) {
   const __m256d off4  = _mm256_set1_pd(data_offset);
   const __m256d hinv4 = _mm256_set1_pd(half_inv_sc);
-  __m256d acc = _mm256_setzero_pd();
+  __m256d acc0 = _mm256_setzero_pd();
+  __m256d acc1 = _mm256_setzero_pd();
   int i = 0;
+  // 8-wide: two independent FMA chains break the loop-carried dep on acc.
+  for (; i + 8 <= n; i += 8) {
+    __m256d d0 = _mm256_loadu_pd(data + i);
+    __m256d t0 = ROBSCALE_TANH4_AVX2(_mm256_mul_pd(_mm256_sub_pd(d0, off4), hinv4));
+    __m256d d1 = _mm256_loadu_pd(data + i + 4);
+    __m256d t1 = ROBSCALE_TANH4_AVX2(_mm256_mul_pd(_mm256_sub_pd(d1, off4), hinv4));
+    acc0 = _mm256_fmadd_pd(t0, t0, acc0);
+    acc1 = _mm256_fmadd_pd(t1, t1, acc1);
+  }
+  __m256d acc = _mm256_add_pd(acc0, acc1);
+  // 4-wide cleanup: handles n % 8 in {4,5,6,7}
   for (; i + 4 <= n; i += 4) {
     __m256d d = _mm256_loadu_pd(data + i);
-    __m256d t = ROBSCALE_TANH4_AVX2(
-        _mm256_mul_pd(_mm256_sub_pd(d, off4), hinv4));
-    acc = _mm256_fmadd_pd(t, t, acc);  // acc[lane] += t[lane]^2, 4-wide
+    __m256d t = ROBSCALE_TANH4_AVX2(_mm256_mul_pd(_mm256_sub_pd(d, off4), hinv4));
+    acc = _mm256_fmadd_pd(t, t, acc);
   }
   // Horizontal sum: [a0,a1,a2,a3] → scalar
   __m128d lo   = _mm256_castpd256_pd128(acc);       // [a0, a1]
