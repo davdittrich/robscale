@@ -140,3 +140,32 @@ test_that("adm opt: WU-ADM1 regression guard — C_adm_fast correct at n=7 (rem 
   set.seed(7); x <- rnorm(7)
   expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(7))
 })
+
+# ============================================================
+# WU-ADM2: caller-side guards (n=1, buffer boundaries, adaptive median)
+# RED tests: must PASS after the caller changes are applied.
+# ============================================================
+
+test_that("adm opt: WU-ADM2 — C_adm_fast(numeric(1)) returns 0.0 (n=1 guard)", {
+  expect_equal(robscale:::C_adm_fast(1.0), 0.0)
+})
+
+test_that("adm opt: WU-ADM2 — C_adm_fast correct at n=128 (last micro-buffer slot)", {
+  set.seed(128); x <- rnorm(128)
+  expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(128))
+})
+
+test_that("adm opt: WU-ADM2 — C_adm_fast correct at n=129 (first large-n path)", {
+  set.seed(129); x <- rnorm(129)
+  expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(129))
+})
+
+test_that("adm opt: WU-ADM2 — C_adm_fast correct at n=2048 (last stack-buf slot)", {
+  set.seed(2048); x <- rnorm(2048)
+  expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(2048))
+})
+
+test_that("adm opt: WU-ADM2 — C_adm_fast correct at n=2049 (first heap allocation)", {
+  set.seed(2049); x <- rnorm(2049)
+  expect_equal(robscale:::C_adm_fast(x), adm(x), tolerance = tol_n(2049))
+})
