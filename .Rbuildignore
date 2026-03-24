@@ -1,25 +1,69 @@
+# --- Dependency management ---
 ^renv$
 ^renv\.lock$
+^\.Rprofile$
+
+# --- CI / GitHub infrastructure ---
 ^\.claude$
 ^\.gitignore$
 ^\.github$
-^README\.md$
+^\.markdownlint\.json$
+^CRAN-SUBMISSION$
 ^cran-comments\.md$
+
+# --- Documentation sources (rendered forms included in package) ---
+^README\.md$
+^README\.qmd$
+^README_files$
+
+# --- Benchmarks and performance gate scripts ---
+^bench$
+^bench/.*$
+^benchmarks$
+^benchmarks/.*$
+
+# --- Pipeline and scripts ---
+^_targets$
+^_targets\.R$
+^scripts$
+
+# --- AI agent tooling ---
+^\.beads$
+^\.beads/.*$
+^\.metaswarm$
+^\.metaswarm/.*$
+^\.tldr$
+^\.tldr/.*$
+^\.tldrignore$
+^\.coverage-thresholds\.json$
+^\.env\.example$
+^bin$
+^bin/.*$
+
+# --- Dev plan and analysis documents ---
+^CLAUDE\.md$
+^ADM_REGRESSION_PLAN\.md$
+^PERFORMANCE_OPTIMIZATION_PLAN\.md$
+^RETROSPECTIVE\.md$
+^SERVICE-INVENTORY\.md$
+^SKILL_OPTIMIZATION_PLAN\.md$
+^aitken_findings\.md$
+^.*_opt_plan\.md$
+^task_plan.*\.md$
+
+# --- Compiled artefacts ---
 ^src/\.o$
 ^src/\.so$
 ^src/\.dll$
 ^src/Makevars$
 ^src/symbols\.rds$
-^benchmarks$
-^install.log$
-^benchmarks/.*$
-^\.markdownlint\.json$
-^CRAN-SUBMISSION$
-^README\.qmd$
-^_targets$
-^_targets\.R$
-^scripts$
+^src/\.tldr$
+^src/\.tldr/.*$
+^install\.log$
+
+# --- Legacy / one-off files ---
 ^data$
+^results$
 ^test_hang$
 ^test_hang\.cpp$
 ^debug_hang\.R$
@@ -35,5 +79,3 @@
 ^test_side_by_side\.R$
 ^qn_64\.out$
 ^sn_16k\.out$
-^README_files$
-^results$
