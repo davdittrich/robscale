@@ -304,3 +304,29 @@ test_that("rob-scale WU-RS4: micro-buffer straddling (n=63, 64, 65) bit-exact", 
     )
   }
 })
+
+# ============================================================
+# 9. WU-RS5 regression guards
+#    (OPT-4: scalar fallback fusion — bit-exact on AVX2 builds)
+# ============================================================
+
+test_that("rob-scale WU-RS5: n=4 correct (AVX2 path regression guard)", {
+  x4 <- c(1.5, 2.7, 0.3, -0.8)
+  v <- robscale:::C_rob_scale_fast(x4)
+  expect_true(is.finite(v) && v > 0, label = "n=4 finite positive")
+  expect_equal(v, robscale::robScale(x4), tolerance = 0)
+})
+
+test_that("rob-scale WU-RS5: n<4 scalar path produces correct results", {
+  # n=0: explicit early return
+  expect_equal(robscale:::C_rob_scale_fast(numeric(0)), 0.0, label = "n=0")
+  # n=1: MAD=0 (single point) → ADM fallback → 0
+  expect_equal(robscale:::C_rob_scale_fast(c(1.0)), 0.0, label = "n=1")
+  # n=2,3: function returns MAD-based estimate (finite, positive) — not 0.
+  # This is correct: for non-degenerate data, the small-n path returns s_init.
+  expect_true(is.finite(robscale:::C_rob_scale_fast(c(1.0, 2.0))), label = "n=2 finite")
+  expect_true(is.finite(robscale:::C_rob_scale_fast(c(1.0, 2.0, 3.0))), label = "n=3 finite")
+  # Matches public robScale() API
+  expect_equal(robscale:::C_rob_scale_fast(c(1.0, 2.0)),
+               robscale::robScale(c(1.0, 2.0)), tolerance = 0, label = "n=2 == robScale")
+})

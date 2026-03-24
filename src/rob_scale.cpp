@@ -250,11 +250,15 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
       return rob_scale_fused_sum_avx2(data, (int)n, data_offset, hisc);
 #endif
     }
-    // 3-pass fallback: use dispatched tanh to avoid a second TLS lookup.
-    for (size_t i = 0; i < n; ++i) tmp[i] = (data[i] - data_offset) * hisc;
-    robscale::bulk_tanh_dispatched(tmp, (int)n, use_avx2);
+    // OPT-4: single-pass fusion — no tmp[] traffic.
+    // Bit-exact: element-wise std::tanh and sequential accumulation match the
+    // old 3-pass scalar path (tmp[]=v; bulk_tanh scalar; sum(tmp^2)).
+    (void)tmp;  // tmp retained in signature for API compatibility (Option A)
     double sr = 0.0;
-    for (size_t i = 0; i < n; ++i) sr += tmp[i] * tmp[i];
+    for (size_t i = 0; i < n; ++i) {
+      const double tv = std::tanh((data[i] - data_offset) * hisc);
+      sr += tv * tv;
+    }
     return sr;
   };
 
