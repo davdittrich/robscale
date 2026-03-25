@@ -1,3 +1,97 @@
+# robscale 0.5.2
+
+## Portability
+
+* **AVX2 detection guarded for non-GCC/Clang compilers** (WU-PORT-1):
+  `__builtin_cpu_supports("avx2")` is now wrapped in
+  `#if defined(__GNUC__) || defined(__clang__)`. MSVC and ICC builds
+  previously hit an undefined-identifier error here; on unsupported
+  compilers, SIMD capability defaults conservatively to `None`.
+
+* **`hardware_concurrency()` zero return clamped** (WU-PORT-1):
+  `std::thread::hardware_concurrency()` returns 0 on platforms that
+  cannot determine the thread count. The result is clamped to
+  `std::max(..., 1u)`, preventing a zero-divisor in the TBB
+  grain-size calculation on such platforms.
+
+* **sysfs L2-cache parse hardened** (WU-PORT-1): The Linux sysfs
+  integer read now wraps `std::stoul` in `try { } catch (...)`.
+  Malformed or out-of-range values fall back to
+  `L2_FALLBACK_KB * 1024` and `num_logical_cores = 1` instead of
+  propagating an uncaught exception to the R session.
+
+* **`mad.cpp` micro-buffer tied to `ROBSCALE_MICRO_BUFFER_SIZE`**
+  (WU-PORT-2): Both `mad_impl_auto` and `mad_impl_center` previously
+  hard-coded `buf_micro[64]` and `n <= 64`. Both now reference
+  `buf_micro[ROBSCALE_MICRO_BUFFER_SIZE]` and
+  `n <= static_cast<int>(ROBSCALE_MICRO_BUFFER_SIZE)`. Changing the
+  package-wide constant in `robscale_config.h` now propagates to both
+  MAD paths without manual adjustment.
+
+## Performance
+
+* **Ensemble bootstrap singleton overhead eliminated** (WU-PERF-1):
+  `ensemble_one_replicate` called
+  `robscale::qnsn::RuntimeConfig::get().sort_boost_threshold` on
+  every bootstrap replicate. The call is replaced with the
+  compile-time constant `ROBSCALE_SORT_BOOST_THRESHOLD`, removing the
+  static-local singleton access from the hot path. Gate results:
+  ~59% speedup at n = 1,000--5,000 (stable-zone ratio ≈ 0.41).
+
+* **AVX2 diff-fill enabled in TBB Qn refinement path** (WU-PERF-2):
+  The `qn_fill_diffs_avx2` kernel previously ran only in the
+  brute-force path. It now dispatches inside the TBB `parallel_for`
+  lambda when `use_avx2 && len >= 4`; the `use_avx2` flag is hoisted
+  before the parallel region to avoid repeated CPUID lookups inside
+  the lambda. Gate results: ~11% speedup at n = 1,000--10,000
+  (stable-zone ratio ≈ 0.89).
+
+## Internal
+
+* **Dead `tmp` parameter removed from `rob_scale_compute`**
+  (WU-CLEAN-1): The function accepted an unused
+  `double* ROBSCALE_RESTRICT tmp` pointer left over from a planned
+  optimization that was never implemented. Removed from the
+  definition, its forward declaration, and all three call sites.
+
+* **`STACK_SIZE` unified to `ROBSCALE_SN_STACK_THRESHOLD`**
+  (WU-CLEAN-1): Four independent `constexpr int STACK_SIZE = 2048`
+  definitions in `gmd.cpp`, `iqr.cpp`, `mad.cpp`, and
+  `sn_estimator.cpp` are replaced with the package-wide constant in
+  `robscale_config.h`.
+
+* **`iqr_select_and_interp` helper extracted; dead `buf2` removed**
+  (WU-CLEAN-2): The pdqselect + max-scan + Type-7 interpolation block
+  was duplicated inline across the Q1 and Q3 selection paths in
+  `iqr()`. Extracting it as `static inline iqr_select_and_interp` in
+  `estimators_internal.h` eliminated the duplication and enabled
+  compiler CSE across both call sites. Side effect: ~75% speedup at
+  n = 1,000 (ratio ≈ 0.25). The now-unused `buf2` parameter is
+  removed from `iqr()` and its call site in `ensemble.cpp`.
+
+* **`sn_inner_serial` template extracted; Sn inner-loop triplicated no
+  more** (WU-CLEAN-3): The Sn inner loop appeared identically in
+  `SnWorker::operator()`, the Tier-1 serial fallback, and the Tier-2
+  large-$n$ branch. All three now delegate to
+  `sn_inner_serial<T>`, tagged `__attribute__((always_inline))`. The
+  attribute is load-bearing: without it, GCC 15 declines to inline
+  across all three call sites at `-O2`, producing a ~5× regression at
+  n = 1,000.
+
+* **`ROBSCALE_SORT_MEDIAN_THRESHOLD` renamed
+  `ROBSCALE_SORT_NETWORK_THRESHOLD`** (WU-CLEAN-4): The macro guards
+  the sort-network dispatch path, not median calculation. The old name
+  was misleading. Renamed across all six files; no value change.
+
+* **Documentation additions** (WU-CLEAN-4): `ensemble_one_replicate`
+  receives a full doc comment covering its parameters, the XorShift32
+  PRNG bit-shifts, and the sorted-once design pattern.
+  `discover_linux`, `discover_macos`, and `discover_windows` in
+  `qnsn_hardware_info.h` receive brief function-level comments. The
+  `diag.cpp` section labels are replaced with semantic names
+  ("M-scale iteration diagnostics", "Median crossover benchmark
+  helpers").
+
 # robscale 0.5.1
 
 ## Performance

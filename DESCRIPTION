@@ -1,7 +1,7 @@
 Package: robscale
 Type: Package
 Title: Accelerated Estimation of Robust Location and Scale
-Version: 0.4.0
+Version: 0.5.2
 Authors@R: c(person(given = "Dennis Alexis Valin", family = "Dittrich",
     role = c("aut", "cre", "cph"), email = "davd@economicscience.net",
     comment = c(ORCID = "0000-0002-4438-8276")))
@@ -9,7 +9,7 @@ Description: Estimates robust location and scale parameters using
     platform-specific Single Instruction, Multiple Data (SIMD) vectorization
     and Intel Threading Building Blocks (TBB) for parallel processing.
     Implements a novel variance-weighted ensemble estimator that adaptively
-    combines all available statistics. Included methods feature logistic
+    combines all available statistics. Methods include logistic
     M-estimators, the estimators of Rousseeuw and Croux (1993), the Gini
     mean difference, the scaled Median Absolute Deviation (MAD), the scaled
     Interquartile Range (IQR), and unbiased standard deviations. Achieves
