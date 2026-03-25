@@ -20,6 +20,48 @@ constexpr size_t SN_MAX_STACK = ROBSCALE_SN_STACK_THRESHOLD;
 // OPT-S3: Micro-buffer threshold for L1-resident fast path (n <= 128 → 1 KB stack frame).
 constexpr size_t SN_MICRO_SIZE = 128;
 
+// --- SHARED INNER LOOP ---
+
+// Walking-window inner loop shared by SnWorker, Tier-1, and Tier-2.
+// Computes inner_medians[i] = min_L max(sx[i]-sx[L], sx[L+h]-sx[i]) for each i
+// in [begin, end), where L walks monotonically forward (amortised O(n) total).
+//
+// Parameters:
+//   sx      - sorted input array (RESTRICT: does not alias im)
+//   n       - total number of elements (used to compute L bounds)
+//   im      - output array for inner medians (RESTRICT: does not alias sx)
+//   begin   - first index to process (inclusive)
+//   end     - last index to process (exclusive)
+//   L_init  - initial value of the walking pointer L (caller computes via
+//             binary search for sub-range chunks; pass 0 for full-range serial)
+template <typename T>
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((always_inline))
+#endif
+static inline void sn_inner_serial(
+    const T* ROBSCALE_RESTRICT sx,
+    int32_t n,
+    T* ROBSCALE_RESTRICT im,
+    int32_t begin,
+    int32_t end,
+    int32_t L_init) noexcept {
+  int32_t h = static_cast<int32_t>(static_cast<size_t>(n) / 2);
+  int32_t L = L_init;
+  for (int32_t i = begin; i < end; ++i) {
+    int32_t L_min = (std::max)(0, i - h);
+    int32_t L_max = (std::min)(i, n - 1 - h);
+    if (L < L_min) L = L_min;
+    T candidate = (std::max)(sx[i] - sx[L], sx[L + h] - sx[i]);
+    while (L < L_max) {
+      T next = (std::max)(sx[i] - sx[L + 1], sx[L + 1 + h] - sx[i]);
+      if (candidate < next) break;
+      L++;
+      candidate = next;
+    }
+    im[i] = candidate;
+  }
+}
+
 // --- SN ESTIMATOR WORKER ---
 
 // OPT-S4: ROBSCALE_RESTRICT on pointer members: the compiler can now prove
@@ -63,20 +105,9 @@ struct SnWorker : public WorkerBase {
       }
     }
 
-    for (; i < static_cast<int32_t>(end); ++i) {
-      int32_t L_min = (std::max)(0, i - h);
-      int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
-      if (L < L_min) L = L_min;
-
-      T candidate = (std::max)(sorted_x[i] - sorted_x[L], sorted_x[L + h] - sorted_x[i]);
-      while (L < L_max) {
-        T next = (std::max)(sorted_x[i] - sorted_x[L + 1], sorted_x[L + 1 + h] - sorted_x[i]);
-        if (candidate < next) break;
-        L++;
-        candidate = next;
-      }
-      results[i] = candidate;
-    }
+    // Delegate the walking-window loop to the shared template function.
+    sn_inner_serial(sorted_x, static_cast<int32_t>(n), results,
+                    static_cast<int32_t>(begin), static_cast<int32_t>(end), L);
   }
 };
 
@@ -121,23 +152,11 @@ double sn_kernel(const T* sorted_x, size_t n) {
   // aliasing barriers between sorted_x reads and inner_medians writes.
   if (n <= SN_MICRO_SIZE) {
     T inner_medians[SN_MICRO_SIZE];
+    // OPT-S4: RESTRICT aliases preserve aliasing-free contract required by sn_inner_serial.
     const T* ROBSCALE_RESTRICT sx = sorted_x;
     T* ROBSCALE_RESTRICT im = inner_medians;
-    int32_t h = static_cast<int32_t>(n / 2);
-    int32_t L = 0;
-    for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
-      int32_t L_min = (std::max)(0, i - h);
-      int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
-      if (L < L_min) L = L_min;
-      T candidate = (std::max)(sx[i] - sx[L], sx[L + h] - sx[i]);
-      while (L < L_max) {
-        T next = (std::max)(sx[i] - sx[L + 1], sx[L + 1 + h] - sx[i]);
-        if (candidate < next) break;
-        L++;
-        candidate = next;
-      }
-      im[i] = candidate;
-    }
+    // Tier-1 serial path: full range, L starts at 0.
+    sn_inner_serial(sx, static_cast<int32_t>(n), im, 0, static_cast<int32_t>(n), 0);
     // OPT-S5: n <= 16 fast path — small_sort + direct index avoids FR/pdqselect dispatch.
     if (n <= 16) {
       robscale::small_sort(inner_medians, n);
@@ -154,23 +173,11 @@ double sn_kernel(const T* sorted_x, size_t n) {
   if (n <= config.sn_stack_threshold) {
     assert(config.sn_stack_threshold <= SN_MAX_STACK);
     T inner_medians[SN_MAX_STACK];
+    // OPT-S4: RESTRICT aliases preserve aliasing-free contract required by sn_inner_serial.
     const T* ROBSCALE_RESTRICT sx = sorted_x;
     T* ROBSCALE_RESTRICT im = inner_medians;
-    int32_t h = static_cast<int32_t>(n / 2);
-    int32_t L = 0;
-    for (int32_t i = 0; i < static_cast<int32_t>(n); ++i) {
-      int32_t L_min = (std::max)(0, i - h);
-      int32_t L_max = (std::min)(i, static_cast<int32_t>(n) - 1 - h);
-      if (L < L_min) L = L_min;
-      T candidate = (std::max)(sx[i] - sx[L], sx[L + h] - sx[i]);
-      while (L < L_max) {
-        T next = (std::max)(sx[i] - sx[L + 1], sx[L + 1 + h] - sx[i]);
-        if (candidate < next) break;
-        L++;
-        candidate = next;
-      }
-      im[i] = candidate;
-    }
+    // Tier-2 serial path: full range, L starts at 0.
+    sn_inner_serial(sx, static_cast<int32_t>(n), im, 0, static_cast<int32_t>(n), 0);
     double raw = robscale::adaptive_lowmedian_select(inner_medians, n);
     return raw * CONST_SN * get_sn_factor(n);
   }
