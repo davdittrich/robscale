@@ -597,11 +597,11 @@ by **4.0–19.7x** and a `collapse::fmedian`-based MAD by **1.0–6.0x**
 
 The test suite verifies `robscale` against reference implementations:
 
-**Legacy M-estimators** (`tests/testthat/test-cross-check.R`): Comparing
-`robscale` against the original `revss` algorithm (up to v2.0.0) across
-5,400 randomly generated inputs ($n = 3, 4, \ldots, 20$; 100 replicates
-per $n$; all three functions `adm`, `robLoc`, `robScale`) yields a 100%
-pass rate at tolerance
+**M-estimator cross-check** (`tests/testthat/test-cross-check.R`):
+Comparing `robscale` against `revss` (up to v2.0.0) across 5,400
+randomly generated inputs ($n = 3, 4, \ldots, 20$; 100 replicates per
+$n$; all three functions `adm`, `robLoc`, `robScale`) yields a 100% pass
+rate at tolerance
 $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$. While
 `robscale` maintains this numerical consistency with the established
 reference, `revss` v3.1.0 has since updated its bias correction factors;
