@@ -207,7 +207,7 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double median_sorted(const double* x, size_t n) 
 // Selection based median
 ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD) {
+  if (n <= ROBSCALE_SORT_NETWORK_THRESHOLD) {
     return robscale::median_net(x, n);
   }
   size_t h = (n - 1) / 2;

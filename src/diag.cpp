@@ -1,8 +1,8 @@
 // diag.cpp — Internal diagnostic and benchmark helpers.
 // None of these functions are part of the user-facing API.
 // They are compiled into the package to support:
-//   Phase 0: iteration-count diagnostics for rob_scale
-//   Phase 2: threshold crossover micro-benchmarks (median_net vs nth_element)
+//   M-scale iteration diagnostics: convergence and rho_eval counting for rob_scale
+//   Median crossover benchmarks: median_net vs FR-select threshold calibration
 //
 // All exports are intentionally ugly names (rob_scale_diag_impl,
 // bench_median_net_impl, bench_fr_select_impl) to signal internal status.
@@ -17,7 +17,7 @@
 #include <algorithm>
 
 // ---------------------------------------------------------------------------
-// Phase 0: M-scale iteration diagnostics
+// M-scale iteration diagnostics
 //
 // Mirrors rob_scale_core/rob_scale_compute exactly but counts:
 //   - outer_iters: number of while-loop passes in aitken_iterate
@@ -94,9 +94,9 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
   std::vector<double> w(x_r.begin(), x_r.end());
   std::vector<double> dev(n);
 
-  // Median: for n > ROBSCALE_SORT_MEDIAN_THRESHOLD use FR-based select,
+  // Median: for n > ROBSCALE_SORT_NETWORK_THRESHOLD use FR-based select,
   // else use median_net.  Must match the current threshold.
-  const bool is_small = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
+  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
   double t;
   if (is_small) {
     t = robscale::median_net(w.data(), n);
@@ -162,7 +162,7 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
 }
 
 // ---------------------------------------------------------------------------
-// Phase 2: Threshold crossover benchmark helpers
+// Median crossover benchmark helpers
 //
 // Each function copies x into a local buffer, runs the target selection
 // algorithm, and returns the median.  The copy ensures:
@@ -183,8 +183,8 @@ double bench_median_net_impl(Rcpp::NumericVector x) {
 // [[Rcpp::export]]
 double bench_fr_select_impl(Rcpp::NumericVector x) {
   // Uses median_select from robust_core.h which:
-  //   n <= ROBSCALE_SORT_MEDIAN_THRESHOLD: calls median_net (same as above)
-  //   n >  ROBSCALE_SORT_MEDIAN_THRESHOLD: calls floyd_rivest_select
+  //   n <= ROBSCALE_SORT_NETWORK_THRESHOLD: calls median_net (same as above)
+  //   n >  ROBSCALE_SORT_NETWORK_THRESHOLD: calls floyd_rivest_select
   //     -> which for n < 600 uses std::nth_element
   // To force the FR/nth_element path for n <= threshold we call
   // floyd_rivest_select directly rather than going through median_select.

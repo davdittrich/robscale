@@ -29,8 +29,23 @@ struct XorShift32 {
 static constexpr int N_ESTIMATORS = 7;
 static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 
-// Sort resample once; use sorted-aware estimators to avoid redundant sorts.
-// resample, work1, work2 are per-task scratch buffers (each n doubles).
+// Compute one bootstrap replicate and store N_ESTIMATORS estimates in boot_row.
+//
+// Parameters:
+//   xp        — pointer to the original data (length n); never modified.
+//   n         — number of observations.
+//   r         — replicate index (0-based); seeds the XorShift32 PRNG as
+//               (r + 12345) to give each replicate a distinct, reproducible
+//               sequence.
+//   boot_row  — output array of length N_ESTIMATORS; caller owns the memory.
+//   resample  — scratch buffer of length n (overwritten with the resample).
+//   work1     — scratch buffer of length n for estimators that need it.
+//   work2     — scratch buffer of length n for estimators that need it.
+//
+// The resample is drawn with replacement using a XorShift32 PRNG (three XOR
+// shifts: <<13, >>17, <<5), then sorted once in ascending order.  All seven
+// estimators (sd_c4, gmd, mad, iqr, sn, qn, adm) exploit the sorted order to
+// avoid redundant sorting passes.
 static void ensemble_one_replicate(
     const double* xp, int n, int r,
     double* boot_row,

@@ -54,6 +54,10 @@ struct HardwareInfo {
   }
 
 private:
+  // Reads L2 cache size (per-core) and cache-line size from sysfs
+  // (/sys/devices/system/cpu/cpu0/cache/); infers physical core count from
+  // the SMT thread_siblings_list.  Falls back to L2_FALLBACK_KB and
+  // num_logical_cores=1 on any parse error.
   void discover_linux() {
     try {
       auto read_sysfs = [](const std::string &path) -> size_t {
@@ -113,6 +117,9 @@ private:
     }
   }
 
+  // Reads total L2 cache size and physical core count via sysctl
+  // (hw.l2cachesize, hw.physicalcpu); derives l2_per_core as their ratio.
+  // Falls back to the HardwareInfo default (256 KB) if sysctl is unavailable.
   void discover_macos() {
 #ifdef __APPLE__
     size_t len = sizeof(size_t);
@@ -128,6 +135,9 @@ private:
 #endif
   }
 
+  // Reads L2 cache size and physical core count via
+  // GetLogicalProcessorInformation(); derives l2_per_core as their ratio.
+  // Falls back to the HardwareInfo default (256 KB) if the API call fails.
   void discover_windows() {
 #ifdef _WIN32
     DWORD len = 0;

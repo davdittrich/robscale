@@ -272,11 +272,11 @@ static double rob_scale_core(const double* xp, size_t n,
                              bool has_loc, double loc_val,
                              double implbound, int maxit,
                              double tol, int fallback) {
-  // For n <= ROBSCALE_SORT_MEDIAN_THRESHOLD (64), median_net is always the
+  // For n <= ROBSCALE_SORT_NETWORK_THRESHOLD (16), median_net is always the
   // right path.  Calling it directly avoids: RuntimeConfig::get() (TLS),
   // the pdq_robscale_threshold comparison, and two function frames — ~3 ns
   // per call, ~6 ns total (median + MAD), on a ~50–200 ns small-n call.
-  const bool is_small = (n <= ROBSCALE_SORT_MEDIAN_THRESHOLD);
+  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
 
   // OPT-E: cache RuntimeConfig once — used for both the parallel threshold
   // check (below) and the use_avx2 flag passed to rob_scale_compute.

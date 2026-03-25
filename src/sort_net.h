@@ -12505,7 +12505,7 @@ inline T median_net(T* x, size_t n) {
     case 64: return median_net_64(x);
     default:
       // median_select never calls median_net for n>64 (guarded by
-      // ROBSCALE_SORT_MEDIAN_THRESHOLD), so this branch is unreachable in
+      // ROBSCALE_SORT_NETWORK_THRESHOLD), so this branch is unreachable in
       // practice.  Guard defensively anyway: std::sort is O(n log n) safe.
       if (n > 64) { std::sort(x, x + n); }
       else        { small_sort(x, n); }
