@@ -1,4 +1,5 @@
 #include "robscale_config.h"
+#include "estimators_internal.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
 #include <cstring>
@@ -24,38 +25,8 @@ double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant
 
   std::memcpy(buf, xp, n * sizeof(double));
 
-  // Q1/Q3 target indices (Type 7)
-  double h1 = (n - 1.0) * 0.25;
-  int lo1 = static_cast<int>(h1);
-  double frac1 = h1 - lo1;
-
-  double h3 = (n - 1.0) * 0.75;
-  int lo3 = static_cast<int>(h3);
-  double frac3 = h3 - lo3;
-
-  // Q1
-  double q1;
-  int q3_start;
-  if (frac1 > 0.0) {
-    // OPT-I3: select to lo1+1; max-scan [0..lo1] is O(0.25n)
-    miniselect::pdqselect(buf, buf + lo1 + 1, buf + n);
-    double q1_next = buf[lo1 + 1];
-    double q1_val = buf[0];
-    for (int i = 1; i <= lo1; ++i)
-      if (buf[i] > q1_val) q1_val = buf[i];
-    q1 = q1_val + frac1 * (q1_next - q1_val);
-    q3_start = lo1 + 2;
-  } else {
-    miniselect::pdqselect(buf, buf + lo1, buf + n);
-    q1 = buf[lo1];
-    q3_start = lo1 + 1;
-  }
-
-  // Q3: select on buf[q3_start .. n-1]
-  miniselect::pdqselect(buf + q3_start, buf + lo3, buf + n);
-  double q3 = robscale::interp_q7(buf, n, lo3, frac3);
-
-  return (q3 - q1) * constant;
+  // R4: delegate to shared helper (eliminates copy-paste with micro path below).
+  return robscale::internal::iqr_select_and_interp(buf, n) * constant;
 }
 
 // OPT-I6: n<=16 sort-once-then-index helper.
@@ -93,39 +64,10 @@ double iqr_impl(Rcpp::NumericVector x, double constant) {
     if (n > IQR_INLINE_LIMIT) return iqr_impl_large(xp, n, constant);
 
     // Micro path (17 <= n <= IQR_INLINE_LIMIT):
+    // R4: delegate to shared helper (eliminates copy-paste with iqr_impl_large).
     double buf_micro[IQR_INLINE_LIMIT];
     std::memcpy(buf_micro, xp, n * sizeof(double));
-
-    double h1 = (n - 1.0) * 0.25;
-    int lo1 = static_cast<int>(h1);
-    double frac1 = h1 - lo1;
-
-    double h3 = (n - 1.0) * 0.75;
-    int lo3 = static_cast<int>(h3);
-    double frac3 = h3 - lo3;
-
-    // Q1
-    double q1;
-    int q3_start;
-    if (frac1 > 0.0) {
-      // OPT-I3: select to lo1+1; max-scan [0..lo1] O(0.25n) vs O(0.75n)
-      miniselect::pdqselect(buf_micro, buf_micro + lo1 + 1, buf_micro + n);
-      double q1_next = buf_micro[lo1 + 1];
-      double q1_val = buf_micro[0];
-      for (int i = 1; i <= lo1; ++i)
-        if (buf_micro[i] > q1_val) q1_val = buf_micro[i];
-      q1 = q1_val + frac1 * (q1_next - q1_val);
-      q3_start = lo1 + 2;
-    } else {
-      miniselect::pdqselect(buf_micro, buf_micro + lo1, buf_micro + n);
-      q1 = buf_micro[lo1];
-      q3_start = lo1 + 1;
-    }
-
-    miniselect::pdqselect(buf_micro + q3_start, buf_micro + lo3, buf_micro + n);
-    double q3 = robscale::interp_q7(buf_micro, n, lo3, frac3);
-
-    return (q3 - q1) * constant;
+    return robscale::internal::iqr_select_and_interp(buf_micro, n) * constant;
   }
 
   return iqr_impl_small(xp, n, constant);

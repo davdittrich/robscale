@@ -65,12 +65,52 @@ inline double mad_from_data(const double* x, double* buf, int n) {
   return MAD_CONSISTENCY * robscale::adaptive_median_select(buf, static_cast<size_t>(n));
 }
 
-// IQR: incremental pdqselect, O(n)
-// Uses buf1 only; buf2 is unused (signature kept for call-site compatibility)
-// OPT-I6: n<=16 handled by small_sort fast path, keeping pdqselect code compact.
+// iqr_select_and_interp: shared pdqselect + max-scan + Type-7 interpolation.
+// R4: extracted to eliminate copy-paste across iqr_impl_large, the micro path
+//     in iqr_impl, and iqr() below.
+// Precondition: buf[0..n-1] is a WRITABLE copy of the data (modified in place).
+//               n >= 17 (callers handle n<=16 via small_sort before reaching here).
+// Returns: raw IQR = Q3 - Q1 (caller multiplies by consistency constant).
 // OPT-I3: symmetric Q1 — pdqselect to lo1+1, max-scan [0..lo1] O(0.25n).
-inline double iqr(const double* ROBSCALE_RESTRICT x, double* ROBSCALE_RESTRICT buf1, double* buf2, int n) {
-  (void)buf2;
+static inline double iqr_select_and_interp(double* ROBSCALE_RESTRICT buf, int n) {
+  double h1 = (n - 1.0) * 0.25;
+  int lo1 = static_cast<int>(h1);
+  double frac1 = h1 - lo1;
+
+  double h3 = (n - 1.0) * 0.75;
+  int lo3 = static_cast<int>(h3);
+  double frac3 = h3 - lo3;
+
+  // Q1
+  double q1;
+  int q3_start;
+  if (frac1 > 0.0) {
+    // OPT-I3: select to lo1+1; max-scan [0..lo1] O(0.25n) vs O(0.75n)
+    miniselect::pdqselect(buf, buf + lo1 + 1, buf + n);
+    double q1_next = buf[lo1 + 1];
+    double q1_val = buf[0];
+    for (int i = 1; i <= lo1; ++i)
+      if (buf[i] > q1_val) q1_val = buf[i];
+    q1 = q1_val + frac1 * (q1_next - q1_val);
+    q3_start = lo1 + 2;
+  } else {
+    miniselect::pdqselect(buf, buf + lo1, buf + n);
+    q1 = buf[lo1];
+    q3_start = lo1 + 1;
+  }
+
+  // Q3: select on buf[q3_start .. n-1], then Type-7 interpolation
+  miniselect::pdqselect(buf + q3_start, buf + lo3, buf + n);
+  double q3 = robscale::interp_q7(buf, n, lo3, frac3);
+
+  return q3 - q1;
+}
+
+// IQR: incremental pdqselect, O(n)
+// R3: buf2 dead parameter removed (was immediately (void)buf2-discarded).
+// OPT-I6: n<=16 handled by small_sort fast path, keeping pdqselect code compact.
+// R4: n>16 path delegates to iqr_select_and_interp (shared with iqr.cpp paths).
+inline double iqr(const double* ROBSCALE_RESTRICT x, double* ROBSCALE_RESTRICT buf1, int n) {
   if (n < 2) return 0.0;
 
   // OPT-I6: n<=16 sort-once-then-index fast path.
@@ -92,38 +132,7 @@ inline double iqr(const double* ROBSCALE_RESTRICT x, double* ROBSCALE_RESTRICT b
   }
 
   std::memcpy(buf1, x, n * sizeof(double));
-
-  double h1 = (n - 1.0) * 0.25;
-  int lo1 = static_cast<int>(h1);
-  double frac1 = h1 - lo1;
-
-  double h3 = (n - 1.0) * 0.75;
-  int lo3 = static_cast<int>(h3);
-  double frac3 = h3 - lo3;
-
-  // Q1
-  double q1;
-  int q3_start;
-  if (frac1 > 0.0) {
-    // OPT-I3: select to lo1+1; max-scan [0..lo1] O(0.25n) vs O(0.75n)
-    miniselect::pdqselect(buf1, buf1 + lo1 + 1, buf1 + n);
-    double q1_next = buf1[lo1 + 1];
-    double q1_val = buf1[0];
-    for (int i = 1; i <= lo1; ++i)
-      if (buf1[i] > q1_val) q1_val = buf1[i];
-    q1 = q1_val + frac1 * (q1_next - q1_val);
-    q3_start = lo1 + 2;
-  } else {
-    miniselect::pdqselect(buf1, buf1 + lo1, buf1 + n);
-    q1 = buf1[lo1];
-    q3_start = lo1 + 1;
-  }
-
-  // Q3: select on buf1[q3_start .. n-1]
-  miniselect::pdqselect(buf1 + q3_start, buf1 + lo3, buf1 + n);
-  double q3 = robscale::interp_q7(buf1, n, lo3, frac3);
-
-  return (q3 - q1) * IQR_CONSISTENCY;
+  return iqr_select_and_interp(buf1, n) * IQR_CONSISTENCY;
 }
 
 // IQR for pre-sorted data: O(1) direct index reads + Type 7 interpolation.

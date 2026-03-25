@@ -142,7 +142,7 @@ static void compute_all_estimators(const double* x, int n, double* results,
   results[1] = robscale::internal::gmd(work1, n);
 
   results[2] = robscale::internal::mad_from_data(x, work1, n);
-  results[3] = robscale::internal::iqr(x, work1, work2, n);
+  results[3] = robscale::internal::iqr(x, work1, n);
   results[4] = robscale::internal::sn(x, n);
   results[5] = robscale::internal::qn(x, n);
   results[6] = robscale::internal::rob_scale(x, work1, n);
