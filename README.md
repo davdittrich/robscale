@@ -356,11 +356,11 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 
 **SIMD vectorization.** The logistic psi function reduces to
 $\tanh(x/2)$, dispatched to the fastest available platform backend:
-Apple Accelerate (`vvtanh`) on macOS, SLEEF on Linux x86_64, and
-`#pragma omp simd` as a portable fallback. For `robLoc()`, a fused AVX2
-kernel accumulates $\psi_i$ and $\text{d}\psi_i$ in a single pass over
-the data, halving memory reads relative to the standard three-pass
-approach.
+Apple Accelerate (`vvtanh`) on macOS, glibc libmvec (`_ZGVdN4v_tanh`) on
+Linux x86_64 (SLEEF as fallback), and `#pragma omp simd` as a portable
+fallback. For `robLoc()`, a fused AVX2 kernel accumulates $\psi_i$ and
+$\text{d}\psi_i$ in a single pass over the data, halving memory reads
+relative to the standard three-pass approach.
 
 **$O(n)$ median selection.** Median and MAD computation uses optimal
 sorting networks for $n \le 16$ (branchless compare-and-swap sequences,
@@ -446,7 +446,7 @@ graph TD
     subgraph "Hardware Acceleration"
         G["AVX2 (AVX-512 with -mavx512f)"]
         H[Apple Accelerate]
-        I[SLEEF Library]
+        I["libmvec / SLEEF"]
     end
 
     T1 & T2 & T3 --> G & H & I
@@ -585,11 +585,11 @@ by **4.0–19.7x** and a `collapse::fmedian`-based MAD by **1.0–6.0x**
 > (`install.packages("robscale", type = "source")`) enables the
 > `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64,
 > NEON on ARM64) and link platform-specific libraries (Apple Accelerate,
-> SLEEF). Pre-built CRAN binaries use portable settings and may not
-> include these optimizations. Parallelism thresholds are derived from
-> the detected per-core L2 cache size at runtime on all platforms. For
-> maximum performance, add the following to `~/.R/Makevars` before
-> installing:
+> glibc libmvec, SLEEF). Pre-built CRAN binaries use portable settings
+> and may not include these optimizations. Parallelism thresholds are
+> derived from the detected per-core L2 cache size at runtime on all
+> platforms. For maximum performance, add the following to
+> `~/.R/Makevars` before installing:
 >
 >     CXXFLAGS = -O2 -march=native -mtune=native
 
