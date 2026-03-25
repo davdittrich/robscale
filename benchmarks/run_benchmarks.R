@@ -322,18 +322,29 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
       })
       results_new <- pool_bench_press(seed_results_new)
 
-      # ── Ensemble estimator (scale_robust total wall-clock) ─────────────────
+      # ── Ensemble estimator (scale_robust, auto_switch=FALSE) ───────────────
+      # Benchmark the bootstrap ensemble path directly, bypassing the gmd()
+      # fallback.  Ensemble is O(n_boot * n_estimators * estimator_cost), so
+      # we cap at n=512 and use a lower iteration budget to keep runtime sane.
+      # At n > 512, ensemble overhead would dominate the figure unproductively.
+      n_ensemble <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512)
+      get_min_iters_ens <- function(n) {
+        if (n <=  16L) 1000L
+        else if (n <= 64L)  200L
+        else if (n <= 256L)  50L
+        else 10L
+      }
       seed_results_ensemble <- lapply(seeds, function(seed) {
         bench::press(
-          n = n_large,
+          n = n_ensemble,
           {
             set.seed(seed + n)
             x <- rnorm(n)
             gc(full = TRUE)
             bench::mark(
-              scale_robust = robscale::scale_robust(x),
+              scale_robust = robscale::scale_robust(x, auto_switch = FALSE),
               check    = FALSE,
-              min_iterations = get_min_iters(n),
+              min_iterations = get_min_iters_ens(n),
               min_time = 1.0
             )
           }
