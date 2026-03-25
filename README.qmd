@@ -784,7 +784,7 @@ R) and `GiniDistance::gmd` by **`r gmd_gd_min`--`r gmd_gd_max`x** (both compiled
 > are derived from the detected per-core L2 cache size at runtime on all platforms.
 > For maximum performance, add the following to `~/.R/Makevars` before installing:
 > ```
-> CXXFLAGS = -O3 -march=native -mtune=native
+> CXXFLAGS = -O2 -march=native -mtune=native
 > ```
 
 ## Numerical equivalence

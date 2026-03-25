@@ -591,7 +591,7 @@ by **4.0–19.7x** and a `collapse::fmedian`-based MAD by **1.0–6.0x**
 > maximum performance, add the following to `~/.R/Makevars` before
 > installing:
 >
->     CXXFLAGS = -O3 -march=native -mtune=native
+>     CXXFLAGS = -O2 -march=native -mtune=native
 
 ## Numerical equivalence
 
