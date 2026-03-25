@@ -3,6 +3,67 @@ library(dplyr)
 library(tidyr)
 library(purrr)
 
+#' Compute a memory- and CPU-aware worker count for mclapply.
+#'
+#' Reads /proc/meminfo (Linux) to estimate available RAM and current swap
+#' pressure. Caps workers at the minimum of:
+#'   1. BENCH_MAX_WORKERS env var (default 4) — hard ceiling
+#'   2. floor(avail_ram * 0.80 / worker_mem_mb) — memory-based ceiling
+#'   3. physical_cores - 1 — leave one core for the orchestration layer
+#'
+#' Emits INFO/WARNING messages so over-commitment is visible in the log.
+#'
+#' @param context   Label for log messages (e.g. "bootstrap CI")
+#' @param worker_mem_mb  Estimated peak RSS per worker in MB (default 1024)
+#' @return Integer worker count, at least 1
+safe_worker_count <- function(context = "mclapply", worker_mem_mb = 1024L) {
+  n_phys    <- parallel::detectCores(logical = FALSE)
+  # Default: leave one core for the targets/callr orchestration layer.
+  # Override with BENCH_MAX_WORKERS env var (e.g. for CI or restricted hosts).
+  hard_cap  <- as.integer(Sys.getenv("BENCH_MAX_WORKERS", as.character(n_phys - 1L)))
+
+  avail_mb  <- NA_real_
+  swap_used_gb <- NA_real_
+
+  if (file.exists("/proc/meminfo")) {
+    lines    <- readLines("/proc/meminfo", warn = FALSE)
+    parse_kb <- function(pat) {
+      hit <- grep(pat, lines, value = TRUE)
+      if (!length(hit)) return(NA_real_)
+      as.numeric(gsub("[^0-9]", "", hit[1]))
+    }
+    avail_mb     <- parse_kb("^MemAvailable:") / 1024
+    swap_total_kb <- parse_kb("^SwapTotal:")
+    swap_free_kb  <- parse_kb("^SwapFree:")
+    if (!is.na(swap_total_kb) && !is.na(swap_free_kb))
+      swap_used_gb <- (swap_total_kb - swap_free_kb) / (1024^2)
+  }
+
+  # Memory-based ceiling: each worker needs ~worker_mem_mb; keep 20 % headroom.
+  mem_cap <- if (!is.na(avail_mb)) {
+    max(1L, floor(avail_mb * 0.80 / worker_mem_mb))
+  } else {
+    hard_cap
+  }
+
+  chosen <- max(1L, min(hard_cap, n_phys - 1L, mem_cap))
+
+  # Always emit a line so resource decisions are visible in the pipeline log.
+  message(sprintf(
+    "INFO  [%s] workers=%d  (hard_cap=%d  mem_cap=%d  phys_cores=%d  avail_mb=%.0f)",
+    context, chosen, hard_cap, mem_cap, n_phys,
+    if (is.na(avail_mb)) -1 else avail_mb
+  ))
+
+  if (!is.na(swap_used_gb) && swap_used_gb > 1)
+    message(sprintf(
+      "WARN  [%s] %.1f GB swap already in use — results may be slower; workers reduced to %d.",
+      context, swap_used_gb, chosen
+    ))
+
+  chosen
+}
+
 #' Compute BCa bootstrap confidence interval for speedup
 #' @param target_times Vector of timings for the new implementation
 #' @param ref_times Vector of timings for the reference implementation
@@ -109,12 +170,12 @@ analyze_benchmarks <- function(rob, legacy) {
       return(NULL)
     }
 
-    # Parallelize across rows using mclapply (all physical cores).
-    # boot::boot inside each worker runs serially — no nested fork risk.
-    n_cores <- parallel::detectCores(logical = FALSE)
+    n_cores <- safe_worker_count("bootstrap CI")
 
     indices <- seq_len(nrow(df))
     ll <- parallel::mclapply(indices, function(i) {
+      # Belt-and-suspenders: silence any inherited TBB threadpool inside forks.
+      RcppParallel::setThreadOptions(numThreads = 1L)
       row <- df[i, ]
       target_data <- as.numeric(row[[target_col]][[1]])
       ref_data <- as.numeric(row[[ref_col]][[1]])
