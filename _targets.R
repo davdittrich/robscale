@@ -47,6 +47,13 @@ list(
     path
   }, format = "file"),
 
+  # Create the absolute-timing figure
+  tar_target(absolute_timing_figure_obj, plot_absolute_timings(rob_optimized)),
+  tar_target(absolute_timing_figure, {
+    path <- "benchmarks/absolute_timing_fig.png"
+    ggsave(path, absolute_timing_figure_obj, width = 10, height = 6)
+    path
+  }, format = "file"),
 
   # Render README.qmd
   tar_quarto(readme_qmd, "README.qmd"),
@@ -70,8 +77,11 @@ list(
     content <- gsub("(?<!\\$)\\$([^$]+)\\$(?!\\$)", "$`\\1`$", content, perl=TRUE)
     
     # Convert relative image paths to absolute GitHub URLs for CRAN/GitHub rendering
-    content <- gsub("!\\s*\\[\\]\\(benchmarks/speedup_fig\\.png\\)", 
-                    "![](https://github.com/davdittrich/robscale/raw/main/benchmarks/speedup_fig.png)", 
+    content <- gsub("!\\s*\\[\\]\\(benchmarks/speedup_fig\\.png\\)",
+                    "![](https://github.com/davdittrich/robscale/raw/main/benchmarks/speedup_fig.png)",
+                    content, perl = TRUE)
+    content <- gsub("!\\s*\\[\\]\\(benchmarks/absolute_timing_fig\\.png\\)",
+                    "![](https://github.com/davdittrich/robscale/raw/main/benchmarks/absolute_timing_fig.png)",
                     content, perl = TRUE)
 
     # Write back

@@ -1092,8 +1092,14 @@ SIMD).
 
 ```{r}
 #| label: fig-benchmarks
-#| fig-cap: "Median speedup factor (x) vs. sample size $n$. Panel A compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B compares `qn` and `sn` against `robustbase`; Panel C compares `gmd`, `iqr_scaled`, and `mad_scaled` against existing R implementations."
+#| fig-cap: "Median speedup factor (x) vs. sample size $n$. Panel A compares `robLoc`, `robScale`, and `adm` against `revss`; Panel B compares `qn` and `sn` against `robustbase`; Panel C compares `gmd`, `iqr_scaled`, and `mad_scaled` against existing R implementations. The thin grey line at $y = 1$ marks parity with the reference."
 knitr::include_graphics(tar_read(speedup_figure))
+```
+
+```{r}
+#| label: fig-absolute-timings
+#| fig-cap: "Median absolute run time for each robscale estimator across sample sizes (log--log scale). All estimators are measured on the same machine under identical conditions; the spread of lines reflects algorithmic complexity ($O(n)$, $O(n \\log n)$, $O(n^2)$) and the onset of TBB parallelism at large $n$."
+knitr::include_graphics(tar_read(absolute_timing_figure))
 ```
 
 **Benchmark environment:**
