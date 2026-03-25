@@ -64,73 +64,85 @@ safe_worker_count <- function(context = "mclapply", worker_mem_mb = 1024L) {
   chosen
 }
 
-#' Compute BCa bootstrap confidence interval for speedup
+#' Compute bootstrap confidence interval for speedup
+#'
 #' @param target_times Vector of timings for the new implementation
-#' @param ref_times Vector of timings for the reference implementation
-#' @param R Number of bootstrap replicates
-compute_bca_speedup <- function(target_times, ref_times, R = 2000) {
-  # Take min length to align samples
+#' @param ref_times    Vector of timings for the reference implementation
+#' @param R            Number of bootstrap replicates
+#' @param method       CI method: "percentile" (default) or "bca".
+#'   Override via the BENCH_CI_METHOD environment variable.
+compute_speedup_ci <- function(target_times, ref_times, R = 2000,
+                               method = Sys.getenv("BENCH_CI_METHOD", "percentile")) {
+  method <- match.arg(method, c("percentile", "bca"))
+
   len <- min(length(target_times), length(ref_times))
   boot_data <- data.frame(
     target = as.numeric(target_times[1:len]),
-    ref = as.numeric(ref_times[1:len])
+    ref    = as.numeric(ref_times[1:len])
   )
 
-  # Ratio of medians function
   ratio_median <- function(d, i) {
-    target_med <- median(d[i, "target"])
-    ref_med <- median(d[i, "ref"])
-    ref_med / target_med
+    median(d[i, "ref"]) / median(d[i, "target"])
   }
 
   # Bootstrap — run serially: this function is already called from mclapply,
   # so inner boot parallelism would nest forks (n_cores^2 processes, crash risk).
   set.seed(42)
-  b <- boot::boot(boot_data, ratio_median, R = R,
-                  parallel = "no")
+  b <- boot::boot(boot_data, ratio_median, R = R, parallel = "no")
 
-  # Try BCa; boot.ci warns (does not error) when all t are equal, returning
-  # NULL for $bca.  Treat a NULL or short result as an error so the fallback
-  # chain fires instead of propagating NULL into as.data.frame().
-  ci <- tryCatch(
-    {
-      res <- boot::boot.ci(b, type = "bca")
-      bca <- res$bca
-      if (is.null(bca) || length(bca) < 5) stop("BCa returned NULL or short")
-      c(bca[4], bca[5])
-    },
-    error = function(e) {
-      # Fallback to percentile if BCa fails (e.g. constant values)
-      tryCatch(
-        {
-          res <- boot::boot.ci(b, type = "perc")
-          pct <- res$percent
-          if (is.null(pct) || length(pct) < 5) stop("percentile returned NULL")
-          c(pct[4], pct[5])
-        },
-        error = function(e2) {
-          # If even percentile fails, use the point estimate as a degenerate CI
-          if (length(b$t0) >= 1 && !is.na(b$t0[1])) {
-            return(c(b$t0[1], b$t0[1]))
-          }
-          c(NA_real_, NA_real_)
-        }
-      )
-    }
-  )
+  # Degenerate fallback used by both paths when boot.ci returns NULL/short.
+  degenerate_ci <- function() {
+    if (length(b$t0) >= 1L && !is.na(b$t0[1L])) c(b$t0[1L], b$t0[1L])
+    else c(NA_real_, NA_real_)
+  }
+
+  ci <- if (method == "percentile") {
+    tryCatch(
+      {
+        res <- boot::boot.ci(b, type = "perc")
+        pct <- res$percent
+        if (is.null(pct) || length(pct) < 5L) stop("percentile returned NULL or short")
+        c(pct[4L], pct[5L])
+      },
+      error = function(e) degenerate_ci()
+    )
+  } else {
+    # BCa — try BCa first, fall back to percentile, then degenerate.
+    # boot.ci warns (does not error) when all t are equal, returning NULL for
+    # $bca — treat NULL as an error so the fallback chain fires.
+    tryCatch(
+      {
+        res <- boot::boot.ci(b, type = "bca")
+        bca <- res$bca
+        if (is.null(bca) || length(bca) < 5L) stop("BCa returned NULL or short")
+        c(bca[4L], bca[5L])
+      },
+      error = function(e) {
+        tryCatch(
+          {
+            res <- boot::boot.ci(b, type = "perc")
+            pct <- res$percent
+            if (is.null(pct) || length(pct) < 5L) stop("percentile returned NULL")
+            c(pct[4L], pct[5L])
+          },
+          error = function(e2) degenerate_ci()
+        )
+      }
+    )
+  }
 
   median_speedup <- median(boot_data$ref) / median(boot_data$target)
-  ci_width_frac  <- (ci[2] - ci[1]) / median_speedup
+  ci_width_frac  <- (ci[2L] - ci[1L]) / median_speedup
 
   list(
     median_speedup = median_speedup,
-    ci_low         = ci[1],
-    ci_high        = ci[2],
-    # Quality diagnostics — flag rows with unreliable CIs
+    ci_low         = ci[1L],
+    ci_high        = ci[2L],
+    ci_method      = method,
     cv_target      = sd(boot_data$target) / mean(boot_data$target),
     cv_ref         = sd(boot_data$ref)    / mean(boot_data$ref),
-    ci_width_frac  = ci_width_frac,       # CI width as fraction of point estimate
-    reliable       = ci_width_frac < 0.5  # FALSE flags noisy / low-iteration cells
+    ci_width_frac  = ci_width_frac,
+    reliable       = ci_width_frac < 0.5
   )
 }
 
@@ -180,7 +192,7 @@ analyze_benchmarks <- function(rob, legacy) {
       target_data <- as.numeric(row[[target_col]][[1]])
       ref_data <- as.numeric(row[[ref_col]][[1]])
 
-      analysis <- compute_bca_speedup(target_data, ref_data)
+      analysis <- compute_speedup_ci(target_data, ref_data)
       cbind(row, as.data.frame(analysis))
     }, mc.cores = n_cores)
     

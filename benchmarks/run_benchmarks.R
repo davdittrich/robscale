@@ -215,7 +215,8 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
       library(robscale)
       library(bench)
 
-      n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
+      n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+                   12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
       n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
                    12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
 
@@ -321,10 +322,30 @@ benchmark_robscale <- function(install_env = list(), lib_path = tempfile("lib_")
       })
       results_new <- pool_bench_press(seed_results_new)
 
+      # ── Ensemble estimator (scale_robust total wall-clock) ─────────────────
+      seed_results_ensemble <- lapply(seeds, function(seed) {
+        bench::press(
+          n = n_large,
+          {
+            set.seed(seed + n)
+            x <- rnorm(n)
+            gc(full = TRUE)
+            bench::mark(
+              scale_robust = robscale::scale_robust(x),
+              check    = FALSE,
+              min_iterations = get_min_iters(n),
+              min_time = 1.0
+            )
+          }
+        )
+      })
+      results_ensemble <- pool_bench_press(seed_results_ensemble)
+
       list(
         m_estimators     = results_m,
         scale_estimators = results_scale,
         new_estimators   = results_new,
+        ensemble         = results_ensemble,
         sys_info         = sessioninfo::session_info()
       )
     })
@@ -359,7 +380,8 @@ benchmark_legacy <- function() {
     library(GiniDistance)
     library(collapse)
 
-    n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 12288, 16384)
+    n_small <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
+                 12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
     n_large <- c(3, 4, 5, 6, 7, 8, 10, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192,
                  12288, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 10000000)
 

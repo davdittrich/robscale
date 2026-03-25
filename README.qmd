@@ -580,7 +580,8 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 
 **SIMD vectorization.** The logistic psi function reduces to $\tanh(x/2)$, dispatched
 to the fastest available platform backend: Apple Accelerate (`vvtanh`) on macOS,
-SLEEF on Linux x86\_64, and `#pragma omp simd` as a portable fallback. For `robLoc()`,
+glibc libmvec (`_ZGVdN4v_tanh`) on Linux x86\_64 (SLEEF as fallback), and
+`#pragma omp simd` as a portable fallback. For `robLoc()`,
 a fused AVX2 kernel accumulates $\psi_i$ and $\text{d}\psi_i$ in a single pass over
 the data, halving memory reads relative to the standard three-pass approach.
 
@@ -663,7 +664,7 @@ graph TD
     subgraph "Hardware Acceleration"
         G["AVX2 (AVX-512 with -mavx512f)"]
         H[Apple Accelerate]
-        I[SLEEF Library]
+        I["libmvec / SLEEF"]
     end
 
     T1 & T2 & T3 --> G & H & I
@@ -779,7 +780,7 @@ R) and `GiniDistance::gmd` by **`r gmd_gd_min`--`r gmd_gd_max`x** (both compiled
 > [!NOTE]
 > **Source builds recommended.** Installing from source (`install.packages("robscale", type = "source")`)
 > enables the `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64, NEON on ARM64)
-> and link platform-specific libraries (Apple Accelerate, SLEEF). Pre-built CRAN binaries
+> and link platform-specific libraries (Apple Accelerate, glibc libmvec, SLEEF). Pre-built CRAN binaries
 > use portable settings and may not include these optimizations. Parallelism thresholds
 > are derived from the detected per-core L2 cache size at runtime on all platforms.
 > For maximum performance, add the following to `~/.R/Makevars` before installing:

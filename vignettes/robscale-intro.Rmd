@@ -303,12 +303,13 @@ The logistic psi function satisfies $\psi_{\log}(x) = \tanh(x/2)$. `robscale`
 evaluates `tanh` in bulk using the fastest available platform backend:
 
 1. **Apple Accelerate** (`vvtanh`): array-wide SIMD on macOS.
-2. **SLEEF**: AVX2-vectorized evaluation on Linux x86\_64.
-3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided fallback.
-4. **Scalar** `std::tanh`: universal fallback.
+2. **glibc libmvec** (`_ZGVdN4v_tanh`): AVX2-vectorized `tanh` on Linux
+   x86\_64 with glibc $\geq$ 2.22 (Ubuntu 16.04+, Arch, Fedora 23+).
+3. **SLEEF**: AVX2-vectorized fallback when libmvec is absent at link time.
+4. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
+5. **Scalar** `std::tanh`: universal fallback.
 
-For $n < 8$, vectorized paths are bypassed; fewer than two full AVX2 vectors
-yield no net gain.
+For $n < 8$, vectorized paths are bypassed.
 
 ### $O(n)$ median selection
 

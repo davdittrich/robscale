@@ -26,7 +26,7 @@ plot_benchmarks <- function(analyzed) {
     expand_limits(y = 0) +
     labs(
       title = "Panel A: Small-sample M-estimators",
-      subtitle = "robscale vs revss (with 95% BCa confidence bands)",
+      subtitle = "robscale vs revss (with 95% percentile confidence bands)",
       x = "Sample Size (n)",
       y = "Median Speedup Factor",
       color = "Estimator",
@@ -50,7 +50,7 @@ plot_benchmarks <- function(analyzed) {
     expand_limits(y = 0) +
     labs(
       title = "Panel B: Scale Estimators",
-      subtitle = "robscale vs robustbase (with 95% BCa confidence bands)",
+      subtitle = "robscale vs robustbase (with 95% percentile confidence bands)",
       x = "Sample Size (n)",
       y = "Median Speedup Factor",
       color = "Estimator",
@@ -74,7 +74,7 @@ plot_benchmarks <- function(analyzed) {
     expand_limits(y = 0) +
     labs(
       title = "Panel C: Single-Pass Scale Estimators",
-      subtitle = "robscale vs base R and CRAN implementations (with 95% BCa confidence bands)",
+      subtitle = "robscale vs base R and CRAN implementations (with 95% percentile confidence bands)",
       x = "Sample Size (n)",
       y = "Median Speedup Factor",
       color = "Comparison",
@@ -108,7 +108,8 @@ plot_absolute_timings <- function(rob) {
   df <- bind_rows(
     to_secs(rob$m_estimators),
     to_secs(rob$scale_estimators),
-    to_secs(rob$new_estimators)
+    to_secs(rob$new_estimators),
+    to_secs(rob$ensemble)
   )
 
   # Human-readable time labels for a log-scale axis (input: seconds)
@@ -122,8 +123,8 @@ plot_absolute_timings <- function(rob) {
   }
 
   ggplot(df, aes(x = n, y = median_sec, color = expr)) +
-    geom_line(linewidth = 0.8) +
-    geom_point(size = 1.5) +
+    geom_line(linewidth = 0.8, alpha = 0.7) +
+    geom_point(size = 1.5, alpha = 0.85) +
     scale_x_log10(
       breaks = 10^(0:7),
       labels = trans_format("log10", math_format(10^.x))
