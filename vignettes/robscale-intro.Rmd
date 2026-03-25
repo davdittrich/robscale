@@ -1,0 +1,540 @@
+---
+title: "Introduction to robscale"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to robscale}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## 1. The Robustness Problem
+
+Outliers compromise the reliability of classical estimators even in moderate
+samples. A single recording error can destroy the standard deviation, yet the
+standard deviation remains the default scale estimator in most statistical
+software.
+
+To see why, consider a small sample with one gross error:
+
+```{r robustness-demo}
+library(robscale)
+
+x_clean <- c(2.1, 2.3, 2.0, 2.4, 2.2, 2.1, 2.3, 1.9)
+x_contaminated <- c(x_clean, 200)   # one recording error
+
+sd(x_clean)
+sd(x_contaminated)   # collapses
+
+gmd(x_clean)
+gmd(x_contaminated)  # unaffected
+
+qn(x_clean)
+qn(x_contaminated)   # unaffected
+```
+
+The **breakdown point** is the fraction of contaminated observations an
+estimator tolerates before producing an arbitrarily large result. The standard
+deviation has a 0% breakdown point; a single outlier drives it to infinity.
+The GMD achieves 29.3%; `qn` and `sn` achieve the maximum 50%.
+
+The **asymptotic relative efficiency** (ARE) measures statistical efficiency
+relative to the sample standard deviation under the Gaussian model. High
+efficiency means fewer observations are needed to match the standard
+deviation's precision. The tradeoff is inherent: higher breakdown point
+generally costs efficiency.
+
+`robscale` exposes all major points on this robustness--efficiency frontier.
+
+## 2. Getting Started
+
+### Installation
+
+```r
+install.packages("robscale")
+
+# Development version:
+# install.packages("remotes")
+# remotes::install_github("davdittrich/robscale")
+```
+
+### Quick demo
+
+```{r quick-demo}
+library(robscale)
+
+set.seed(42)
+x <- c(rnorm(20), 50)   # 20 clean observations + one outlier
+
+scale_robust(x)              # auto-selects best strategy
+scale_robust(x, ci = TRUE)   # with confidence interval
+
+data.frame(
+  estimator = c("sd", "sd_c4", "gmd", "qn", "mad_scaled"),
+  value = round(c(sd(x), sd_c4(x), gmd(x), qn(x), mad_scaled(x)), 4)
+)
+```
+
+## 3. The Estimator Spectrum
+
+`robscale` provides 11 exported functions spanning the full
+robustness--efficiency spectrum:
+
+| Function | ARE | Breakdown | Description |
+| :--- | ---: | ---: | :--- |
+| `sd_c4(x)` | 100% | 0% | Bias-corrected standard deviation |
+| `gmd(x)` | 98% | 29.3% | Gini mean difference |
+| `adm(x)` | 88.3% | 25% | Average deviation from median |
+| `qn(x)` | 82.3% | 50% | Rousseeuw--Croux $Q_n$ |
+| `sn(x)` | 58.2% | 50% | Rousseeuw--Croux $S_n$ |
+| `iqr_scaled(x)` | 37% | 25% | Scaled interquartile range |
+| `mad_scaled(x)` | 36.7% | 50% | Scaled median absolute deviation |
+| `robScale(x)` | ~50--70%¹ | 50% | M-estimator for scale |
+| `robLoc(x)` | 98.4% | 50% | M-estimator for location |
+| `scale_robust(x)` | ensemble | --- | Variance-weighted dispatcher |
+| `get_consistency_constant(n)` | --- | --- | Finite-sample bias correction factors |
+
+¹ ARE varies with sample size.
+
+### Decision guide
+
+- **Maximum efficiency, no outliers expected:** `sd_c4`
+- **High efficiency with moderate outlier protection:** `gmd`
+- **Maximum breakdown with good efficiency:** `qn`
+- **Fast computation on large data:** `mad_scaled` or `iqr_scaled`
+- **Uncertain which estimator to use:** `scale_robust()` (adaptive)
+- **M-estimate of location:** `robLoc`
+- **M-estimate of scale:** `robScale`
+
+## 4. The `scale_robust()` Dispatcher
+
+`scale_robust()` adapts its strategy to sample size automatically.
+
+### Ensemble mode ($n < 20$)
+
+For small samples, all 7 scale estimators run on bootstrap replicates.
+Inverse-variance weights combine them into a single estimate:
+
+$$
+\hat\sigma = \frac{\sum_{j=1}^{7} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{7} 1/\hat\sigma_j^2}
+$$
+
+```{r ensemble}
+set.seed(1)
+x_small <- rnorm(12)
+scale_robust(x_small)              # ensemble (n = 12 < 20)
+scale_robust(x_small, ci = TRUE)   # BCa bootstrap CI
+```
+
+### Automatic switch to GMD ($n \geq 20$)
+
+For larger samples, `scale_robust()` uses `gmd()` directly: 98% ARE,
+29.3% breakdown, $O(n \log n)$.
+
+```{r auto-switch}
+x_large <- rnorm(500)
+scale_robust(x_large)   # equivalent to gmd(x_large)
+```
+
+### Explicit method selection
+
+```{r explicit-method}
+scale_robust(x_small, method = "qn")       # force Qn
+scale_robust(x_small, method = "robScale") # force M-scale
+scale_robust(x_small, auto_switch = FALSE) # keep ensemble at any n
+```
+
+## 5. Individual Estimators
+
+### `sd_c4(x)`: Bias-corrected standard deviation
+
+Applies the exact $c_4(n)$ finite-sample correction to remove the downward
+bias of the sample standard deviation under normality:
+
+```{r sd-c4}
+x <- c(1.2, 0.8, 1.5, 0.9, 1.1)
+sd_c4(x)              # unbiased under normality
+sd(x)                 # biased downward for small n
+sd_c4(x, ci = TRUE)
+```
+
+### `gmd(x)`: Gini mean difference
+
+Average absolute pairwise difference, computed via the order-statistics form
+in $O(n \log n)$:
+
+```{r gmd}
+gmd(c(1, 2, 3, 5, 7, 8))
+gmd(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+```
+
+### `adm(x)`: Average deviation from the median
+
+```{r adm}
+adm(c(1, 2, 3, 5, 7, 8))
+```
+
+### `qn(x)`: Rousseeuw--Croux $Q_n$
+
+```{r qn}
+qn(c(1, 2, 3, 5, 7, 8))
+qn(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+```
+
+### `sn(x)`: Rousseeuw--Croux $S_n$
+
+```{r sn}
+sn(c(1, 2, 3, 5, 7, 8))
+sn(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+```
+
+### `iqr_scaled(x)` and `mad_scaled(x)`
+
+```{r iqr-mad}
+iqr_scaled(c(1, 2, 3, 5, 7, 8))
+mad_scaled(c(1, 2, 3, 5, 7, 8))
+```
+
+### `robLoc(x)`: M-estimator for location
+
+M-estimator for location via Newton--Raphson iteration on the logistic psi
+function (Rousseeuw & Verboven 2002, Eq. 21). Starting value:
+$T^{(0)} = \text{median}(x)$; auxiliary scale: $S = \text{MAD}(x)$.
+
+**Fallback:** When scale is unknown and $n < 4$, or when scale is known and
+$n < 3$, returns `median(x)` without iteration.
+
+```{r robloc}
+robLoc(c(1, 2, 3, 5, 7, 8))
+robLoc(c(1, 2, 3), scale = 1.5)   # known scale enables n = 3
+```
+
+Newton--Raphson algorithm for `robLoc()`:
+
+```
+flowchart TD
+    A[Set minobs: 3 if scale known, 4 if unknown] --> B[med = median x]
+    B --> C{n < minobs?}
+    C -- Yes --> D([Return med])
+    C -- No --> E{Scale known?}
+    E -- Yes --> F[s = scale]
+    E -- No --> G[s = MAD x]
+    F --> H{s = 0?}
+    G --> H
+    H -- Yes --> I([Return med])
+    H -- No --> J[t = med]
+    J --> K[psi_i = tanh( (x_i - t) / 2s )]
+    K --> L[sum_psi = Sum psi_i, sum_dpsi = Sum (1 - psi_i^2)]
+    L --> M[t += 2s * sum_psi / sum_dpsi]
+    M --> N{abs(v) <= tol?}
+    N -- No --> K
+    N -- Yes --> O([Return t])
+```
+
+### `robScale(x)`: M-estimator for scale
+
+M-estimator for scale via multiplicative iteration with the rho function
+(Rousseeuw & Verboven 2002, Eq. 27). Starting value: $S^{(0)} = \text{MAD}(x)$.
+
+```{r robscale}
+robScale(c(1, 2, 3, 5, 7, 8))
+robScale(c(5, 5, 5, 5, 6), fallback = "na")   # revss compatibility
+robScale(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+```
+
+Multiplicative iteration for `robScale()`:
+
+```
+flowchart TD
+    A{Location known?}
+    A -- Yes --> B1[w = x - loc]
+    B1 --> B2[s = 1.4826 * median( abs(w) )]
+    B2 --> B3[t = 0, minobs = 3]
+    A -- No --> C1[med = median x]
+    C1 --> C2[s = MAD x, t = med]
+    C2 --> C3[minobs = 4]
+    B3 --> D{n < minobs?}
+    C3 --> D
+    D -- Yes --> E{s <= implbound?}
+    E -- Yes --> F{fallback?}
+    F -- adm --> F1([Return ADM x])
+    F -- na --> F2([Return NA])
+    E -- No --> G([Return s])
+    D -- No --> H{s <= implbound?}
+    H -- Yes --> F
+    H -- No --> J[psi_i = tanh( (x_i - t) / (2cs) )]
+    J --> K[sum_rho = Sum psi_i^2]
+    K --> L[v = sqrt( 2 * sum_rho / n ), s *= v]
+    L --> M{abs(v - 1) <= tol?}
+    M -- No --> J
+    M -- Yes --> N([Return s])
+```
+
+## 6. Confidence Intervals
+
+All scale estimators support `ci = TRUE`:
+
+```{r ci}
+# Analytical CI (chi-squared for sd_c4, ARE-based for others)
+sd_c4(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+gmd(c(1, 2, 3, 5, 7, 8), ci = TRUE)
+
+# BCa bootstrap CI for scale_robust() ensemble
+set.seed(42)
+x_small <- rnorm(10)
+scale_robust(x_small, ci = TRUE, n_boot = 500)
+```
+
+The CI return type is a named list with `estimate`, `lower`, `upper`, and
+`level`. For `scale_robust()` in ensemble mode, the object class is
+`robscale_ensemble_ci` and includes per-estimator weights.
+
+## 7. Performance Architecture
+
+### SIMD vectorization
+
+The logistic psi function satisfies $\psi_{\log}(x) = \tanh(x/2)$. `robscale`
+evaluates `tanh` in bulk using the fastest available platform backend:
+
+1. **Apple Accelerate** (`vvtanh`): array-wide SIMD on macOS.
+2. **SLEEF**: AVX2-vectorized evaluation on Linux x86\_64.
+3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided fallback.
+4. **Scalar** `std::tanh`: universal fallback.
+
+For $n < 8$, vectorized paths are bypassed; fewer than two full AVX2 vectors
+yield no net gain.
+
+### $O(n)$ median selection
+
+`robscale` uses a tiered strategy rather than `sort()`:
+
+- **$n \leq 16$**: optimal sorting networks (verified minimal comparator counts,
+  compiled to branchless machine code at `-O2`):
+
+| $n$ | Comparators |
+| ---: | ---: |
+| 3 | 3 |
+| 4 | 5 |
+| 8 | 19 |
+| 12 | 39 |
+| 16 | 60 |
+
+- **$17 \leq n < 600$**: `std::nth_element` (introselect, $O(n)$ worst-case).
+- **$n \geq 600$**: Floyd--Rivest algorithm, which narrows the active window to
+  $O(n^{2/3})$ elements before partitioning.
+
+The crossover between Floyd--Rivest and pdqselect is derived at runtime from
+the per-core L2 cache size; each estimator uses its own threshold based on
+working-set pressure:
+
+| Estimator | Strategy | Threshold |
+| :--- | :--- | :--- |
+| `iqr_scaled` | Always pdqselect | --- |
+| `mad_scaled` | Floyd--Rivest vs. pdqselect | $\max(2048,\, L_2 / 40)$ |
+| `robScale` | Floyd--Rivest vs. pdqselect | $\max(2048,\, L_2 / 16)$ |
+| $S_n$ | Floyd--Rivest vs. pdqselect | $\max(2048,\, L_2 / 16)$ |
+| $Q_n$ (final window) | Inline check | $\max(2048,\, L_2 / 32)$ |
+
+### Stack-allocated memory arenas
+
+A 64-double micro-buffer covers $n \leq 64$; a 2,048-double buffer handles
+$n \leq 2{,}048$ --- both stack-allocated, eliminating heap traffic.
+
+**Fused single-buffer algorithm.** After median selection the working buffer
+holds a permutation of the input. Because MAD is order-invariant, absolute
+deviations can be computed in-place, eliminating the second scratch array and
+halving memory from $2n$ to $n$ doubles per estimator.
+
+### Newton--Raphson convergence
+
+Location estimation uses Newton--Raphson (quadratic convergence, ~3 iterations)
+rather than the scoring fixed-point method (~6--8 iterations):
+
+$$
+T^{(k+1)} = T^{(k)} + \frac{2\,S\sum \psi\!\left(\frac{x_i - T^{(k)}}{2S}\right)}
+{\sum \left[1 - \psi^2\!\left(\frac{x_i - T^{(k)}}{2S}\right)\right]}
+$$
+
+Since $\tanh$ values are already computed for the numerator, the denominator
+costs only squaring and subtraction. Typical iteration counts:
+
+| $n$ | Scoring | Newton--Raphson |
+| ---: | ---: | ---: |
+| 4 | 7 | 3 |
+| 8 | 7 | 3 |
+| 20 | 6 | 3 |
+| 100 | 5 | 3 |
+
+**Fused AVX2 kernel for `robLoc()`.** `rob_loc_nr_step_avx2` collapses three
+passes into one. Two AVX2 accumulators advance in lockstep:
+
+$$
+\texttt{acc\_psi} \mathrel{+}= p_i, \qquad \texttt{acc\_p2} \mathrel{+}= p_i^2
+$$
+
+where $p_i = \tanh(u_i)$ is evaluated once. The derivative sum follows from
+$\text{sech}^2(u) = 1 - \tanh^2(u)$:
+
+$$
+\sum \text{dpsi} = n - \sum p_i^2
+$$
+
+### TBB parallelism
+
+$Q_n$ and $S_n$ partition inner loops across TBB threads for $n$ above a
+runtime L2-derived threshold. `scale_robust()` parallelizes the
+$n_{\text{boot}}$ bootstrap iterations across cores.
+
+### Compile-time optimizations
+
+- Reciprocal constants ($1/\alpha$, $1/c$) are `constexpr`, replacing
+  inner-loop divisions with multiplications.
+- Loop-invariant quantities (`inv_s`, `half_inv_s`, `inv_n`) are hoisted
+  before the Newton--Raphson loop.
+- Sorting-network entry points are instantiated in a single translation unit,
+  reducing cold build time from ~300 s to ~52 s.
+- `sd_c4` uses Welford's one-pass algorithm for numerically stable variance.
+
+## 8. Mathematical Foundations
+
+### Logistic psi function
+
+(Rousseeuw & Verboven 2002, Eq. 23):
+
+$$
+\psi_{\log}(x) = \frac{e^x - 1}{e^x + 1} = \tanh(x/2)
+$$
+
+Bounded in $(-1, 1)$, $C^\infty$, strictly monotone. Boundedness provides
+robustness; smoothness avoids the corner artifacts of Huber's psi at small $n$.
+
+### Decoupled estimation
+
+Location and scale are estimated separately with a fixed auxiliary estimate,
+breaking the positive-feedback loop of Huber's Proposal 2. `robLoc` fixes
+scale at $\text{MAD}(x)$; `robScale` fixes location at $\text{median}(x)$.
+
+### Rho function for scale
+
+(Rousseeuw & Verboven 2002, Eq. 26):
+
+$$
+\rho_{\log}(x) = \psi_{\log}^2(x / c)
+$$
+
+where $c = 0.37394112142347236$ is the constant that yields a 50% breakdown
+point.
+
+### $Q_n$ and $S_n$ statistics
+
+$$Q_n = c_n \cdot 2.2191 \cdot \{|x_i - x_j|;\; i < j\}_{(k)}$$
+
+where $k = \binom{h}{2}$, $h = \lfloor n/2 \rfloor + 1$, and $c_n$ is the
+finite-sample correction factor.
+
+$$S_n = c_n' \cdot 1.1926 \cdot \operatorname{lomed}_i \{\operatorname{himed}_j |x_i - x_j|\}$$
+
+where $\operatorname{lomed}$ and $\operatorname{himed}$ denote the low and high
+medians respectively.
+
+### $c_4(n)$ correction factor
+
+$$
+c_4(n) = \sqrt{\frac{2}{n{-}1}} \cdot \frac{\Gamma(n/2)}{\Gamma((n{-}1)/2)}
+$$
+
+### Gini mean difference
+
+$$
+\text{GMD}(x) = C_{\text{GMD}} \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}
+$$
+
+Algebraically equivalent to
+$\frac{1}{\binom{n}{2}}\sum_{i<j}|x_i - x_j|$, but computed in
+$O(n \log n)$ via sorted-array indexing.
+
+### Ensemble weighting formula
+
+$$
+\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{J} 1/\hat\sigma_j^2}
+$$
+
+### Key constants (full double precision)
+
+| Symbol | Value | Definition |
+| :--- | :--- | :--- |
+| $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
+| $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
+| $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
+| $C_{\text{MAD}}$ | `1.482602218505602` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
+| $C_{\text{GMD}}$ | `0.886226925452758` | $\sqrt{\pi}/2$; GMD consistency constant |
+| $C_{\text{IQR}}$ | `0.741301109252801` | $1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25))$; IQR consistency constant |
+
+## 9. Compatibility
+
+### revss API
+
+`adm()`, `robLoc()`, and `robScale()` accept the same arguments and return the
+same values as `revss`. Code using `revss` can switch to `robscale` by
+changing only the `library()` call:
+
+```{r revss-compat, eval = requireNamespace("revss", quietly = TRUE)}
+x <- c(1.2, 2.4, 3.1, 5.5, 7.0)
+revss::robScale(x)
+robscale::robScale(x)   # same value
+```
+
+Note: `revss` v3.1.0 updated its bias correction factors; `robscale` follows
+the original Rousseeuw & Verboven (2002) definitions, so results may differ at
+convergence tolerance.
+
+### robustbase API
+
+`qn()` and `sn()` match `robustbase::Qn()` and `robustbase::Sn()` (with
+lowercase names for consistency).
+
+### Numerical equivalence
+
+At tolerance $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$,
+`robscale` matches `revss` across 5,400 randomly generated inputs
+($n = 3, \ldots, 20$; 100 replicates per $n$; 100% pass rate). See
+`tests/testthat/test-cross-check.R` for full test coverage.
+
+## 10. References
+
+Bickel, P.J. and Lehmann, E.L. (1976). Descriptive Statistics for Nonparametric
+Models III. Dispersion. *Annals of Statistics*, **4**(6), 1139--1158.
+<https://doi.org/10.1214/aos/1176343648>
+
+Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
+*Communications of the ACM*, **18**(3), 165--172.
+<https://doi.org/10.1145/360680.360691>
+
+Gini, C. (1912). *Variabilita e mutabilita*. Bologna: Tipografia di Paolo
+Cuppini.
+
+Marsaglia, G. (2003). Xorshift RNGs. *Journal of Statistical Software*,
+**8**(14), 1--6. <https://doi.org/10.18637/jss.v008.i14>
+
+Nair, K.R. (1936). On the Mean Deviation. *Biometrika*, **28**(3/4), 428--436.
+
+Nair, K.R. (1947). A Note on the Mean Deviation from the Median. *Biometrika*,
+**34**(3/4), 360--362.
+
+Rousseeuw, P.J. and Croux, C. (1993). Alternatives to the Median Absolute
+Deviation. *Journal of the American Statistical Association*, **88**, 1273--1283.
+<https://doi.org/10.1080/01621459.1993.10476408>
+
+Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
+samples. *Computational Statistics & Data Analysis*, **40**(4), 741--758.
+<https://doi.org/10.1016/S0167-9473(02)00078-6>
+
+Welford, B.P. (1962). Note on a Method for Calculating Corrected Sums of
+Squares and Products. *Technometrics*, **4**(3), 419--420.
+<https://doi.org/10.1080/00401706.1962.10490022>
