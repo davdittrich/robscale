@@ -11,7 +11,7 @@
 
 static ROBSCALE_NOINLINE
 double mad_impl_auto_large(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
-  constexpr int STACK_SIZE = 2048;
+  constexpr int STACK_SIZE = ROBSCALE_SN_STACK_THRESHOLD;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* w = (n <= STACK_SIZE)
@@ -47,7 +47,7 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
 static ROBSCALE_NOINLINE
 double mad_impl_center_large(const double* ROBSCALE_RESTRICT xp, int n,
                               double center, double constant) {
-  constexpr int STACK_SIZE = 2048;
+  constexpr int STACK_SIZE = ROBSCALE_SN_STACK_THRESHOLD;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* dev = (n <= STACK_SIZE)

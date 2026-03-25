@@ -48,7 +48,7 @@ double gmd_impl(Rcpp::NumericVector x, double constant) {
   if (n < 2) return 0.0;
   if (n <= ROBSCALE_MICRO_BUFFER_SIZE)
     return gmd_impl_small(x.begin(), n, constant);
-  constexpr int STACK_SIZE = 2048;
+  constexpr int STACK_SIZE = ROBSCALE_SN_STACK_THRESHOLD;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* buf = (n <= STACK_SIZE)

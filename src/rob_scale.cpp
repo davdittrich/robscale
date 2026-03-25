@@ -226,7 +226,6 @@ ROBSCALE_HIDDEN
 double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
                          size_t n, double data_offset, double s,
                          int maxit, double tol,
-                         double* ROBSCALE_RESTRICT tmp,
                          bool use_avx2) {
   const double inv_n = 1.0 / (double)n;
 
@@ -253,7 +252,6 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
     // OPT-4: single-pass fusion — no tmp[] traffic.
     // Bit-exact: element-wise std::tanh and sequential accumulation match the
     // old 3-pass scalar path (tmp[]=v; bulk_tanh scalar; sum(tmp^2)).
-    (void)tmp;  // tmp retained in signature for API compatibility (Option A)
     double sr = 0.0;
     for (size_t i = 0; i < n; ++i) {
       const double tv = std::tanh((data[i] - data_offset) * hisc);
@@ -352,8 +350,7 @@ static double rob_scale_core(const double* xp, size_t n,
 
   // OPT-F: pass w[] (abs-deviations) with data_offset=0 — eliminates one VSUB
   // per element per iteration in the AVX2 fused kernel.
-  // dev[] serves as tmp scratch for the 3-pass scalar fallback.
-  return rob_scale_compute(w, n, 0.0, s_init, maxit, tol, dev, avx2);
+  return rob_scale_compute(w, n, 0.0, s_init, maxit, tol, avx2);
 }
 
 /**

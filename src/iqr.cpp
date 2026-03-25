@@ -15,7 +15,7 @@ static constexpr int IQR_INLINE_LIMIT = 256;
 // max-scan [0..lo1] O(0.25n) instead of min-scan [lo1+1..n-1] O(0.75n).
 static ROBSCALE_NOINLINE
 double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
-  constexpr int STACK_SIZE = 2048;
+  constexpr int STACK_SIZE = ROBSCALE_SN_STACK_THRESHOLD;
   double buf_stack[STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* buf = (n <= STACK_SIZE)

@@ -28,7 +28,6 @@ ROBSCALE_HIDDEN
 double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
                          size_t n, double data_offset, double s,
                          int maxit, double tol,
-                         double* ROBSCALE_RESTRICT tmp,
                          bool use_avx2 = false);
 
 namespace robscale { namespace internal {
@@ -229,8 +228,8 @@ inline double rob_scale(const double* x, double* buf, int n) {
 #else
   const bool avx2 = false;
 #endif
-  // Newton-Raphson iteration: buf is reused as scratch (written before read)
-  return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, buf, avx2);
+  // Newton-Raphson iteration.
+  return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, avx2);
 }
 
 // robScale on pre-sorted input (WU-RS9 / OPT-9).
@@ -255,7 +254,7 @@ inline double rob_scale_sorted(const double* ROBSCALE_RESTRICT sorted_x,
 #else
   const bool avx2 = false;
 #endif
-  return rob_scale_compute(sorted_x, n, t, s_init, 80, 1.4901161e-8, buf, avx2);
+  return rob_scale_compute(sorted_x, n, t, s_init, 80, 1.4901161e-8, avx2);
 }
 
 }} // namespace robscale::internal
