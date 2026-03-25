@@ -674,7 +674,8 @@ graph TD
 Figures 1 and 2 show speedup factors relative to reference implementations (Figure 1)
 and absolute wall-clock run times (Figure 2) across sample sizes on a `r bm_info$cpu_name`
 (`r bm_info$platform`, `r bm_info$r_version`, build flags: `` `r bm_info$cxx_flags` ``,
-`tanh` backend: `r bm_info$tanh_backend`, TBB: `r bm_info$tbb_source`).
+`tanh` backend: `r bm_info$tanh_backend`, TBB: `r bm_info$tbb_source`,
+benchmarked `r bm_info$benchmark_date`).
 Baseline packages: `robustbase` `r bm_pkgs$robustbase`, `revss` `r bm_pkgs$revss`,
 `Hmisc` `r bm_pkgs$Hmisc`, `GiniDistance` `r bm_pkgs$GiniDistance`,
 `collapse` `r bm_pkgs$collapse`.
@@ -781,6 +782,10 @@ R) and `GiniDistance::gmd` by **`r gmd_gd_min`--`r gmd_gd_max`x** (both compiled
 > and link platform-specific libraries (Apple Accelerate, SLEEF). Pre-built CRAN binaries
 > use portable settings and may not include these optimizations. Parallelism thresholds
 > are derived from the detected per-core L2 cache size at runtime on all platforms.
+> For maximum performance, add the following to `~/.R/Makevars` before installing:
+> ```
+> CXXFLAGS = -O3 -march=native -mtune=native
+> ```
 
 ## Numerical equivalence
 
