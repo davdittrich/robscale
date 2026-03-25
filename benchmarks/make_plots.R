@@ -73,8 +73,8 @@ plot_benchmarks <- function(analyzed) {
     scale_y_continuous(labels = label_number(suffix = "x")) +
     expand_limits(y = 0) +
     labs(
-      title = "Panel C: New Scale Estimators",
-      subtitle = "robscale vs existing R implementations (with 95% BCa confidence bands)",
+      title = "Panel C: Single-Pass Scale Estimators",
+      subtitle = "robscale vs base R and CRAN implementations (with 95% BCa confidence bands)",
       x = "Sample Size (n)",
       y = "Median Speedup Factor",
       color = "Comparison",
