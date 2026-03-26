@@ -157,9 +157,10 @@ private:
           }
         }
         if (phys > 0) num_physical_cores = phys;
-        l2_per_core = (num_physical_cores > 0)
-                        ? l2_cache_size / num_physical_cores
-                        : l2_cache_size;
+        // Each RelationCache entry covers one sharing unit (typically per-core
+        // L2), so Cache.Size is already the per-core value.  Do not divide by
+        // num_physical_cores — that would give a fraction of the per-core size.
+        l2_per_core = l2_cache_size;
       }
     }
 #endif

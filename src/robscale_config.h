@@ -97,7 +97,7 @@
  * to a single .so — internal functions are never interposed at runtime.
  * hidden visibility lets the linker emit direct calls.
  */
-#if defined(__GNUC__) || defined(__clang__)
+#if (defined(__GNUC__) || defined(__clang__)) && !defined(_WIN32)
 #  define ROBSCALE_HIDDEN __attribute__((visibility("hidden")))
 #else
 #  define ROBSCALE_HIDDEN
