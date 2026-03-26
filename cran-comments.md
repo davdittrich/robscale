@@ -19,14 +19,14 @@
 
 ## Test environments
 
-- Arch Linux (x86_64), R 4.5.x, GCC 15.1.0
-- macOS (ARM64), R 4.5.x, Apple Clang (rhub)
-- Fedora Linux (x86_64), R-devel, GCC (rhub)
-- Windows (x86_64), R-devel (rhub)
+- Arch Linux (x86_64), R 4.5.x, GCC 15.1.0 (local)
+- Fedora Linux (x86_64), R-devel, GCC (rhub): **0 errors, 0 warnings, 0 notes**
+- macOS ARM64, R-devel 4.6.0-r89710, Apple Clang 17 (rhub): see note below
+- Windows (x86_64), R-devel (rhub): see note below
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 1 note (local and Linux rhub)
 
 - **Non-portable compilation flag** (`-march=native`): Used only when the
   building user's compiler supports it, detected at configure time. CRAN
@@ -36,6 +36,19 @@
 
 - **GNU make**: `SystemRequirements` field lists GNU make (needed for
   `$(shell)` in Makevars). Already declared in DESCRIPTION.
+
+## rhub platform notes
+
+**macOS ARM64 (R-devel 4.6.0-r89710)**: The package compiled, installed, and
+loaded successfully (all `** testing if installed package can be loaded`
+steps passed). The run failed at `* creating tarball` with
+`Error in if (custom.bin) { : argument is of length zero` — an error in
+R-devel's staged installation infrastructure, not in the package. The same
+step succeeds on R-release and R-oldrel.
+
+**Windows (R-devel)**: The `setup-deps` step failed with a network connection
+error (`cannot open the connection`) while downloading pak dependencies — a
+transient infrastructure timeout unrelated to the package.
 
 ## DOI URLs
 

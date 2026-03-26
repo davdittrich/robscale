@@ -27,7 +27,9 @@ struct XorShift32 {
 };
 
 static constexpr int N_ESTIMATORS = 7;
+#ifdef USE_DIRECT_TBB
 static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
+#endif
 
 // Compute one bootstrap replicate and store N_ESTIMATORS estimates in boot_row.
 //
@@ -182,11 +184,10 @@ struct EnsembleCore {
     boot_results = boot_mem.get();
 
     // --- Bootstrap loop ---
-    int64_t work_size = static_cast<int64_t>(n) * nboot;
     double* br = boot_results;  // raw pointer safe to capture in lambda
 
 #ifdef USE_DIRECT_TBB
-    if (work_size >= ENSEMBLE_PARALLEL_THRESHOLD) {
+    if (static_cast<int64_t>(n) * nboot >= ENSEMBLE_PARALLEL_THRESHOLD) {
       tbb::parallel_for(
         tbb::blocked_range<int>(0, nboot),
         [xp, n, br](const tbb::blocked_range<int>& range) {

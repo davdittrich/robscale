@@ -153,8 +153,6 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
   const bool use_fused = (n >= 4) &&  // OPT-RL1: lowered from n>=8 to n>=4
     (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
      robscale::qnsn::SIMDLevel::AVX2);
-#else
-  const bool use_fused = false;
 #endif
 
   for (int k = 0; k < maxit; ++k) {
