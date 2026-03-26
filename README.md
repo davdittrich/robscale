@@ -27,7 +27,8 @@ and `mad_scaled` beat their base R counterparts by **2.6–14.6x**,
 
 Speed comes from C++17 kernels with platform-specific SIMD
 vectorization, $`O(n)`$ selection algorithms, stack-allocated memory
-arenas, and Intel TBB parallelism for large datasets.
+arenas, Aitken $`\Delta^2`$ acceleration for M-estimator convergence, and
+Intel TBB parallelism for large datasets.
 
 ## Installation
 
@@ -55,9 +56,10 @@ gmd(x)                               # 98% ARE, 29.3% breakdown
 qn(x)                                # 82.3% ARE, 50% breakdown
 mad_scaled(x)                        # 36.8% ARE, 50% breakdown
 
-# Confidence intervals
-qn(x, ci = TRUE)                     # point estimate + 95% CI
-gmd(x, ci = TRUE, level = 0.99)      # 99% CI
+# Confidence intervals --- analytical (default) or bootstrap
+qn(x, ci = TRUE)                                               # analytical 95% CI
+scale_robust(x, method = "qn", ci = TRUE, boot_method = "bca") # BCa bootstrap CI
+gmd(x, ci = TRUE, level = 0.99)                                # 99% analytical CI
 
 # Outlier resistance
 x[5] <- 100                          # recording error
@@ -122,7 +124,7 @@ intervals.
 Computes the sample standard deviation corrected by $`c_4(n)`$ to remove
 the small-sample bias of the square-root estimator:
 
-$$\hat\sigma = \frac{s}{c_4(n)} = \frac{s}{\sqrt{2/(n{-}1)} \cdot \Gamma(n/2) / \Gamma((n{-}1)/2)}$$
+$$`\hat\sigma = \frac{s}{c_4(n)} = \frac{s}{\sqrt{2/(n{-}1)} \cdot \Gamma(n/2) / \Gamma((n{-}1)/2)}`$$
 
 where $`s`$ is the usual sample standard deviation. Uses Welford’s online
 algorithm for numerically stable variance computation, avoiding
@@ -139,7 +141,7 @@ sd_c4(c(1, 2, 3, 5, 7, 8))
 Computes the Gini mean difference (Gini, 1912), scaled by a consistency
 constant for asymptotic normality under the Gaussian model:
 
-$$\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}$$
+$$`\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)}`$$
 
 where $`x_{(1)} \le \ldots \le x_{(n)}`$ are the order statistics and
 $`C = \sqrt{\pi}/2 \approx 0.8862`$. The computation requires a full sort
@@ -160,7 +162,7 @@ gmd(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw (unscaled)
 Computes the mean absolute deviation from the median, scaled by a
 consistency constant for asymptotic normality under the Gaussian model:
 
-$$\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|$$
+$$`\text{ADM}(x) = C \cdot \frac{1}{n}\sum_{i=1}^{n} |x_i - \text{med}(x)|`$$
 
 where $`C = \sqrt{\pi/2} \approx 1.2533`$ (Nair, 1947). When `center` is
 supplied, it replaces the median. The ADM achieves **88.3% ARE** but
@@ -197,7 +199,7 @@ M-estimator for scale using multiplicative iteration with the rho
 function—the square of the logistic psi (Rousseeuw & Verboven 2002, Eq.
 27):
 
-$$S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\frac{x_i - T}{c \cdot S^{(k-1)}}\right)}$$
+$$`S^{(k)} = S^{(k-1)} \cdot \sqrt{2 \cdot \frac{1}{n}\sum \psi_{\log}^2\!\left(\frac{x_i - T}{c \cdot S^{(k-1)}}\right)}`$$
 
 where $`c = 0.37394112142347236`$ and $`T = \text{median}(x)`$ is held
 fixed. Starting value: $`S^{(0)} = \text{MAD}(x)`$.
@@ -254,7 +256,7 @@ sn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 Computes the interquartile range scaled by a consistency constant for
 asymptotic normality under the Gaussian model:
 
-$$\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})$$
+$$`\text{IQR}_s(x) = C \cdot (Q_{0.75} - Q_{0.25})`$$
 
 where $`Q_p`$ denotes the Type 7 quantile (R default) and
 $`C = 1/(\Phi^{-1}(0.75) - \Phi^{-1}(0.25)) \approx 0.7413`$ (Bickel &
@@ -274,7 +276,7 @@ iqr_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw IQR
 Computes the median absolute deviation from the median, scaled by a
 consistency constant for asymptotic normality:
 
-$$\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|$$
+$$`\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|`$$
 
 where $`C = 1/\Phi^{-1}(3/4) \approx 1.4826`$. Unlike `stats::mad()`, this
 implementation uses adaptive $`O(n)`$ selection (Floyd–Rivest below a
@@ -287,43 +289,61 @@ mad_scaled(c(1, 2, 3, 5, 7, 8))
 mad_scaled(c(1, 2, 3, 5, 7, 8), constant = 1)   # raw MAD
 ```
 
-### `scale_robust(x, method = c("ensemble", "gmd", "sd", "mad", "iqr", "sn", "qn", "robScale"), auto_switch = TRUE, threshold = 20L, n_boot = 200L, na.rm = FALSE, ci = FALSE, level = 0.95, boot_method = c("auto", "bca", "percentile", "parametric"))`
+### `scale_robust(x, method = c("ensemble", "gmd", "sd", "mad", "iqr", "sn", "qn", "robScale"), auto_switch = TRUE, threshold = 20L, n_boot = 200L, na.rm = FALSE, ci = FALSE, level = 0.95, boot_method = c("auto", "analytical", "bca", "percentile", "parametric"))`
 
 Unified dispatcher for robust scale estimation. Operates in three modes:
 
-1.  **Ensemble** (default, `method = "ensemble"`): variance-weighted
-    combination of all 7 scale estimators via bootstrap resampling.
-2.  **Auto-switch** (`auto_switch = TRUE`, default): when $`n \ge`$
-    `threshold` (default 20), returns `gmd(x)` directly—the most
-    efficient robust estimator at negligible cost.
+1.  **Ensemble** (`method = "ensemble"`, $`n <`$ `threshold`):
+    variance-weighted combination of all 7 scale estimators via
+    bootstrap resampling.
+2.  **Auto-switched GMD** (`method = "ensemble"`, `auto_switch = TRUE`,
+    $`n \ge`$ `threshold`): returns `gmd(x)` directly. Named methods (e.g.
+    `method = "qn"`) are never intercepted by `auto_switch`—they always
+    dispatch their own estimator regardless of $`n`$.
 3.  **Explicit method**: dispatches to a specific estimator by name.
 
-When `ci = TRUE`, the ensemble and auto-switch modes use bootstrap
-confidence intervals (BCa by default); explicit single-method dispatch
-uses analytical intervals based on each estimator’s asymptotic relative
-efficiency.
+When `ci = TRUE`: the ensemble returns a `robscale_ensemble_ci` object
+with a bootstrap CI (`boot_method = "auto"` selects BCa for $`n \le 200`$,
+percentile for $`n \le 5000`$, parametric otherwise). For named methods,
+`boot_method = "auto"` or `"analytical"` returns an analytical interval
+(chi-squared for `"sd"`, ARE-based normal approximation for all others);
+`boot_method = "bca"`, `"percentile"`, or `"parametric"` returns a
+bootstrap CI via `n_boot` resamples. `"analytical"` is not supported for
+`method = "ensemble"`.
 
 ``` r
-scale_robust(c(1, 2, 3, 5, 7, 8))           # ensemble (n < 20)
-scale_robust(rnorm(50))                       # auto-switches to gmd
-scale_robust(rnorm(50), auto_switch = FALSE)  # forces ensemble
-scale_robust(rnorm(50), method = "qn")        # explicit Qn
-scale_robust(c(1, 2, 3, 5, 7, 8), ci = TRUE) # ensemble + bootstrap CI
+scale_robust(c(1, 2, 3, 5, 7, 8))                               # ensemble (n < 20)
+scale_robust(rnorm(50))                                          # auto-switches to gmd (n >= 20)
+scale_robust(rnorm(50), auto_switch = FALSE)                     # forces ensemble at any n
+scale_robust(rnorm(50), method = "qn")                           # explicit Qn (not intercepted by auto_switch)
+scale_robust(c(1, 2, 3, 5, 7, 8), ci = TRUE)                    # ensemble + bootstrap CI
+scale_robust(rnorm(50), method = "qn", ci = TRUE)                # Qn + analytical CI (default)
+scale_robust(rnorm(50), method = "qn", ci = TRUE,
+             boot_method = "bca")                                # Qn + BCa bootstrap CI
 ```
 
 ```mermaid
 flowchart TD
-    A["scale_robust(x, method, auto_switch, threshold, n_boot)"] --> B{n < 2?}
+    A["scale_robust(x, method, auto_switch, threshold,\nn_boot, ci, boot_method)"] --> B{n < 2?}
     B -- Yes --> C([Return NA])
-    B -- No --> D{auto_switch AND n >= threshold?}
-    D -- Yes --> E(["Return gmd(x)"])
+    B -- No --> D{"method='ensemble' AND\nauto_switch AND n >= threshold?"}
+    D -- Yes --> E["gmd() direct"]
+    E --> ECI{ci?}
+    ECI -- No --> EC([Return scalar])
+    ECI -- Yes --> ECA([Return robscale_ci, analytical])
     D -- No --> F{method?}
     F -- ensemble --> G["Bootstrap n_boot resamples"]
     G --> H["Compute all 7 estimators per resample"]
     H --> I["Inverse-variance weights from bootstrap variances"]
-    I --> J["Weighted sum of estimators on original data"]
-    J --> K([Return weighted estimate])
-    F -- "gmd/sd/mad/iqr/sn/qn/robScale" --> L(["Return method(x)"])
+    I --> J["Weighted sum on original data"]
+    J --> KCI{ci?}
+    KCI -- No --> K([Return scalar])
+    KCI -- Yes --> KA([Return robscale_ensemble_ci, bootstrap])
+    F -- "gmd/sd/mad/iqr/sn/qn/robScale" --> L["Compute estimator"]
+    L --> MCI{ci?}
+    MCI -- No --> MN([Return scalar])
+    MCI -- "Yes, auto/analytical" --> MA([Return robscale_ci, analytical])
+    MCI -- "Yes, bca/percentile/parametric" --> MB([Return robscale_ci, bootstrap])
 ```
 
 The ensemble combines: `sd_c4`, `gmd`, `mad_scaled`, `iqr_scaled`, `sn`,
@@ -417,10 +437,10 @@ how each estimator selects its algorithm tier at runtime.
 
 ```mermaid
 graph TD
-    SR["scale_robust() dispatcher"] --> ENS{Ensemble or single?}
-    ENS -- "n < threshold" --> BOOT["Bootstrap ensemble kernel<br/>(7 estimators x n_boot resamples)"]
-    ENS -- "n >= threshold" --> GMD_FAST["gmd() direct"]
-    ENS -- "explicit method" --> SINGLE["Single estimator dispatch"]
+    SR["scale_robust() dispatcher"] --> ENS{method?}
+    ENS -- "ensemble, n < threshold<br/>or auto_switch=FALSE" --> BOOT["Bootstrap ensemble kernel<br/>(7 estimators × n_boot resamples)"]
+    ENS -- "ensemble, auto_switch=TRUE,<br/>n >= threshold" --> GMD_FAST["gmd() direct"]
+    ENS -- "gmd/sd/mad/iqr/sn/qn/robScale" --> SINGLE["Single estimator dispatch"]
 
     subgraph "Scale Estimators"
         SD["sd_c4"]
