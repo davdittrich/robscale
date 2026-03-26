@@ -93,10 +93,6 @@ rob_loc_noaitken_impl <- function(x) {
     .Call(`_robscale_rob_loc_noaitken_impl`, x)
 }
 
-rob_loc_noaitken_iters <- function(x) {
-    .Call(`_robscale_rob_loc_noaitken_iters`, x)
-}
-
 rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
     .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
 }

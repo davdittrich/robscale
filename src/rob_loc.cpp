@@ -412,9 +412,11 @@ double rob_loc_noaitken_impl(Rcpp::NumericVector x) {
   return t;
 }
 
-// Returns the number of NR evaluations for plain NR (no Aitken).
-// Temporary diagnostic — removed at the end of WU-RL-A2 once test 0.45 passes.
-// [[Rcpp::export]]
+// Returns the number of NR evaluations for plain NR.
+// Finding (WU-RL-A2): robLoc uses quadratic NR (observed Hessian sum_dpsi = Σ sech²),
+// NOT linearly converging IRLS. Aitken was therefore not added to the production path.
+// This diagnostic confirms ≤ 4 evaluations on typical data.
+// Not exported (test 0.46 guards against re-export).
 int rob_loc_noaitken_iters(Rcpp::NumericVector x) {
   static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
   static const int    MAXIT = 80;

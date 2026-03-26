@@ -1,9 +1,14 @@
-## Tests 0.36–0.44 — robLoc Aitken Δ² acceleration (WU-RL-A1 correctness baseline)
+## Tests 0.36–0.47 — robLoc NR characterization and cleanup
 ##
 ## rob_loc_noaitken_impl: permanent correctness cross-check (like rob_loc_scalar_impl).
-## Tests 0.37–0.44 remain GREEN both before and after WU-RL-A2 (same fixed point).
+## Tests 0.37–0.44 cross-check robLoc() against the plain-NR reference implementation.
 ##
-## Tests 0.45–0.47 (TDD gate + removal guards) are added at the start of WU-RL-A2.
+## WU-RL-A2 finding: robLoc uses quadratic NR (observed Hessian sum_dpsi = Σ sech²),
+## not linearly converging IRLS. Aitken was investigated and found to provide no benefit
+## (ties or costs +1 evaluation). It was therefore not added to the production path.
+##
+## Tests 0.45: documents the finding — plain NR converges in ≤ 4 evaluations.
+## Tests 0.46–0.47: removal guards — confirm temporary iterator exports are absent.
 
 # ── Test 0.36 — diagnostic callability ───────────────────────────────────────
 test_that("0.36 rob_loc_noaitken_impl is callable", {
@@ -104,4 +109,18 @@ test_that("0.44 Aitken matches plain NR across 20 seeds, n=64", {
                  tolerance = 2 * sqrt(.Machine$double.eps),
                  info = paste("seed =", seed))
   }
+})
+
+# ── Tests 0.46–0.47 — removal guards ─────────────────────────────────────────
+# exists(..., envir=asNamespace("robscale"), inherits=FALSE) probes the namespace
+# environment directly — detects unexported symbols unlike getNamespaceExports().
+
+test_that("0.46 rob_loc_noaitken_iters is not exported from the namespace", {
+  expect_false(exists("rob_loc_noaitken_iters",
+                      envir = asNamespace("robscale"), inherits = FALSE))
+})
+
+test_that("0.47 rob_loc_aitken_iters was never added to the namespace", {
+  expect_false(exists("rob_loc_aitken_iters",
+                      envir = asNamespace("robscale"), inherits = FALSE))
 })
