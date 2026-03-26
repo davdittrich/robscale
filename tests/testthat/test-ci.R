@@ -78,7 +78,7 @@ test_that("print.robscale_ci produces output", {
   x <- rnorm(50)
   res <- sn(x, ci = TRUE)
   expect_output(print(res), "sn estimate:")
-  expect_output(print(res), "95% CI:")
+  expect_output(print(res), "95% CI")
 })
 
 test_that("analytical CI method names are correct", {

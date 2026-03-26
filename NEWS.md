@@ -1,3 +1,26 @@
+# robscale (development)
+
+## Bug fixes
+
+* `scale_robust(x, method = "qn")` with `n >= threshold` now correctly returns
+  the Qn estimator instead of silently returning `gmd(x)`. The `auto_switch`
+  mechanism now only applies to `method = "ensemble"`; named methods are always
+  dispatched as requested.
+
+## New features
+
+* `scale_robust(..., ci = TRUE)` now supports bootstrap confidence intervals for
+  individual named methods via `boot_method = "bca"`, `"percentile"`, or
+  `"parametric"`. The new C++ function `cpp_single_estimator_ci_bounds` runs
+  the bootstrap on the single requested estimator.
+
+* `boot_method = "analytical"` is now accepted explicitly by `scale_robust()`.
+  It selects the chi-squared interval for `sd` and the ARE-based normal
+  approximation for all other named methods.
+
+* `print.robscale_ci` now shows the CI method in the output header
+  (e.g., `95% CI (analytical): [0.6123, 1.1456]`).
+
 # robscale 0.5.2
 
 ## Portability

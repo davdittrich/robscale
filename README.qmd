@@ -576,7 +576,7 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 
 ## Performance architecture
 
-`robscale` achieves its speed gains through five cooperating mechanisms.
+`robscale` achieves its speed gains through six cooperating mechanisms.
 
 **SIMD vectorization.** The logistic psi function reduces to $\tanh(x/2)$, dispatched
 to the fastest available platform backend: Apple Accelerate (`vvtanh`) on macOS,
@@ -599,24 +599,30 @@ compute median and absolute deviations in-place on the same array, halving memor
 consumption and reducing cache pressure in the ensemble where multiple estimators
 share working memory.
 
-**Newton--Raphson convergence.** The M-estimators replace the scoring fixed-point
+**Iteration convergence.** The M-estimators replace the scoring fixed-point
 iteration (linear convergence, 6--8 iterations) with Newton--Raphson (quadratic
 convergence, ~3 iterations). Because $\tanh$ values are already available from the
 numerator, the denominator $\sum(1 - \psi_i^2)$ requires only squaring and
 subtraction---no additional transcendental calls. Loop-invariant quantities
 (`inv_s`, `half_inv_s`, `inv_n`) are hoisted before the iteration; reciprocal
-constants are `constexpr`, replacing divisions with multiplications.
+constants are `constexpr`, replacing divisions with multiplications. Aitken
+$\Delta^2$ (Steffensen's method) extrapolates from successive iterates $(s_0, s_1,
+s_2)$ via $s_{\text{acc}} = s_2 - (s_2 - s_1)^2 / (s_2 - 2s_1 + s_0)$, reducing
+iterations by 30--50% at small $n$ and ~20% at large $n$; oscillating sequences
+fall back to geometric-mean bisection $\sqrt{s_1 s_2}$.
 
-**TBB parallelism.** The $Q_n$ and $S_n$ algorithms partition their inner loops across
-Intel TBB threads for $n$ above a runtime L2-derived threshold, scaling to all
-available cores. For the ensemble, `cpp_scale_ensemble` evaluates all $7 \times
+**Parallelism and radix sorting.** The $Q_n$ and $S_n$ algorithms partition their
+inner loops across Intel TBB threads for $n$ above a runtime L2-derived threshold,
+scaling to all available cores. `cpp_scale_ensemble` evaluates all $7 \times
 n_{\text{boot}}$ estimator calls in C++ without R overhead, sharing two pre-allocated
-work buffers per bootstrap replicate.
+work buffers per bootstrap replicate. Large-$n$ bootstrap resamples are sorted with
+`boost::spreadsort::float_sort` (radix sort, $O(n)$ average), replacing the
+$O(n \log n)$ comparison sort.
 
-**Compile-time.** Sorting-network entry points are instantiated once in
-`src/sort_net_inst.cpp` and suppressed elsewhere via `extern template`, reducing a
-cold 12-core build from approximately 300 s to 52 s. `sd_c4` uses Welford's one-pass
-algorithm for numerically stable variance computation.
+**Numerical stability and build.** `sd_c4` uses Welford's one-pass algorithm for
+numerically stable variance computation. Sorting-network entry points are instantiated
+once in `src/sort_net_inst.cpp` and suppressed elsewhere via `extern template`,
+reducing a cold 12-core build from approximately 300 s to 52 s.
 
 ## Architecture overview
 

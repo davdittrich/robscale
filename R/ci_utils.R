@@ -49,8 +49,10 @@
 print.robscale_ci <- function(x, digits = 4, ...) {
   cat(sprintf("%s estimate: %s\n", x$method,
               formatC(x$estimate, digits = digits, format = "f")))
-  cat(sprintf("%g%% CI: [%s, %s]\n",
+  bm <- if (!is.null(x$boot_method)) x$boot_method else "analytical"
+  cat(sprintf("%g%% CI (%s): [%s, %s]\n",
     x$level * 100,
+    bm,
     formatC(x$ci[["lower"]], digits = digits, format = "f"),
     formatC(x$ci[["upper"]], digits = digits, format = "f")))
   invisible(x)

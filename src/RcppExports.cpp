@@ -70,6 +70,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cpp_single_estimator_ci_bounds
+Rcpp::List cpp_single_estimator_ci_bounds(Rcpp::NumericVector x, double est, int estimator_id, int n_boot, double level, int method_code);
+RcppExport SEXP _robscale_cpp_single_estimator_ci_bounds(SEXP xSEXP, SEXP estSEXP, SEXP estimator_idSEXP, SEXP n_bootSEXP, SEXP levelSEXP, SEXP method_codeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type est(estSEXP);
+    Rcpp::traits::input_parameter< int >::type estimator_id(estimator_idSEXP);
+    Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
+    Rcpp::traits::input_parameter< double >::type level(levelSEXP);
+    Rcpp::traits::input_parameter< int >::type method_code(method_codeSEXP);
+    rcpp_result_gen = Rcpp::wrap(cpp_single_estimator_ci_bounds(x, est, estimator_id, n_boot, level, method_code));
+    return rcpp_result_gen;
+END_RCPP
+}
 // cpp_scale_ensemble
 double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot);
 RcppExport SEXP _robscale_cpp_scale_ensemble(SEXP xSEXP, SEXP n_bootSEXP) {
@@ -336,6 +352,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_rob_scale_diag_impl", (DL_FUNC) &_robscale_rob_scale_diag_impl, 3},
     {"_robscale_bench_median_net_impl", (DL_FUNC) &_robscale_bench_median_net_impl, 1},
     {"_robscale_bench_fr_select_impl", (DL_FUNC) &_robscale_bench_fr_select_impl, 1},
+    {"_robscale_cpp_single_estimator_ci_bounds", (DL_FUNC) &_robscale_cpp_single_estimator_ci_bounds, 6},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
     {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},
     {"_robscale_C_sn_sorted", (DL_FUNC) &_robscale_C_sn_sorted, 1},

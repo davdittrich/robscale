@@ -258,6 +258,222 @@ struct EnsembleCore {
   }
 };
 
+// Bootstrap CI for a single named estimator.
+//
+// Runs n_boot resamples, computing only the requested estimator per replicate
+// (avoids the 7x overhead of cpp_scale_ensemble_ci for individual methods).
+//
+// Parameters:
+//   x            — data vector (validated: no NAs, n >= 2)
+//   est          — pre-computed point estimate on original data
+//   estimator_id — 0=gmd, 1=sd, 2=mad, 3=iqr, 4=sn, 5=qn, 6=robScale
+//   n_boot       — bootstrap replicates
+//   level        — confidence level (e.g. 0.95)
+//   method_code  — BCa=0, percentile=1, parametric=2
+//                  BCa falls back to percentile when z0 or adjusted quantiles
+//                  are non-finite.
+//
+// Returns List with ci_lower and ci_upper.
+// [[Rcpp::export]]
+Rcpp::List cpp_single_estimator_ci_bounds(
+    Rcpp::NumericVector x, double est, int estimator_id,
+    int n_boot, double level, int method_code) {
+
+  using Rcpp::Named;
+  int n = x.size();
+
+  if (n < 2 || !std::isfinite(est)) {
+    return Rcpp::List::create(
+      Named("ci_lower") = NA_REAL,
+      Named("ci_upper") = NA_REAL
+    );
+  }
+
+  const double* xp = x.begin();
+  if (n_boot < 2) n_boot = 2;
+
+  // --- Bootstrap loop ---
+  std::vector<double> boot_vals(static_cast<size_t>(n_boot));
+  {
+    std::unique_ptr<double[]> ws(new double[3 * static_cast<size_t>(n)]);
+    double* resample = ws.get();
+    double* work1    = resample + n;
+    double* work2    = work1   + n;
+
+    for (int r = 0; r < n_boot; ++r) {
+      XorShift32 rng(static_cast<uint32_t>(r + 12345));
+      for (int i = 0; i < n; ++i)
+        resample[i] = xp[rng.next() % static_cast<uint32_t>(n)];
+
+      if (n <= 16) {
+        robscale::small_sort(resample, n);
+      } else if (static_cast<size_t>(n) <= ROBSCALE_SORT_BOOST_THRESHOLD) {
+        std::sort(resample, resample + n);
+      } else {
+        boost::sort::spreadsort::float_sort(resample, resample + n);
+      }
+
+      double val = 0.0;
+      switch (estimator_id) {
+        case 0: {  // gmd
+          const double gmd_scale = robscale::GMD_CONSISTENCY * 2.0
+            / (static_cast<double>(n) * (n - 1));
+          double sum = 0.0;
+          for (int i = 0; i < n; ++i)
+            sum += (2.0 * (i + 1) - n - 1.0) * resample[i];
+          val = gmd_scale * sum;
+          break;
+        }
+        case 1:  // sd_c4
+          val = robscale::internal::sd_c4(resample, n);
+          break;
+        case 2: {  // mad_scaled
+          double med = robscale::median_sorted(resample, static_cast<size_t>(n));
+          val = (n < 2) ? 0.0
+              : robscale::MAD_CONSISTENCY
+                * robscale::vshaped_mad(resample, n, med, work2);
+          break;
+        }
+        case 3: {  // iqr_scaled
+          double h1 = (n - 1.0) * 0.25;
+          int    lo1 = static_cast<int>(h1);
+          double q1  = resample[lo1];
+          double f1  = h1 - lo1;
+          if (f1 > 0.0 && lo1 + 1 < n) q1 += f1 * (resample[lo1 + 1] - q1);
+          double h3 = (n - 1.0) * 0.75;
+          int    lo3 = static_cast<int>(h3);
+          double q3  = resample[lo3];
+          double f3  = h3 - lo3;
+          if (f3 > 0.0 && lo3 + 1 < n) q3 += f3 * (resample[lo3 + 1] - q3);
+          val = (q3 - q1) * robscale::IQR_CONSISTENCY;
+          break;
+        }
+        case 4:  // sn
+          val = robscale::internal::sn_sorted(resample, n, work1);
+          break;
+        case 5: {  // qn
+          using WS = robscale::qnsn::QnWorkspace;
+          static constexpr size_t QN_WS_THRESHOLD = 2048;
+          const size_t un = static_cast<size_t>(n);
+          WS  qn_ws{};
+          WS* qn_ws_ptr = nullptr;
+          if (un <= QN_WS_THRESHOLD) {
+            qn_ws.work    = reinterpret_cast<float*>(work1);
+            qn_ws.iweight = reinterpret_cast<int32_t*>(work1) + un;
+            qn_ws.left    = reinterpret_cast<int32_t*>(work2);
+            qn_ws.right   = reinterpret_cast<int32_t*>(work2) + un;
+            qn_ws_ptr = &qn_ws;
+          }
+          val = robscale::internal::qn_sorted(resample, n, qn_ws_ptr);
+          break;
+        }
+        default:  // robScale (6)
+          val = robscale::internal::rob_scale_sorted(
+            resample, static_cast<size_t>(n), work1);
+          break;
+      }
+      boot_vals[r] = val;
+    }
+  }
+
+  // --- CI computation ---
+  double ci_lower = NA_REAL, ci_upper = NA_REAL;
+
+  if (method_code == 0) {
+    // ========================= BCa =========================
+    // Step 1: bias-correction z0
+    int below = 0;
+    for (int r = 0; r < n_boot; ++r)
+      if (boot_vals[r] < est) ++below;
+    double prop = static_cast<double>(below) / n_boot;
+    prop = std::max(0.5 / n_boot, std::min(1.0 - 0.5 / n_boot, prop));
+    double z0 = R::qnorm(prop, 0.0, 1.0, 1, 0);
+
+    bool bca_ok = std::isfinite(z0);
+    if (bca_ok) {
+      // Step 2: jackknife acceleration
+      std::unique_ptr<double[]> loo(new double[n - 1]);
+      std::unique_ptr<double[]> jw1(new double[n]);
+      std::unique_ptr<double[]> jw2(new double[n]);
+      std::vector<double> jv(static_cast<size_t>(n));
+      for (int i = 0; i < n; ++i) {
+        int k = 0;
+        for (int ii = 0; ii < n; ++ii)
+          if (ii != i) loo[k++] = xp[ii];
+        double res[N_ESTIMATORS];
+        compute_all_estimators(loo.get(), n - 1, res, jw1.get(), jw2.get());
+        jv[i] = res[estimator_id];
+      }
+      double jack_mean = 0.0;
+      for (int i = 0; i < n; ++i) jack_mean += jv[i];
+      jack_mean /= n;
+      double sum2 = 0.0, sum3 = 0.0;
+      for (int i = 0; i < n; ++i) {
+        double L  = jack_mean - jv[i];
+        double L2 = L * L;
+        sum2 += L2;
+        sum3 += L2 * L;
+      }
+      double acc = (sum2 > 0.0) ? sum3 / (6.0 * std::pow(sum2, 1.5)) : 0.0;
+
+      // Step 3: adjusted quantile indices
+      double alpha  = 1.0 - level;
+      double z_lo   = R::qnorm(alpha / 2.0,       0.0, 1.0, 1, 0);
+      double z_hi   = R::qnorm(1.0 - alpha / 2.0, 0.0, 1.0, 1, 0);
+      double num_lo = z0 + z_lo;
+      double num_hi = z0 + z_hi;
+      double a1 = R::pnorm(z0 + num_lo / (1.0 - acc * num_lo), 0.0, 1.0, 1, 0);
+      double a2 = R::pnorm(z0 + num_hi / (1.0 - acc * num_hi), 0.0, 1.0, 1, 0);
+
+      if (std::isfinite(a1) && std::isfinite(a2)) {
+        a1 = std::max(0.5 / n_boot, std::min(1.0 - 0.5 / n_boot, a1));
+        a2 = std::max(0.5 / n_boot, std::min(1.0 - 0.5 / n_boot, a2));
+        std::sort(boot_vals.begin(), boot_vals.end());
+        int idx1 = std::max(0, std::min(n_boot - 1,
+                     static_cast<int>(std::floor(a1 * n_boot))));
+        int idx2 = std::max(0, std::min(n_boot - 1,
+                     static_cast<int>(std::floor(a2 * n_boot))));
+        ci_lower = boot_vals[idx1];
+        ci_upper = boot_vals[idx2];
+      } else {
+        bca_ok = false;
+      }
+    }
+    if (!bca_ok) method_code = 1;  // fall back to percentile
+  }
+
+  if (method_code == 1) {
+    // ====================== Percentile ======================
+    std::sort(boot_vals.begin(), boot_vals.end());
+    double alpha  = 1.0 - level;
+    int lo_idx = std::max(0,
+      static_cast<int>(std::floor(alpha / 2.0 * n_boot)));
+    int hi_idx = std::min(n_boot - 1,
+      static_cast<int>(std::floor((1.0 - alpha / 2.0) * n_boot)));
+    ci_lower = boot_vals[lo_idx];
+    ci_upper = boot_vals[hi_idx];
+  } else if (method_code == 2) {
+    // ====================== Parametric ======================
+    double mean_b = 0.0;
+    for (int r = 0; r < n_boot; ++r) mean_b += boot_vals[r];
+    mean_b /= n_boot;
+    double sq = 0.0;
+    for (int r = 0; r < n_boot; ++r) {
+      double d = boot_vals[r] - mean_b;
+      sq += d * d;
+    }
+    double sd_b = (n_boot > 1) ? std::sqrt(sq / (n_boot - 1.0)) : 0.0;
+    double z = R::qnorm(1.0 - (1.0 - level) / 2.0, 0.0, 1.0, 1, 0);
+    ci_lower = est - z * sd_b;
+    ci_upper = est + z * sd_b;
+  }
+
+  return Rcpp::List::create(
+    Named("ci_lower") = ci_lower,
+    Named("ci_upper") = ci_upper
+  );
+}
+
 // [[Rcpp::export]]
 double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   int n = x.size();

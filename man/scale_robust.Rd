@@ -13,7 +13,7 @@ scale_robust(
   na.rm = FALSE,
   ci = FALSE,
   level = 0.95,
-  boot_method = c("auto", "bca", "percentile", "parametric")
+  boot_method = c("auto", "bca", "percentile", "parametric", "analytical")
 )
 }
 \arguments{
@@ -24,28 +24,34 @@ Options: \code{"ensemble"} (default), \code{"gmd"}, \code{"sd"},
 \code{"mad"}, \code{"iqr"}, \code{"sn"}, \code{"qn"}, \code{"robScale"}.}
 
 \item{auto_switch}{Logical. If \code{TRUE} (default), automatically uses
-GMD for \code{n >= threshold}.}
+GMD when \code{method = "ensemble"} and \code{n >= threshold}. Has no
+effect on named methods: \code{method = "qn"} always returns the Qn
+estimator regardless of sample size.}
 
-\item{threshold}{Integer. Sample size at which the switch to GMD occurs.
-Default: 20 (research-backed; see \sQuote{Details}).}
+\item{threshold}{Integer. Sample size at which the ensemble auto-switches
+to GMD. Default: 20 (research-backed; see \sQuote{Details}).}
 
 \item{n_boot}{Integer. Number of bootstrap replicates for the ensemble
-weighting. Default: 200.}
+weighting or bootstrap CI. Default: 200.}
 
 \item{na.rm}{Logical. If \code{TRUE}, \code{NA} values are stripped from
 \code{x} before computation. Default: \code{FALSE}.}
 
 \item{ci}{Logical. If \code{TRUE}, return confidence intervals alongside
-the point estimate. Single methods yield a \code{"robscale_ci"} object
-with analytical CIs; the ensemble yields a \code{"robscale_ensemble_ci"}
-object with both analytical and bootstrap CIs. Default: \code{FALSE}.}
+the point estimate. Single methods yield a \code{"robscale_ci"} object;
+the ensemble yields a \code{"robscale_ensemble_ci"} object. Default:
+\code{FALSE}.}
 
 \item{level}{Confidence level for the interval (default 0.95).}
 
-\item{boot_method}{Bootstrap CI method for the ensemble. \code{"auto"}
-(default) selects BCa for n \eqn{\le} 200, percentile for
-n \eqn{\le} 5000, and parametric otherwise. Override with \code{"bca"},
-\code{"percentile"}, or \code{"parametric"}.}
+\item{boot_method}{CI method. For single named methods: \code{"auto"} and
+\code{"analytical"} (default) return the closed-form ARE-based interval
+(\code{sd} uses chi-squared; all others use the normal approximation).
+\code{"bca"}, \code{"percentile"}, and \code{"parametric"} return a
+bootstrap CI via \code{n_boot} resamples. For the ensemble: \code{"auto"}
+selects BCa for n \eqn{\le} 200, percentile for n \eqn{\le} 5000, and
+parametric otherwise. \code{"analytical"} is not supported for
+\code{method = "ensemble"}.}
 }
 \value{
 If \code{ci = FALSE} (default), a single numeric value: the scale
@@ -80,31 +86,41 @@ contribution. Estimators with lower sampling variance receive higher
 weight.
 
 \strong{Automatic switching.}
-When \code{auto_switch = TRUE} and \code{n >= threshold}, the function
-returns \code{\link{gmd}(x)} directly. The GMD achieves 98\% asymptotic
-relative efficiency at the Gaussian while being computationally cheaper
-than the ensemble, making it the optimal choice for moderate-to-large
-samples.
+When \code{auto_switch = TRUE} and \code{method = "ensemble"} and
+\code{n >= threshold}, the function returns \code{\link{gmd}(x)} directly.
+The GMD achieves 98\% asymptotic relative efficiency at the Gaussian while
+being computationally cheaper than the ensemble. Named methods (e.g.\
+\code{method = "qn"}) are always dispatched as requested; \code{auto_switch}
+never overrides an explicit method choice.
 
 \strong{Individual methods.}
-When a specific method is requested, \code{scale_robust} dispatches to the
-corresponding function with default parameters.
+When a specific method is requested, \code{scale_robust} bypasses the
+ensemble and calls the corresponding C++ entry point directly. With
+\code{ci = TRUE}, the default \code{boot_method = "auto"} returns the
+analytical interval: chi-squared for \code{"sd"}, ARE-based normal
+approximation for all others. Pass \code{boot_method = "bca"},
+\code{"percentile"}, or \code{"parametric"} to obtain a bootstrap CI
+instead.
 }
 \examples{
 x <- c(1, 2, 3, 5, 7, 8)
 scale_robust(x)                          # ensemble (n < 20)
-scale_robust(x, method = "qn")           # specific method
+scale_robust(x, method = "qn")           # specific method (always qn)
 
 set.seed(42)
 y <- rnorm(50)
-scale_robust(y)                          # auto-switches to GMD (n >= 20)
+scale_robust(y)                          # ensemble auto-switches to GMD
+scale_robust(y, method = "qn")           # qn regardless of n
 scale_robust(y, auto_switch = FALSE)     # forces ensemble
+
+# Analytical CI for a named method (default)
+scale_robust(x, method = "sn", ci = TRUE)
+
+# Bootstrap CI for a named method
+scale_robust(x, method = "qn", ci = TRUE, boot_method = "percentile")
 
 # Ensemble with bootstrap CIs
 scale_robust(x, ci = TRUE)
-
-# Single-method analytical CI
-scale_robust(x, method = "sn", ci = TRUE)
 
 }
 \seealso{

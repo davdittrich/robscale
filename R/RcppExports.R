@@ -21,6 +21,10 @@ bench_fr_select_impl <- function(x) {
     .Call(`_robscale_bench_fr_select_impl`, x)
 }
 
+cpp_single_estimator_ci_bounds <- function(x, est, estimator_id, n_boot, level, method_code) {
+    .Call(`_robscale_cpp_single_estimator_ci_bounds`, x, est, estimator_id, n_boot, level, method_code)
+}
+
 cpp_scale_ensemble <- function(x, n_boot) {
     .Call(`_robscale_cpp_scale_ensemble`, x, n_boot)
 }

@@ -10,22 +10,28 @@
 #'   Options: \code{"ensemble"} (default), \code{"gmd"}, \code{"sd"},
 #'   \code{"mad"}, \code{"iqr"}, \code{"sn"}, \code{"qn"}, \code{"robScale"}.
 #' @param auto_switch Logical. If \code{TRUE} (default), automatically uses
-#'   GMD for \code{n >= threshold}.
-#' @param threshold Integer. Sample size at which the switch to GMD occurs.
-#'   Default: 20 (research-backed; see \sQuote{Details}).
+#'   GMD when \code{method = "ensemble"} and \code{n >= threshold}. Has no
+#'   effect on named methods: \code{method = "qn"} always returns the Qn
+#'   estimator regardless of sample size.
+#' @param threshold Integer. Sample size at which the ensemble auto-switches
+#'   to GMD. Default: 20 (research-backed; see \sQuote{Details}).
 #' @param n_boot Integer. Number of bootstrap replicates for the ensemble
-#'   weighting. Default: 200.
+#'   weighting or bootstrap CI. Default: 200.
 #' @param na.rm Logical. If \code{TRUE}, \code{NA} values are stripped from
 #'   \code{x} before computation. Default: \code{FALSE}.
 #' @param ci Logical. If \code{TRUE}, return confidence intervals alongside
-#'   the point estimate. Single methods yield a \code{"robscale_ci"} object
-#'   with analytical CIs; the ensemble yields a \code{"robscale_ensemble_ci"}
-#'   object with both analytical and bootstrap CIs. Default: \code{FALSE}.
+#'   the point estimate. Single methods yield a \code{"robscale_ci"} object;
+#'   the ensemble yields a \code{"robscale_ensemble_ci"} object. Default:
+#'   \code{FALSE}.
 #' @param level Confidence level for the interval (default 0.95).
-#' @param boot_method Bootstrap CI method for the ensemble. \code{"auto"}
-#'   (default) selects BCa for n \eqn{\le} 200, percentile for
-#'   n \eqn{\le} 5000, and parametric otherwise. Override with \code{"bca"},
-#'   \code{"percentile"}, or \code{"parametric"}.
+#' @param boot_method CI method. For single named methods: \code{"auto"} and
+#'   \code{"analytical"} (default) return the closed-form ARE-based interval
+#'   (\code{sd} uses chi-squared; all others use the normal approximation).
+#'   \code{"bca"}, \code{"percentile"}, and \code{"parametric"} return a
+#'   bootstrap CI via \code{n_boot} resamples. For the ensemble: \code{"auto"}
+#'   selects BCa for n \eqn{\le} 200, percentile for n \eqn{\le} 5000, and
+#'   parametric otherwise. \code{"analytical"} is not supported for
+#'   \code{method = "ensemble"}.
 #'
 #' @details
 #' \strong{Ensemble method.}
@@ -46,15 +52,21 @@
 #' weight.
 #'
 #' \strong{Automatic switching.}
-#' When \code{auto_switch = TRUE} and \code{n >= threshold}, the function
-#' returns \code{\link{gmd}(x)} directly. The GMD achieves 98\% asymptotic
-#' relative efficiency at the Gaussian while being computationally cheaper
-#' than the ensemble, making it the optimal choice for moderate-to-large
-#' samples.
+#' When \code{auto_switch = TRUE} and \code{method = "ensemble"} and
+#' \code{n >= threshold}, the function returns \code{\link{gmd}(x)} directly.
+#' The GMD achieves 98\% asymptotic relative efficiency at the Gaussian while
+#' being computationally cheaper than the ensemble. Named methods (e.g.\
+#' \code{method = "qn"}) are always dispatched as requested; \code{auto_switch}
+#' never overrides an explicit method choice.
 #'
 #' \strong{Individual methods.}
-#' When a specific method is requested, \code{scale_robust} dispatches to the
-#' corresponding function with default parameters.
+#' When a specific method is requested, \code{scale_robust} bypasses the
+#' ensemble and calls the corresponding C++ entry point directly. With
+#' \code{ci = TRUE}, the default \code{boot_method = "auto"} returns the
+#' analytical interval: chi-squared for \code{"sd"}, ARE-based normal
+#' approximation for all others. Pass \code{boot_method = "bca"},
+#' \code{"percentile"}, or \code{"parametric"} to obtain a bootstrap CI
+#' instead.
 #'
 #' @return If \code{ci = FALSE} (default), a single numeric value: the scale
 #'   estimate (\code{NA} when \code{n < 2}). If \code{ci = TRUE} with a single
@@ -72,18 +84,22 @@
 #' @examples
 #' x <- c(1, 2, 3, 5, 7, 8)
 #' scale_robust(x)                          # ensemble (n < 20)
-#' scale_robust(x, method = "qn")           # specific method
+#' scale_robust(x, method = "qn")           # specific method (always qn)
 #'
 #' set.seed(42)
 #' y <- rnorm(50)
-#' scale_robust(y)                          # auto-switches to GMD (n >= 20)
+#' scale_robust(y)                          # ensemble auto-switches to GMD
+#' scale_robust(y, method = "qn")           # qn regardless of n
 #' scale_robust(y, auto_switch = FALSE)     # forces ensemble
+#'
+#' # Analytical CI for a named method (default)
+#' scale_robust(x, method = "sn", ci = TRUE)
+#'
+#' # Bootstrap CI for a named method
+#' scale_robust(x, method = "qn", ci = TRUE, boot_method = "percentile")
 #'
 #' # Ensemble with bootstrap CIs
 #' scale_robust(x, ci = TRUE)
-#'
-#' # Single-method analytical CI
-#' scale_robust(x, method = "sn", ci = TRUE)
 #'
 #' @keywords univar robust
 #' @export
@@ -97,9 +113,10 @@ scale_robust <- function(x,
                          ci = FALSE,
                          level = 0.95,
                          boot_method = c("auto", "bca", "percentile",
-                                         "parametric")) {
-  method <- match.arg(method)
+                                         "parametric", "analytical")) {
+  method      <- match.arg(method)
   boot_method <- match.arg(boot_method)
+
   if (isTRUE(na.rm)) {
     x <- x[!is.na(x)]
   } else {
@@ -110,28 +127,73 @@ scale_robust <- function(x,
   n <- length(x)
   if (n < 2L) return(NA_real_)
 
-  # Auto-switch to GMD for large n
-  if (auto_switch && n >= threshold) {
-    return(gmd(x, ci = ci, level = level))
-  }
+  # Resolve effective estimator: auto_switch only applies to the ensemble path.
+  # Named methods (gmd, sd, …) are always dispatched as requested.
+  effective_method <- method
+  if (method == "ensemble" && auto_switch && n >= threshold)
+    effective_method <- "gmd"
 
-  # Non-ensemble methods
-  if (method != "ensemble") {
-    return(switch(method,
-      gmd      = gmd(x, ci = ci, level = level),
-      sd       = sd_c4(x, ci = ci, level = level),
-      mad      = mad_scaled(x, ci = ci, level = level),
-      iqr      = iqr_scaled(x, ci = ci, level = level),
-      sn       = sn(x, ci = ci, level = level),
-      qn       = qn(x, ci = ci, level = level),
-      robScale = robScale(x, ci = ci, level = level)
+  # "analytical" CI is not defined for the ensemble (which has no single ARE).
+  if (boot_method == "analytical" && effective_method == "ensemble")
+    stop('"analytical" CI is not available for method = "ensemble"')
+
+  # ── Individual estimator path ────────────────────────────────────────
+  if (effective_method != "ensemble") {
+    est <- switch(effective_method,
+      gmd      = gmd_impl(x, 0.886226925452758),
+      sd       = sd_c4_impl(x),
+      mad      = mad_impl_auto(x, 1.482602218505602),
+      iqr      = iqr_impl(x, 0.741301109252801),
+      sn       = C_sn_fast(x),
+      qn       = C_qn_fast(x),
+      robScale = C_rob_scale_fast(x)
+    )
+
+    if (!ci) return(est)
+
+    # Canonical name used by .are_values and print output.
+    result_method <- switch(effective_method,
+      sd  = "sd_c4",
+      mad = "mad_scaled",
+      iqr = "iqr_scaled",
+      effective_method       # gmd, sn, qn, robScale pass through unchanged
+    )
+
+    if (boot_method %in% c("auto", "analytical")) {
+      ci_obj <- if (effective_method == "sd") {
+        .chisq_ci(est, n, level)
+      } else {
+        .analytical_ci(est, n, .are_values[[result_method]], level,
+                       result_method)
+      }
+      ci_obj$boot_method <- "analytical"
+      return(ci_obj)
+    }
+
+    # Bootstrap CI for individual estimator
+    estimator_id <- match(effective_method,
+                          c("gmd", "sd", "mad", "iqr", "sn", "qn",
+                            "robScale")) - 1L
+    method_code  <- switch(boot_method, bca = 0L, percentile = 1L,
+                            parametric = 2L)
+    bounds <- cpp_single_estimator_ci_bounds(x, est, estimator_id, n_boot,
+                                             level, method_code)
+    return(structure(
+      list(
+        estimate    = est,
+        ci          = c(lower = bounds$ci_lower, upper = bounds$ci_upper),
+        level       = level,
+        method      = result_method,
+        boot_method = boot_method
+      ),
+      class = "robscale_ci"
     ))
   }
 
-  # Ensemble without CI — fast path
+  # ── Ensemble path ────────────────────────────────────────────────────
   if (!ci) return(cpp_scale_ensemble(x, n_boot))
 
-  # Ensemble with CI — determine bootstrap tier
+  # Determine bootstrap tier for ensemble CI
   if (boot_method == "auto") {
     method_code <- if (n <= 200L) 0L else if (n <= 5000L) 1L else 2L
   } else {
@@ -142,7 +204,7 @@ scale_robust <- function(x,
 
   raw <- cpp_scale_ensemble_ci(x, n_boot, level, method_code)
 
-  # Analytical CIs for each component
+  # Analytical CIs for each component estimator
   estimator_names <- c("sd_c4", "gmd", "mad_scaled", "iqr_scaled",
                        "sn", "qn", "robScale")
   are_values <- c(1.00, 0.98, 0.368, 0.37, 0.58, 0.82, 0.55)
