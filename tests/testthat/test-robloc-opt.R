@@ -195,7 +195,7 @@ test_that("0.15 — permutation invariance at all gate sizes", {
     x    <- rnorm(n)
     loc1 <- robLoc(x)
     loc2 <- robLoc(sample(x))
-    expect_equal(loc1, loc2, tolerance=sqrt(.Machine$double.eps), scale=1,
+    expect_equal(loc1, loc2, tolerance=sqrt(.Machine$double.eps),
       label=sprintf("n=%d: |perm-orig| = %.3e", n, abs(loc1-loc2)))
   }
 })

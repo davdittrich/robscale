@@ -1,14 +1,10 @@
-library(testthat)
-library(robscale)
-
 test_that("robLoc refactor maintains numerical parity", {
   # Test with various n including tiny, small, and medium
   n_to_test <- c(3, 4, 8, 16, 64, 128, 256)
-  
+
   for (n in n_to_test) {
     set.seed(42 + n)
     x <- rnorm(n)
-    if (n == 3) print(x)
     
     res1 <- robLoc(x)
     

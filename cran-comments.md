@@ -1,29 +1,58 @@
-# CRAN submission comments for robscale 0.2.2
+# CRAN submission comments for robscale 0.6.0
 
-## Changes in 0.2.2
+## Changes in 0.6.0
 
-This patch fixes ERROR-level check failures on r-devel-linux-x86_64-fedora-clang,
-r-devel-linux-x86_64-fedora-gcc, and r-oldrel-windows-x86_64 caused by
-`revss` v3.0.0 changing the defaults of `robScale()` and `robLoc()` to use
-bias-corrected "AA" constants.
+### Bug fix
 
-- Tests: Skip `robScale()` and `robLoc()` cross-validation against `revss`
-  when `revss >= 3.0.0` (breaking upstream change). The `adm()` cross-check
-  remains active for all versions.
-- Tests: Added frozen golden reference tests (90 values each) for `robScale()`
-  and `robLoc()`, verified against `revss` v2.0.0. These catch regressions in
-  our own algorithm independent of upstream version changes.
-- No changes to the robscale algorithm or any source code.
+`scale_robust(x, method = "qn")` with `n >= threshold` previously returned
+`gmd(x)` silently. The `auto_switch` guard now only fires for
+`method = "ensemble"`; named methods are always dispatched as requested.
+
+### New features
+
+- `scale_robust(..., ci = TRUE)` supports bootstrap confidence intervals for
+  individual named methods via `boot_method = "bca"`, `"percentile"`, or
+  `"parametric"`. A new C++ bootstrap kernel (`cpp_single_estimator_ci_bounds`)
+  runs the resampling on the single requested estimator.
+- `boot_method = "analytical"` is accepted explicitly by `scale_robust()`.
+- `print.robscale_ci` now shows the CI method in the output header.
 
 ## Test environments
 
-- macOS (ARM64), R 4.5.3, Apple Clang
-- Fedora Linux (x86_64), R-devel, GCC 15.2.1
-- Fedora Linux (x86_64), R-devel, GCC 15.2.1 (Intel)
+- Arch Linux (x86_64), R 4.5.x, GCC 15.1.0
+- macOS (ARM64), R 4.5.x, Apple Clang (rhub)
+- Fedora Linux (x86_64), R-devel, GCC (rhub)
+- Windows (x86_64), R-devel (rhub)
 
 ## R CMD check results
 
 0 errors | 0 warnings | 1 note
 
+- **Non-portable compilation flag** (`-march=native`): Used only when the
+  building user's compiler supports it, detected at configure time. CRAN
+  binary builds do not use this flag; it is present only in local
+  `src/Makevars`. The configure script writes a portable fallback for
+  environments where `-march=native` is not supported.
+
 - **GNU make**: `SystemRequirements` field lists GNU make (needed for
   `$(shell)` in Makevars). Already declared in DESCRIPTION.
+
+## DOI URLs
+
+Several reference DOIs (Rousseeuw & Croux 1993, Aitken 1926, Steffensen 1933)
+return HTTP 403 during automated URL checks because the publishers
+(Taylor & Francis, JSTOR) block crawler requests. The URLs resolve correctly
+in a browser. They are correct and permanent DOIs.
+
+## Method references
+
+Key references for the methods implemented:
+
+- Rousseeuw, P.J. & Croux, C. (1993). Alternatives to the Median Absolute
+  Deviation. *Journal of the American Statistical Association*, 88, 1273-1283.
+  doi:10.1080/01621459.1993.10476408
+- Aitken, A.C. (1926). On Bernoulli's numerical solution of algebraic equations.
+  *Proceedings of the Royal Society of Edinburgh*, 46, 289-305.
+  doi:10.2307/2333958
+- Steffensen, J.F. (1933). Remarks on iteration. *Skandinavisk Aktuarietidskrift*,
+  16, 64-72. doi:10.1080/03461238.1933.10419209

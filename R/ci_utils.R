@@ -45,6 +45,12 @@
   )
 }
 
+#' Print a robscale_ci object
+#'
+#' @param x A \code{"robscale_ci"} object.
+#' @param digits Number of significant digits to display. Default: 4.
+#' @param ... Further arguments passed to or from other methods.
+#' @return The object \code{x}, invisibly.
 #' @export
 print.robscale_ci <- function(x, digits = 4, ...) {
   cat(sprintf("%s estimate: %s\n", x$method,
@@ -58,6 +64,12 @@ print.robscale_ci <- function(x, digits = 4, ...) {
   invisible(x)
 }
 
+#' Print a robscale_ensemble_ci object
+#'
+#' @param x A \code{"robscale_ensemble_ci"} object.
+#' @param digits Number of significant digits to display. Default: 4.
+#' @param ... Further arguments passed to or from other methods.
+#' @return The object \code{x}, invisibly.
 #' @export
 print.robscale_ensemble_ci <- function(x, digits = 4, ...) {
   cat(sprintf("Ensemble estimate: %s\n",
