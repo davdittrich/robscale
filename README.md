@@ -406,8 +406,8 @@ $`\sum(1 - \psi_i^2)`$ requires only squaring and subtraction—no
 additional transcendental calls. Loop-invariant quantities (`inv_s`,
 `half_inv_s`, `inv_n`) are hoisted before the iteration; reciprocal
 constants are `constexpr`, replacing divisions with multiplications.
-Aitken $`\Delta^2`$ (Steffensen’s method) extrapolates from successive
-iterates $(s_0, s_1,
+Aitken $`\Delta^2`$ (Aitken, 1926; Steffensen, 1933) extrapolates from
+successive iterates $(s_0, s_1,
 s_2)$` via `$s_{\text{acc}} = s_2 - (s_2 - s_1)^2 / (s_2 - 2s_1 + s_0)$,
 reducing iterations by 30–50% at small $`n`$ and ~20% at large $`n`$;
 oscillating sequences fall back to geometric-mean bisection
@@ -687,6 +687,11 @@ Adler, A. (2020). *revss: Robust Estimation in Very Small Samples*. R
 package version 2.0.0.
 [doi:10.32614/CRAN.package.revss](https://doi.org/10.32614/CRAN.package.revss)
 
+Aitken, A.C. (1926). On Bernoulli’s numerical solution of algebraic
+equations. *Proceedings of the Royal Society of Edinburgh*, **46**,
+289–305.
+[doi:10.1017/S0370164600022070](https://doi.org/10.1017/S0370164600022070)
+
 Bickel, P.J. and Lehmann, E.L. (1976). Descriptive Statistics for
 Nonparametric Models III. Dispersion. *Annals of Statistics*, **4**(6),
 1139–1158.
@@ -736,6 +741,10 @@ Absolute Deviation. *Journal of the American Statistical Association*,
 Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
 samples. *Computational Statistics & Data Analysis*, **40**(4), 741–758.
 [doi:10.1016/S0167-9473(02)00078-6](https://doi.org/10.1016/S0167-9473(02)00078-6)
+
+Steffensen, J.F. (1933). Remarks on iteration. *Skandinavisk
+Aktuarietidskrift*, **16**, 64–72.
+[doi:10.1080/03461238.1933.10419209](https://doi.org/10.1080/03461238.1933.10419209)
 
 Welford, B.P. (1962). Note on a Method for Calculating Corrected Sums of
 Squares and Products. *Technometrics*, **4**(3), 419–420.
