@@ -365,3 +365,92 @@ double rob_loc_serial_impl(Rcpp::NumericVector x) {
   // Intentionally passes xp (original data order) — serial reference for cross-checking.
   return rob_loc_compute(xp, n, med, s, MAXIT, TOL);
 }
+
+// Aitken correctness cross-check — plain NR, no Aitken acceleration.
+// Self-contained: does NOT call rob_loc_compute, so it remains an unmodified
+// plain-NR reference after WU-RL-A2 applies Aitken to that function.
+// Assert: |rob_loc_noaitken_impl(x) - robLoc(x)| < 2*sqrt(eps)
+// after WU-RL-A2 (same fixed point, different convergence path).
+// [[Rcpp::export]]
+double rob_loc_noaitken_impl(Rcpp::NumericVector x) {
+  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
+  static const int    MAXIT = 80;
+
+  const size_t n = (size_t)x.size();
+  if (n == 0) return 0.0;
+
+  const double* xp = x.begin();
+
+  std::unique_ptr<double[]> arena(new double[n * 2]);
+  double* buf = arena.get();
+  double* dev = arena.get() + n;
+
+  std::memcpy(buf, xp, n * sizeof(double));
+  double med = robscale::median_select(buf, n);
+  if (n < 4) return med;
+
+  double s = robscale::mad_select(buf, (int)n, med, dev);
+  if (s == 0.0) return med;
+
+  // Single-pass scalar NR — matches the production scalar fallback in rob_loc_compute
+  // (OPT-RL2 pattern: accumulators in registers, no tmp[] writes), no SIMD, no Aitken.
+  const double half_inv_s = 0.5 / s;
+  double t = med;
+
+  for (int k = 0; k < MAXIT; ++k) {
+    double sum_psi = 0.0, sum_dpsi = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      double p = std::tanh((xp[i] - t) * half_inv_s);
+      sum_psi  += p;
+      sum_dpsi += 1.0 - p * p;
+    }
+    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
+    double v = 2.0 * s * sum_psi / sum_dpsi;
+    t += v;
+    if (std::abs(v) <= TOL) break;
+  }
+  return t;
+}
+
+// Returns the number of NR evaluations for plain NR (no Aitken).
+// Temporary diagnostic — removed at the end of WU-RL-A2 once test 0.45 passes.
+// [[Rcpp::export]]
+int rob_loc_noaitken_iters(Rcpp::NumericVector x) {
+  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
+  static const int    MAXIT = 80;
+
+  const size_t n = (size_t)x.size();
+  if (n == 0) return 0;
+
+  const double* xp = x.begin();
+
+  std::unique_ptr<double[]> arena(new double[n * 2]);
+  double* buf = arena.get();
+  double* dev = arena.get() + n;
+
+  std::memcpy(buf, xp, n * sizeof(double));
+  double med = robscale::median_select(buf, n);
+  if (n < 4) return 0;
+
+  double s = robscale::mad_select(buf, (int)n, med, dev);
+  if (s == 0.0) return 0;
+
+  const double half_inv_s = 0.5 / s;
+  double t = med;
+  int neval = 0;
+
+  for (int k = 0; k < MAXIT; ++k) {
+    ++neval;
+    double sum_psi = 0.0, sum_dpsi = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      double p = std::tanh((xp[i] - t) * half_inv_s);
+      sum_psi  += p;
+      sum_dpsi += 1.0 - p * p;
+    }
+    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
+    double v = 2.0 * s * sum_psi / sum_dpsi;
+    t += v;
+    if (std::abs(v) <= TOL) break;
+  }
+  return neval;
+}
