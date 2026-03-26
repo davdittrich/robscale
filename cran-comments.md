@@ -1,6 +1,6 @@
-# CRAN submission comments for robscale 0.6.0
+# CRAN submission comments for robscale 0.5.2
 
-## Changes in 0.6.0
+## Changes in 0.5.2
 
 ### Bug fix
 

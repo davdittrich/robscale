@@ -1,4 +1,4 @@
-# robscale 0.6.0
+# robscale 0.5.2
 
 ## Bug fixes
 
