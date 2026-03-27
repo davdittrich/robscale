@@ -237,7 +237,7 @@ inline double rob_scale(const double* x, double* buf, int n) {
 #else
   const bool avx2 = false;
 #endif
-  // Newton-Raphson iteration.
+  // Aitken Δ² iteration (ensemble path; production path uses NR via nr_scale_compute).
   return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, avx2);
 }
 

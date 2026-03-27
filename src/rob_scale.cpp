@@ -218,6 +218,73 @@ static double rob_scale_parallel_compute(const double* ROBSCALE_RESTRICT data,
 #endif // parallel backends
 
 /**
+ * Newton-Raphson scale iteration for the production serial path.
+ * Replaces rob_scale_compute in rob_scale_core at one call site.
+ * rob_scale_compute is preserved unchanged for the ensemble path.
+ *
+ * data:    w[] = |x_i - t| (data_offset = 0.0, OPT-F); no VSUB needed.
+ * scratch: dev[] from rob_scale_core — idle after MAD, used as tanh buffer.
+ * The NR denominator sum Σu·tanh(u)·sech²(u) is even in u, so using
+ * abs-deviations with offset=0 gives the same result as signed deviations.
+ *
+ * use_avx2: pre-cached flag (OPT-L2); avoids RuntimeConfig::get() per iter.
+ */
+static double nr_scale_compute(const double* ROBSCALE_RESTRICT data,
+                                double* ROBSCALE_RESTRICT scratch,
+                                size_t n, double data_offset,
+                                double s, int maxit, double tol,
+                                bool use_avx2) {
+  const double inv_n    = 1.0 / static_cast<double>(n);
+  const double hisc_pre = 0.5 * robscale::INV_RHO_SCALE_CONST;
+  int iter = 0;
+
+  for (; iter < maxit; ) {
+    // Phase 1 — fill scratch with u_i = (data[i] - offset) * hisc_pre / s
+    const double hisc = hisc_pre / s;
+    for (size_t i = 0; i < n; ++i)
+      scratch[i] = (data[i] - data_offset) * hisc;
+
+    // Phase 2 — vectorised tanh in-place; scratch[i] → tanh(u_i)
+    // OPT-L2: pre-hoisted avx2 flag avoids one TLS read per NR iteration.
+    robscale::bulk_tanh_dispatched(scratch, static_cast<int>(n), use_avx2);
+
+    // Phase 3 — accumulate NR sums; u_i recomputed from data[i]
+    // (scratch holds tanh(u_i); data[i] is cache-hot from Phase 1)
+    double sum_tanh2 = 0.0, sum_u_tanh_sech2 = 0.0;
+    for (size_t i = 0; i < n; ++i) {
+      const double ui = (data[i] - data_offset) * hisc;  // recompute u_i
+      const double tv = scratch[i];                        // tanh(u_i)
+      sum_tanh2        += tv * tv;
+      sum_u_tanh_sech2 += ui * tv * (1.0 - tv * tv);     // u·tanh·sech²
+    }
+
+    const double numer = sum_tanh2 * inv_n - 0.5;
+    const double denom = 2.0 * inv_n * sum_u_tanh_sech2;
+
+    // GP guard: denominator degenerate → multiplicative fallback + ++iter
+    if (std::abs(denom) <= 1e-14 * s) {
+      s *= std::sqrt(2.0 * sum_tanh2 * inv_n);
+      ++iter;
+      continue;
+    }
+
+    const double delta_s = s * numer / denom;
+
+    // Neg-s guard: proposed update non-positive → halve + ++iter
+    if (s + delta_s <= 0.0) {
+      s /= 2.0;
+      ++iter;
+      continue;
+    }
+
+    s += delta_s;
+    ++iter;
+    if (std::abs(delta_s) / s <= tol) break;
+  }
+  return s;
+}
+
+/**
  * Portably optimized robScale kernel.
  * Non-static: also called by estimators_internal.h for the ensemble.
  * use_avx2: pre-cached AVX2 flag (OPT-E); eliminates repeated TLS lookups.
@@ -349,8 +416,8 @@ static double rob_scale_core(const double* xp, size_t n,
 #endif
 
   // OPT-F: pass w[] (abs-deviations) with data_offset=0 — eliminates one VSUB
-  // per element per iteration in the AVX2 fused kernel.
-  return rob_scale_compute(w, n, 0.0, s_init, maxit, tol, avx2);
+  // per element per iteration. dev[] is idle after MAD; used as tanh scratch.
+  return nr_scale_compute(w, dev, n, 0.0, s_init, maxit, tol, avx2);
 }
 
 /**
