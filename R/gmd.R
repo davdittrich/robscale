@@ -30,7 +30,7 @@
 #' GMD is a consistent estimator of \eqn{\sigma} under the Gaussian model. The
 #' GMD achieves an \bold{asymptotic relative efficiency (ARE) of 0.98} compared
 #' to the sample standard deviation, making it the most efficient robust
-#' alternative in this package. Its breakdown point is \eqn{1 - 1/\sqrt{2} \approx 29.3\%}{1 - 1/sqrt(2) ~ 29.3%}.
+#' alternative in this package. Its breakdown point is \eqn{1 - 1/\sqrt{2}}{1 - 1/sqrt(2)}, approximately 29.3\%.
 #'
 #' @return If \code{ci = FALSE} (default), a single numeric value: the scaled
 #'   Gini mean difference. Returns \code{0} if \code{n < 2}; returns \code{NA}
