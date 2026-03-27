@@ -92,7 +92,8 @@ of 80 is a conservative safety limit.
 
 \strong{Performance and SIMD.}
 The underlying C++ core utilizes platform-specific SIMD (Single Instruction,
-Multiple Data) backends (SLEEF on Linux, Apple Accelerate on macOS) to
+Multiple Data) backends (glibc libmvec on Linux x86\_64, Apple Accelerate on
+macOS; SLEEF as Linux fallback) to
 vectorize the \code{tanh} evaluations. This architectural choice delivers
 substantial performance gains, particularly for large-scale or
 high-throughput workflows.

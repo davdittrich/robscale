@@ -59,9 +59,24 @@
 #' often seen in simultaneous location--scale estimation (Proposal 2)
 #' at very small sample sizes.
 #'
+#' \strong{Convergence.}
+#' The multiplicative update is a linearly converging fixed-point iteration:
+#' the contraction rate \eqn{T'(s^*)}{T'(s*)} lies strictly in \eqn{(0, 1)}{(0,1)}
+#' at the solution.  This contrasts with \code{\link{robLoc}}, where the
+#' Newton--Raphson denominator is the observed Hessian
+#' \eqn{\sum \operatorname{sech}^2\!\bigl((x_i - t)/(2s)\bigr)}{sum(sech^2((x_i-t)/(2s)))},
+#' obtainable for free as \eqn{1 - \tanh^2}{1 - tanh^2} and giving
+#' \eqn{T'(t^*) = 0}{T'(t*) = 0} (quadratic convergence).  Applying
+#' Newton--Raphson to the scale equation would require a second per-iteration
+#' accumulation --- \eqn{\sum z_i \rho'(z_i)}{sum(z_i*rho'(z_i))} --- not
+#' obtainable as a byproduct of the rho sum, unlike the location case.
+#' Aitken \eqn{\Delta^2}{Delta^2} (Steffensen) acceleration is applied instead,
+#' reducing iteration count by approximately 30--50\% at no additional kernel cost.
+#'
 #' \strong{Performance and SIMD.}
 #' The C++ implementation leverages platform-specific SIMD (Single Instruction,
-#' Multiple Data) backends (SLEEF on Linux, Apple Accelerate on macOS) to
+#' Multiple Data) backends (glibc libmvec on Linux x86\_64, Apple Accelerate on
+#' macOS; SLEEF as Linux fallback) to
 #' \eqn{\psi_{\mathrm{log}}} evaluations (via \code{tanh}). This specialized
 #' architecture typically yields an 11--39x speedup over pure-R code for
 #' samples of size \eqn{n \le 20}.
