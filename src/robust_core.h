@@ -16,33 +16,49 @@
   #define ROBSCALE_HAS_ACCELERATE 1
 #endif
 
+// SLEEF header — only when SLEEF is actually installed
 #if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE)
   #include <sleef.h>
-  #if defined(__x86_64__) || defined(_M_X64)
-    #include <immintrin.h>
-    #ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  #if defined(__aarch64__) || defined(_M_ARM64)
+    #include <arm_neon.h>
+  #endif
+#endif
+
+// Vectorized tanh declarations.
+// Backend hierarchy (highest priority first):
+//   1. macOS Accelerate vvtanh (ROBSCALE_HAS_ACCELERATE)
+//   2. glibc libmvec _ZGVeN8v_tanh — AVX-512 8-wide (ROBSCALE_HAS_AVX512_TANH)
+//   3. glibc libmvec _ZGVdN4v_tanh — AVX2 4-wide   (ROBSCALE_HAS_GLIBC_MVEC)
+//   4. SLEEF Sleef_tanhd4_u10avx2  — AVX2 4-wide   (ROBSCALE_HAS_SLEEF)
+//   5. #pragma omp simd / scalar std::tanh
+//
+// ROBSCALE_HAS_AVX2_TANH: defined when AVX2 tanh backend available (3 or 4).
+// ROBSCALE_HAS_AVX512_TANH: defined when 8-wide AVX-512 tanh available (2).
+#if (defined(ROBSCALE_HAS_AVX2_TANH) || defined(ROBSCALE_HAS_AVX512_TANH)) && \
+    !defined(ROBSCALE_HAS_ACCELERATE)
+  #include <immintrin.h>
+  // AVX2 4-wide backend
+  #if defined(ROBSCALE_HAS_GLIBC_MVEC)
+    extern "C" __m256d _ZGVdN4v_tanh(__m256d);
+    #define ROBSCALE_TANH4_AVX2 _ZGVdN4v_tanh
+  #elif defined(ROBSCALE_HAS_SLEEF)
     // sleef.h guards Sleef_tanhd4_u10avx2 behind #ifdef __AVX2__, which is
     // absent without global -mavx2.  The symbol exists in libsleef regardless;
     // declare it here so the target-attributed wrapper can call it.
     extern "C" __m256d Sleef_tanhd4_u10avx2(__m256d);
-    // glibc libmvec _ZGVdN4v_tanh is 25-50% faster than SLEEF on glibc >= 2.35
-    // systems (Zen/Skylake). Preferred when ROBSCALE_HAS_GLIBC_MVEC is set.
-    // SLEEF remains the fallback on older glibc and non-glibc platforms.
-    #if defined(ROBSCALE_HAS_GLIBC_MVEC)
-    extern "C" __m256d _ZGVdN4v_tanh(__m256d);
-    #define ROBSCALE_TANH4_AVX2 _ZGVdN4v_tanh
-    #else
     #define ROBSCALE_TANH4_AVX2 Sleef_tanhd4_u10avx2
-    #endif
-    #endif
-  #elif defined(__aarch64__) || defined(_M_ARM64)
-    #include <arm_neon.h>
+  #endif
+  // AVX-512 8-wide backend (glibc libmvec, same -lmvec as the 4-wide variant)
+  #if defined(ROBSCALE_HAS_AVX512_TANH)
+    extern "C" __m512d _ZGVeN8v_tanh(__m512d);
+    #define ROBSCALE_TANH8_AVX512 _ZGVeN8v_tanh
   #endif
 #endif
 
 namespace robscale {
 
 // --- Asymptotic Relative Efficiency (ARE) constants ---
+
 constexpr double ARE_ROBSCALE   = 0.55;
 constexpr double ARE_QN         = 0.82;
 constexpr double ARE_SN         = 0.58;
@@ -54,14 +70,35 @@ constexpr double ARE_SD_C4      = 1.00;
 
 // --- Low-level Kernels ---
 
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE)
-  #ifdef ROBSCALE_HAS_AVX2_DISPATCH
+#if defined(ROBSCALE_HAS_AVX512_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  // AVX-512 tanh: processes 8 doubles per iteration via ROBSCALE_TANH8_AVX512.
+  // ROBSCALE_TARGET_AVX512F enables 512-bit codegen without global -mavx512f.
+  // Called only when SIMDLevel::AVX512 confirmed at runtime; safe on AVX2-only
+  // hardware (function never invoked when AVX-512 absent per CPUID).
+  ROBSCALE_TARGET_AVX512F
+  inline void bulk_tanh_avx512(double* inout, int n) {
+    int i = 0;
+    for (; i + 8 <= n; i += 8) {
+      __m512d v = _mm512_loadu_pd(inout + i);
+      v = ROBSCALE_TANH8_AVX512(v);
+      _mm512_storeu_pd(inout + i, v);
+    }
+    // 4-wide cleanup (may be skipped if n%8 < 4)
+    for (; i + 4 <= n; i += 4) {
+      __m256d v = _mm256_loadu_pd(inout + i);
+      v = ROBSCALE_TANH4_AVX2(v);
+      _mm256_storeu_pd(inout + i, v);
+    }
+    for (; i < n; i++) inout[i] = std::tanh(inout[i]);
+  }
+#endif
+
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   // AVX2 tanh: processes 4 doubles per iteration via ROBSCALE_TANH4_AVX2.
-  // Resolves to glibc libmvec _ZGVdN4v_tanh (preferred, 25-50% faster) when
-  // ROBSCALE_HAS_GLIBC_MVEC is defined; falls back to Sleef_tanhd4_u10avx2.
+  // Resolves to glibc libmvec _ZGVdN4v_tanh (preferred) or SLEEF fallback.
   // Target attribute enables AVX2 codegen without global -mavx2.
   ROBSCALE_TARGET_AVX2
-  inline void bulk_tanh_sleef_avx2(double* inout, int n) {
+  inline void bulk_tanh_avx2(double* inout, int n) {
     int i = 0;
     for (; i + 4 <= n; i += 4) {
       __m256d v = _mm256_loadu_pd(inout + i);
@@ -70,12 +107,11 @@ constexpr double ARE_SD_C4      = 1.00;
     }
     for (; i < n; i++) inout[i] = std::tanh(inout[i]);
   }
-  #endif
 #endif
 
-// Bulk tanh: vectorized via Accelerate (macOS), SLEEF (Linux), or OpenMP SIMD
-// Scalar fallback only for n<8: at n<8 SIMD setup overhead exceeds the gain
-// (fewer than 2 full AVX2 vectors). For n>=8, use SIMD path.
+// Bulk tanh: vectorized via Accelerate (macOS), AVX-512 8-wide, AVX2 4-wide,
+// OpenMP SIMD, or scalar std::tanh. Dispatch order: AVX-512 > AVX2 > OMP > scalar.
+// Scalar bypass for n<8: SIMD overhead exceeds gain (fewer than 2 AVX2 vectors).
 ROBSCALE_HIDDEN inline void bulk_tanh(double* inout, int n) {
   if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
@@ -83,15 +119,22 @@ ROBSCALE_HIDDEN inline void bulk_tanh(double* inout, int n) {
   }
 #if defined(ROBSCALE_HAS_ACCELERATE)
   vvtanh(inout, inout, &n);
-#elif defined(ROBSCALE_HAS_SLEEF)
-  #ifdef ROBSCALE_HAS_AVX2_DISPATCH
-  if (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
-      robscale::qnsn::SIMDLevel::AVX2) {
-    bulk_tanh_sleef_avx2(inout, n);
-    return;
+#elif defined(ROBSCALE_HAS_AVX512_TANH) || defined(ROBSCALE_HAS_AVX2_TANH)
+  {
+    const auto lvl = robscale::qnsn::RuntimeConfig::get().hw.simd_level;
+#if defined(ROBSCALE_HAS_AVX512_TANH)
+    if (lvl >= robscale::qnsn::SIMDLevel::AVX512) {
+      bulk_tanh_avx512(inout, n);
+      return;
+    }
+#endif
+#if defined(ROBSCALE_HAS_AVX2_TANH)
+    if (lvl >= robscale::qnsn::SIMDLevel::AVX2) {
+      bulk_tanh_avx2(inout, n);
+      return;
+    }
+#endif
   }
-  #endif
-  // Scalar SLEEF fallback (no AVX2 at runtime, or SLEEF on non-x86)
   for (int i = 0; i < n; i++) inout[i] = std::tanh(inout[i]);
 #else
   #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
@@ -101,29 +144,27 @@ ROBSCALE_HIDDEN inline void bulk_tanh(double* inout, int n) {
 #endif
 }
 
-// OPT-L2: dispatch variant accepting a pre-hoisted AVX2 flag, avoiding a
-// repeated RuntimeConfig::get() (TLS read) on each NR iteration.
+// OPT-L2: dispatch variant with pre-hoisted flags to avoid TLS reads per NR iter.
+// use_avx2: true when AVX2 confirmed; use_avx512: true when AVX-512 confirmed.
 // CPUID features are invariant for process lifetime; hoisting is safe.
-ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n, bool use_avx2) {
+ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n,
+                                                  bool use_avx2,
+                                                  bool use_avx512 = false) {
   if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
     return;
   }
 #if defined(ROBSCALE_HAS_ACCELERATE)
-  (void)use_avx2;
+  (void)use_avx2; (void)use_avx512;
   vvtanh(inout, inout, &n);
-#elif defined(ROBSCALE_HAS_SLEEF)
-  #ifdef ROBSCALE_HAS_AVX2_DISPATCH
-  if (use_avx2) {
-    bulk_tanh_sleef_avx2(inout, n);
-    return;
-  }
-  #else
-  (void)use_avx2;
-  #endif
-  for (int i = 0; i < n; i++) inout[i] = std::tanh(inout[i]);
 #else
-  (void)use_avx2;
+  #if defined(ROBSCALE_HAS_AVX512_TANH)
+    if (use_avx512) { bulk_tanh_avx512(inout, n); return; }
+  #endif
+  #if defined(ROBSCALE_HAS_AVX2_TANH)
+    if (use_avx2)   { bulk_tanh_avx2(inout, n);   return; }
+  #endif
+  (void)use_avx2; (void)use_avx512;
   #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
     #pragma omp simd
   #endif
@@ -233,6 +274,60 @@ inline double lowmedian_select(double* x, size_t n) {
 ROBSCALE_HIDDEN inline double mad_select(const double* x, int n, double med, double* dev) {
   for (int i = 0; i < n; ++i) dev[i] = std::abs(x[i] - med);
   return robscale::MAD_CONSISTENCY * median_select(dev, static_cast<size_t>(n));
+}
+
+// GMD weighted sum: computes scale * sum_i{ w_i * x[i] } where
+// x is pre-sorted ascending and w_i = 2*i - (n-1) (0-indexed).
+// Dispatches to AVX2 FMA 4-wide kernel (ROBSCALE_HAS_AVX2_TANH guard reuses
+// the same AVX2 dispatch infrastructure; target attribute emits avx2/fma
+// instructions without global -mavx2).
+// Scalar tail handles remainder; same scalar path used when AVX2 absent.
+// Threshold n<8: fewer than two full AVX2 vectors, scalar is faster.
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
+ROBSCALE_INLINE double gmd_weighted_sum_avx2(
+    const double* ROBSCALE_RESTRICT x, int n, double scale) {
+  // Weight w_i = 2*i - (n-1).  For 4-wide lane at offset i:
+  //   {w, w+2, w+4, w+6}  where w = 2*i - (n-1).
+  // After 4 elements the base increments by 8.
+  const double w0  = -static_cast<double>(n - 1);
+  const double inc = 8.0;
+  __m256d wv  = _mm256_set_pd(w0 + 6.0, w0 + 4.0, w0 + 2.0, w0);
+  const __m256d d8 = _mm256_set1_pd(inc);
+  __m256d acc = _mm256_setzero_pd();
+  int i = 0;
+  for (; i + 4 <= n; i += 4) {
+    __m256d xv = _mm256_loadu_pd(x + i);
+    acc = _mm256_fmadd_pd(wv, xv, acc);
+    wv  = _mm256_add_pd(wv, d8);
+  }
+  // Horizontal sum of acc
+  __m128d lo   = _mm256_castpd256_pd128(acc);
+  __m128d hi   = _mm256_extractf128_pd(acc, 1);
+  __m128d s128 = _mm_add_pd(lo, hi);
+  s128         = _mm_hadd_pd(s128, s128);
+  double sum   = _mm_cvtsd_f64(s128);
+  // Scalar tail: weights continue from where vector left off
+  double wi = w0 + 2.0 * i;
+  for (; i < n; ++i, wi += 2.0) sum += wi * x[i];
+  return scale * sum;
+}
+#endif
+
+ROBSCALE_HIDDEN ROBSCALE_INLINE double gmd_weighted_sum(
+    const double* ROBSCALE_RESTRICT x, int n, double scale) {
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  if (n >= 8) {
+    const auto lvl = robscale::qnsn::RuntimeConfig::get().hw.simd_level;
+    if (lvl >= robscale::qnsn::SIMDLevel::AVX2)
+      return gmd_weighted_sum_avx2(x, n, scale);
+  }
+#endif
+  double sum = 0.0;
+  const double w0 = -static_cast<double>(n - 1);
+  for (int i = 0; i < n; ++i)
+    sum += (w0 + 2.0 * i) * x[i];
+  return scale * sum;
 }
 
 } // namespace robscale

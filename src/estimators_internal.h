@@ -43,15 +43,10 @@ inline double gmd(double* buf, int n) {
     robscale::small_sort(buf, n);
   else
     robscale::qnsn::optimized_sort(buf, buf + n);
+  // WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
   const double scale = GMD_CONSISTENCY * 2.0
     / (static_cast<double>(n) * (n - 1));
-  double sum = 0.0;
-#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
-  #pragma omp simd reduction(+:sum)
-#endif
-  for (int i = 0; i < n; ++i)
-    sum += (2.0 * (i + 1) - n - 1.0) * buf[i];
-  return scale * sum;
+  return robscale::gmd_weighted_sum(buf, n, scale);
 }
 
 // MAD from original data: fused single-buffer approach.
@@ -230,14 +225,13 @@ inline double rob_scale(const double* x, double* buf, int n) {
   }
 
   // OPT-E: cache AVX2 flag once; avoids a TLS lookup inside rob_scale_compute.
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
                      robscale::qnsn::SIMDLevel::AVX2);
 #else
   const bool avx2 = false;
 #endif
-  // Aitken Δ² iteration (ensemble path; production path uses NR via nr_scale_compute).
+  // NR iteration via nr_scale_compute (both ensemble and production paths).
   return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, avx2);
 }
 
@@ -256,8 +250,7 @@ inline double rob_scale_sorted(const double* ROBSCALE_RESTRICT sorted_x,
     return robscale::adm_core_sorted(sorted_x, static_cast<int>(n), t,
                                      robscale::ADM_CONSISTENCY);
   }
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
                      robscale::qnsn::SIMDLevel::AVX2);
 #else

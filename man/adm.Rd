@@ -72,11 +72,10 @@ ideal \bold{implosion fallback} for the M-estimator of scale in
 
 \strong{Computational Performance.}
 This implementation employs a tiered selection strategy: optimal sorting
-networks for very small samples (\eqn{n \le 16}) and a C++17 introselect
-algorithm for larger datasets. This approach provides an \eqn{O(n)}
-worst-case time complexity, typically outperforming pure-R implementations
-by an order of magnitude. Performance is further enhanced by avoiding the
-full sort required by the standard \code{\link{median}} function.
+networks for \eqn{n \le 16} and adaptive \eqn{O(n)} selection
+(Floyd--Rivest or pdqselect, depending on cache-derived thresholds) for
+larger datasets. This avoids the full sort required by the standard
+\code{\link{median}} function.
 }
 \examples{
 adm(c(1:9))

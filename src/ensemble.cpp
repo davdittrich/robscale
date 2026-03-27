@@ -31,7 +31,8 @@ static constexpr int N_ESTIMATORS = 7;
 static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 #endif
 
-// Compute one bootstrap replicate and store N_ESTIMATORS estimates in boot_row.
+// Compute one bootstrap replicate and write N_ESTIMATORS estimates into the
+// transposed (7 × nboot) boot_results matrix.
 //
 // Parameters:
 //   xp        — pointer to the original data (length n); never modified.
@@ -39,10 +40,16 @@ static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 //   r         — replicate index (0-based); seeds the XorShift32 PRNG as
 //               (r + 12345) to give each replicate a distinct, reproducible
 //               sequence.
-//   boot_row  — output array of length N_ESTIMATORS; caller owns the memory.
+//   base      — start of the 7×nboot matrix; estimator j for replicate r
+//               is written to base[j * nboot + r].
+//   nboot     — total number of bootstrap replicates (used as column stride).
 //   resample  — scratch buffer of length n (overwritten with the resample).
 //   work1     — scratch buffer of length n for estimators that need it.
 //   work2     — scratch buffer of length n for estimators that need it.
+//
+// WU-LAYOUT-1: transposed layout (7×nboot instead of nboot×7) makes the
+// mean/variance reduction pass sequential (j outer, r inner) and removes
+// the stride-7 access pattern in EnsembleCore::run().
 //
 // The resample is drawn with replacement using a XorShift32 PRNG (three XOR
 // shifts: <<13, >>17, <<5), then sorted once in ascending order.  All seven
@@ -50,8 +57,13 @@ static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 // avoid redundant sorting passes.
 static void ensemble_one_replicate(
     const double* xp, int n, int r,
-    double* boot_row,
+    double* base, int nboot,
     double* resample, double* work1, double* work2) {
+  // Helper: write estimator j for replicate r.
+  // base[j * nboot + r] in the 7×nboot column-major matrix.
+  auto write_est = [base, nboot, r](int j, double v) {
+    base[static_cast<size_t>(j) * nboot + r] = v;
+  };
 
   XorShift32 rng(static_cast<uint32_t>(r + 12345));
   for (int i = 0; i < n; ++i) {
@@ -72,29 +84,23 @@ static void ensemble_one_replicate(
   }
 
   // 0: sd_c4 (read-only, order-agnostic)
-  boot_row[0] = robscale::internal::sd_c4(resample, n);
+  write_est(0, robscale::internal::sd_c4(resample, n));
 
-  // 1: gmd — inline sorted kernel, O(n) weighted sum.
+  // 1: gmd — WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
   // OPT-G5: scale precomputed once outside the accumulation loop.
   {
     const double gmd_scale = (n < 2) ? 0.0
       : robscale::GMD_CONSISTENCY * 2.0
         / (static_cast<double>(n) * (n - 1));
-    double sum = 0.0;
-#if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
-    #pragma omp simd reduction(+:sum)
-#endif
-    for (int i = 0; i < n; ++i)
-      sum += (2.0 * (i + 1) - n - 1.0) * resample[i];
-    boot_row[1] = gmd_scale * sum;
+    write_est(1, robscale::gmd_weighted_sum(resample, n, gmd_scale));
   }
 
   // 2: mad — V-shaped O(log n) deviation median (OPT-M7)
-  // work2 is reused as scratch; estimator 6 overwrites it independently at line ~155.
+  // work2 is reused as scratch; estimator 6 overwrites it independently below.
   {
     double med = robscale::median_sorted(resample, static_cast<size_t>(n));
-    boot_row[2] = (n < 2) ? 0.0
-      : robscale::MAD_CONSISTENCY * robscale::vshaped_mad(resample, n, med, work2);
+    write_est(2, (n < 2) ? 0.0
+      : robscale::MAD_CONSISTENCY * robscale::vshaped_mad(resample, n, med, work2));
   }
 
   // 3: iqr — direct index reads with interpolation
@@ -113,13 +119,13 @@ static void ensemble_one_replicate(
     if (frac3 > 0.0 && lo3 + 1 < n)
       q3 += frac3 * (resample[lo3 + 1] - q3);
 
-    boot_row[3] = (n < 2) ? 0.0 : (q3 - q1) * robscale::IQR_CONSISTENCY;
+    write_est(3, (n < 2) ? 0.0 : (q3 - q1) * robscale::IQR_CONSISTENCY);
   }
 
   // 4: sn — sorted variant, skip redundant copy+sort
   // OPT-S7: pass work1 as workspace to avoid heap allocation for n > sn_stack_threshold.
-  // work1 is free at this point: rob_scale_compute (estimator 6) writes it at line ~160.
-  boot_row[4] = robscale::internal::sn_sorted(resample, n, work1);
+  // work1 is free at this point: rob_scale_compute (estimator 6) writes it below.
+  write_est(4, robscale::internal::sn_sorted(resample, n, work1));
 
   // 5: qn — sorted variant, skip redundant copy+sort
   // OPT-Q6: workspace reuse — reinterpret work1/work2 as Qn arena to avoid
@@ -140,13 +146,13 @@ static void ensemble_one_replicate(
       qn_ws.right   = reinterpret_cast<int32_t*>(work2) + un;
       qn_ws_ptr = &qn_ws;
     }
-    boot_row[5] = robscale::internal::qn_sorted(resample, n, qn_ws_ptr);
+    write_est(5, robscale::internal::qn_sorted(resample, n, qn_ws_ptr));
   }
 
   // 6: robScale — OPT-9: rob_scale_sorted combines O(1) median + O(log n) MAD
   //    + Newton-Raphson in one call; resample is already sorted.
-  boot_row[6] = robscale::internal::rob_scale_sorted(
-      resample, static_cast<size_t>(n), work1);
+  write_est(6, robscale::internal::rob_scale_sorted(
+      resample, static_cast<size_t>(n), work1));
 }
 
 // Helper: compute all 7 estimators on arbitrary (non-const-safe) data.
@@ -180,7 +186,10 @@ struct EnsembleCore {
 
   void run(const double* xp, int n, int n_boot) {
     nboot = n_boot;
-    boot_mem.reset(new double[static_cast<size_t>(nboot) * N_ESTIMATORS]);
+    // WU-LAYOUT-1: allocate 7×nboot (estimator-major) instead of nboot×7.
+    // Mean/variance pass reads boot_results[j*nboot+r] (sequential per j),
+    // eliminating the stride-7 access pattern of the old nboot×7 layout.
+    boot_mem.reset(new double[static_cast<size_t>(N_ESTIMATORS) * nboot]);
     boot_results = boot_mem.get();
 
     // --- Bootstrap loop ---
@@ -190,15 +199,13 @@ struct EnsembleCore {
     if (static_cast<int64_t>(n) * nboot >= ENSEMBLE_PARALLEL_THRESHOLD) {
       tbb::parallel_for(
         tbb::blocked_range<int>(0, nboot),
-        [xp, n, br](const tbb::blocked_range<int>& range) {
+        [xp, n, br, n_boot](const tbb::blocked_range<int>& range) {
           std::unique_ptr<double[]> ws(new double[3 * static_cast<size_t>(n)]);
           double* resample = ws.get();
           double* work1 = resample + n;
           double* work2 = work1 + n;
-          for (int r = range.begin(); r < range.end(); ++r) {
-            double* row = br + static_cast<size_t>(r) * N_ESTIMATORS;
-            ensemble_one_replicate(xp, n, r, row, resample, work1, work2);
-          }
+          for (int r = range.begin(); r < range.end(); ++r)
+            ensemble_one_replicate(xp, n, r, br, n_boot, resample, work1, work2);
         }
       );
     } else
@@ -208,25 +215,25 @@ struct EnsembleCore {
       double* resample = ws.get();
       double* work1 = resample + n;
       double* work2 = work1 + n;
-      for (int r = 0; r < nboot; ++r) {
-        double* row = br + static_cast<size_t>(r) * N_ESTIMATORS;
-        ensemble_one_replicate(xp, n, r, row, resample, work1, work2);
-      }
+      for (int r = 0; r < nboot; ++r)
+        ensemble_one_replicate(xp, n, r, br, nboot, resample, work1, work2);
     }
 
     // --- Mean and variance per estimator ---
+    // WU-LAYOUT-1: boot_results[j*nboot+r] — sequential reads for fixed j.
     for (int j = 0; j < N_ESTIMATORS; ++j) {
+      const double* col = boot_results + static_cast<size_t>(j) * nboot;
       double sum = 0.0;
       int count = 0;
       for (int r = 0; r < nboot; ++r) {
-        double v = boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j];
+        double v = col[r];
         if (std::isfinite(v) && v > 0.0) { sum += v; ++count; }
       }
       if (count < 2) { vars[j] = 1e30; means[j] = 0.0; continue; }
       means[j] = sum / count;
       double sq_sum = 0.0;
       for (int r = 0; r < nboot; ++r) {
-        double v = boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j];
+        double v = col[r];
         if (std::isfinite(v) && v > 0.0) {
           double d = v - means[j];
           sq_sum += d * d;
@@ -317,12 +324,10 @@ Rcpp::List cpp_single_estimator_ci_bounds(
       double val = 0.0;
       switch (estimator_id) {
         case 0: {  // gmd
+          // WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
           const double gmd_scale = robscale::GMD_CONSISTENCY * 2.0
             / (static_cast<double>(n) * (n - 1));
-          double sum = 0.0;
-          for (int i = 0; i < n; ++i)
-            sum += (2.0 * (i + 1) - n - 1.0) * resample[i];
-          val = gmd_scale * sum;
+          val = robscale::gmd_weighted_sum(resample, n, gmd_scale);
           break;
         }
         case 1:  // sd_c4
@@ -531,12 +536,14 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
   }
   double ensemble_lower = NA_REAL, ensemble_upper = NA_REAL;
 
-  // Compute ensemble bootstrap values (needed by all tiers)
+  // Compute ensemble bootstrap values (needed by all tiers).
+  // WU-LAYOUT-1: boot_results[j*actual_nboot+r] — stride-actual_nboot per j.
+  // Inner loop has 7 iterations so the scattered reads stay in L1/L2 cache.
   std::vector<double> ensemble_boot(actual_nboot);
   for (int r = 0; r < actual_nboot; ++r) {
     double val = 0.0;
     for (int j = 0; j < N_ESTIMATORS; ++j) {
-      double v = boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j];
+      double v = boot_results[static_cast<size_t>(j) * actual_nboot + r];
       if (std::isfinite(v) && v > 0.0) val += weights[j] * v;
     }
     ensemble_boot[r] = val;
@@ -545,11 +552,12 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
   if (method_code == 0) {
     // ========================= BCa =========================
     // Step 1: Bias correction z0
+    // WU-LAYOUT-1: col = boot_results + j*actual_nboot — sequential reads.
     for (int j = 0; j < N_ESTIMATORS; ++j) {
+      const double* col_j = boot_results + static_cast<size_t>(j) * actual_nboot;
       int below = 0;
       for (int r = 0; r < actual_nboot; ++r) {
-        if (boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j] < estimates[j])
-          ++below;
+        if (col_j[r] < estimates[j]) ++below;
       }
       double prop = static_cast<double>(below) / actual_nboot;
       prop = std::max(0.5 / actual_nboot,
@@ -629,10 +637,11 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
     double z_lo = R::qnorm(alpha / 2.0, 0.0, 1.0, 1, 0);
     double z_hi = R::qnorm(1.0 - alpha / 2.0, 0.0, 1.0, 1, 0);
 
+    // WU-LAYOUT-1: copy column j (sequential) then sort.
     std::vector<double> col(actual_nboot);
     for (int j = 0; j < N_ESTIMATORS; ++j) {
-      for (int r = 0; r < actual_nboot; ++r)
-        col[r] = boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j];
+      const double* col_j = boot_results + static_cast<size_t>(j) * actual_nboot;
+      std::copy(col_j, col_j + actual_nboot, col.begin());
       std::sort(col.begin(), col.end());
 
       double numer_lo = z0_arr[j] + z_lo;
@@ -688,10 +697,11 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
     int hi_idx = std::min(actual_nboot - 1,
       static_cast<int>(std::floor((1.0 - alpha / 2.0) * actual_nboot)));
 
+    // WU-LAYOUT-1: copy sequential column j then sort.
     std::vector<double> col(actual_nboot);
     for (int j = 0; j < N_ESTIMATORS; ++j) {
-      for (int r = 0; r < actual_nboot; ++r)
-        col[r] = boot_results[static_cast<size_t>(r) * N_ESTIMATORS + j];
+      const double* col_j = boot_results + static_cast<size_t>(j) * actual_nboot;
+      std::copy(col_j, col_j + actual_nboot, col.begin());
       std::sort(col.begin(), col.end());
       boot_lowers[j] = col[lo_idx];
       boot_uppers[j] = col[hi_idx];

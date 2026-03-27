@@ -21,8 +21,6 @@
 * `print.robscale_ci` now shows the CI method in the output header
   (e.g., `95% CI (analytical): [0.6123, 1.1456]`).
 
-# robscale 0.5.2
-
 ## Portability
 
 * **AVX2 detection guarded for non-GCC/Clang compilers** (WU-PORT-1):
@@ -68,6 +66,19 @@
   before the parallel region to avoid repeated CPUID lookups inside
   the lambda. Gate results: ~11% speedup at n = 1,000--10,000
   (stable-zone ratio ≈ 0.89).
+
+* **AVX-512 tanh dispatch**: On glibc ≥ 2.35 systems where libmvec provides
+  `_ZGVeN8v_tanh`, the bulk tanh kernel processes 8 doubles per iteration
+  instead of 4. CPUID dispatch ensures the 8-wide path runs only on AVX-512F
+  hardware; other systems fall through to AVX2 with zero overhead.
+
+* **GMD AVX2 FMA kernel**: The Gini mean difference weighted sum uses a shared
+  `gmd_weighted_sum` kernel with `_mm256_fmadd_pd` for n ≥ 8 on AVX2
+  hardware, replacing three duplicate scalar loops.
+
+* **Estimator-major bootstrap layout**: `boot_results` is stored as
+  7 × n_boot (estimator-major) so the mean/variance reduction pass reads each
+  estimator's replicates contiguously (stride-1 instead of stride-7).
 
 ## Internal
 

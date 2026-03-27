@@ -44,14 +44,15 @@ else
   echo "  SLEEF not detected, falling back to Accelerate/OpenMP"
 fi
 
-# Detect glibc libmvec _ZGVdN4v_tanh (Linux, glibc >= 2.35)
+# Detect glibc libmvec _ZGVdN4v_tanh (Linux x86_64, glibc >= 2.35)
 # libmvec is 25-50% faster than SLEEF for 4-wide double tanh on Zen/Skylake.
-# Guard: requires HAS_SLEEF (so ROBSCALE_HAS_AVX2_DISPATCH is also present),
-# Linux-only (macOS uses Accelerate, Windows uses SLEEF).
+# Independent of SLEEF: libmvec is a glibc-native AVX2 tanh that needs no
+# third-party library.  ROBSCALE_HAS_AVX2_DISPATCH (compiler-derived in
+# robscale_config.h) provides the target-attribute infrastructure.
 HAS_GLIBC_MVEC="no"
 GLIBC_MVEC_CFLAGS=""
 GLIBC_MVEC_LIBS=""
-if [ "${HAS_SLEEF}" = "yes" ] && [ "$(uname -s)" = "Linux" ]; then
+if [ "$(uname -s)" = "Linux" ]; then
   # Test 1: glibc >= 2.35 (versioned _ZGVdN4v_tanh@GLIBC_2.35 requires this)
   cat > conftest_glibc.c << 'CFEOF'
 #include <features.h>
@@ -71,15 +72,37 @@ CFEOF
       HAS_GLIBC_MVEC="yes"
       GLIBC_MVEC_CFLAGS="-DROBSCALE_HAS_GLIBC_MVEC"
       GLIBC_MVEC_LIBS="-lmvec"
-      echo "  glibc libmvec _ZGVdN4v_tanh detected (preferred over SLEEF)"
+      echo "  glibc libmvec _ZGVdN4v_tanh detected (preferred AVX2 tanh)"
     else
-      echo "  libmvec not available, retaining SLEEF"
+      echo "  libmvec not available"
     fi
     rm -f conftest_mvec.c conftest_mvec
   else
-    echo "  glibc < 2.35, retaining SLEEF"
+    echo "  glibc < 2.35, libmvec not available"
   fi
   rm -f conftest_glibc.c conftest_glibc
+fi
+
+# Detect glibc libmvec _ZGVeN8v_tanh (AVX-512 8-wide tanh, Linux x86_64)
+# Links from the same libmvec as the 4-wide variant. No separate -l needed
+# when GLIBC_MVEC_LIBS is already set. On non-AVX-512 hardware (Zen 3) the
+# symbol links but is never called; CPUID dispatches to the AVX2 path.
+HAS_AVX512_TANH="no"
+AVX512_TANH_CFLAGS=""
+if [ "${HAS_GLIBC_MVEC}" = "yes" ]; then
+  cat > conftest_mvec512.c << 'CFEOF'
+typedef double v8d __attribute__((vector_size(64)));
+extern v8d _ZGVeN8v_tanh(v8d);
+int main(void) { v8d x = {0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}; v8d r = _ZGVeN8v_tanh(x); return (int)r[0]; }
+CFEOF
+  if ${CC:-gcc} conftest_mvec512.c -lmvec -o conftest_mvec512 2>/dev/null; then
+    HAS_AVX512_TANH="yes"
+    AVX512_TANH_CFLAGS="-DROBSCALE_HAS_AVX512_TANH"
+    echo "  glibc libmvec _ZGVeN8v_tanh detected (AVX-512 8-wide tanh)"
+  else
+    echo "  _ZGVeN8v_tanh not available (libmvec too old or not AVX-512 enabled)"
+  fi
+  rm -f conftest_mvec512.c conftest_mvec512
 fi
 
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
@@ -166,6 +189,7 @@ sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
     -e "s|@OMP_PARALLEL_LIBS@|${OMP_PARALLEL_LIBS}|" \
     -e "s|@GLIBC_MVEC_CFLAGS@|${GLIBC_MVEC_CFLAGS}|" \
     -e "s|@GLIBC_MVEC_LIBS@|${GLIBC_MVEC_LIBS}|" \
+    -e "s|@AVX512_TANH_CFLAGS@|${AVX512_TANH_CFLAGS}|" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"

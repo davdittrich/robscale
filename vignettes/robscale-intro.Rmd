@@ -1,6 +1,7 @@
 ---
 title: "Introduction to robscale"
 output: rmarkdown::html_vignette
+bibliography: ../inst/references.bib
 vignette: >
   %\VignetteIndexEntry{Introduction to robscale}
   %\VignetteEngine{knitr::rmarkdown}
@@ -45,10 +46,10 @@ deviation has a 0% breakdown point; a single outlier drives it to infinity.
 The GMD achieves 29.3%; `qn` and `sn` achieve the maximum 50%.
 
 The **asymptotic relative efficiency** (ARE) measures statistical efficiency
-relative to the sample standard deviation under the Gaussian model. High
-efficiency means fewer observations are needed to match the standard
-deviation's precision. The tradeoff is inherent: higher breakdown point
-generally costs efficiency.
+relative to the sample standard deviation under the Gaussian model
+[@bickel1976]. High efficiency means fewer observations are needed to match
+the standard deviation's precision. The tradeoff is inherent: higher breakdown
+point generally costs efficiency.
 
 `robscale` exposes all major points on this robustness--efficiency frontier.
 
@@ -90,17 +91,15 @@ robustness--efficiency spectrum:
 | :--- | ---: | ---: | :--- |
 | `sd_c4(x)` | 100% | 0% | Bias-corrected standard deviation |
 | `gmd(x)` | 98% | 29.3% | Gini mean difference |
-| `adm(x)` | 88.3% | 25% | Average deviation from median |
+| `adm(x)` | 88.3% | $1/n$ | Average deviation from median |
 | `qn(x)` | 82.3% | 50% | Rousseeuw--Croux $Q_n$ |
 | `sn(x)` | 58.2% | 50% | Rousseeuw--Croux $S_n$ |
 | `iqr_scaled(x)` | 37% | 25% | Scaled interquartile range |
 | `mad_scaled(x)` | 36.7% | 50% | Scaled median absolute deviation |
-| `robScale(x)` | ~50--70%¹ | 50% | M-estimator for scale |
+| `robScale(x)` | ~55% | 50% | M-estimator for scale |
 | `robLoc(x)` | 98.4% | 50% | M-estimator for location |
 | `scale_robust(x)` | ensemble | --- | Variance-weighted dispatcher |
 | `get_consistency_constant(n)` | --- | --- | Finite-sample bias correction factors |
-
-¹ ARE varies with sample size.
 
 ### Decision guide
 
@@ -119,10 +118,11 @@ robustness--efficiency spectrum:
 ### Ensemble mode ($n < 20$)
 
 For small samples, all 7 scale estimators run on bootstrap replicates.
-Inverse-variance weights combine them into a single estimate:
+Inverse-variance weights---where the variance is the bootstrap variance of
+each estimator across replicates---combine them into a single estimate:
 
 $$
-\hat\sigma = \frac{\sum_{j=1}^{7} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{7} 1/\hat\sigma_j^2}
+\hat\sigma = \frac{\sum_{j=1}^{7} \hat\sigma_j(x) \,/\, \operatorname{Var}_{\mathrm{boot}}(\hat\sigma_j)}{\sum_{j=1}^{7} 1 \,/\, \operatorname{Var}_{\mathrm{boot}}(\hat\sigma_j)}
 $$
 
 ```{r ensemble}
@@ -166,8 +166,8 @@ sd_c4(x, ci = TRUE)
 
 ### `gmd(x)`: Gini mean difference
 
-Average absolute pairwise difference, computed via the order-statistics form
-in $O(n \log n)$:
+Average absolute pairwise difference [@gini1912], computed via the
+order-statistics form in $O(n \log n)$:
 
 ```{r gmd}
 gmd(c(1, 2, 3, 5, 7, 8))
@@ -176,11 +176,14 @@ gmd(c(1, 2, 3, 5, 7, 8), ci = TRUE)
 
 ### `adm(x)`: Average deviation from the median
 
+The mean deviation from the median [@nair1936; @nair1947], scaled for
+consistency at the normal distribution.
+
 ```{r adm}
 adm(c(1, 2, 3, 5, 7, 8))
 ```
 
-### `qn(x)`: Rousseeuw--Croux $Q_n$
+### `qn(x)`: Rousseeuw--Croux $Q_n$ [@rousseeuw1993]
 
 ```{r qn}
 qn(c(1, 2, 3, 5, 7, 8))
@@ -204,7 +207,7 @@ mad_scaled(c(1, 2, 3, 5, 7, 8))
 ### `robLoc(x)`: M-estimator for location
 
 M-estimator for location via Newton--Raphson iteration on the logistic psi
-function (Rousseeuw & Verboven 2002, Eq. 21). Starting value:
+function [@rousseeuw2002, Eq. 21]. Starting value:
 $T^{(0)} = \text{median}(x)$; auxiliary scale: $S = \text{MAD}(x)$.
 
 **Fallback:** When scale is unknown and $n < 4$, or when scale is known and
@@ -239,8 +242,8 @@ flowchart TD
 
 ### `robScale(x)`: M-estimator for scale
 
-M-estimator for scale via multiplicative iteration with the rho function
-(Rousseeuw & Verboven 2002, Eq. 27). Starting value: $S^{(0)} = \text{MAD}(x)$.
+M-estimator for scale via Newton--Raphson iteration on the M-scale
+estimating equation [@rousseeuw2002]. Starting value: $S^{(0)} = \text{MAD}(x)$.
 
 ```{r robscale}
 robScale(c(1, 2, 3, 5, 7, 8))
@@ -248,7 +251,7 @@ robScale(c(5, 5, 5, 5, 6), fallback = "na")   # revss compatibility
 robScale(c(1, 2, 3, 5, 7, 8), ci = TRUE)
 ```
 
-Multiplicative iteration for `robScale()`:
+Newton--Raphson iteration for `robScale()`:
 
 ```
 flowchart TD
@@ -268,10 +271,10 @@ flowchart TD
     E -- No --> G([Return s])
     D -- No --> H{s <= implbound?}
     H -- Yes --> F
-    H -- No --> J[psi_i = tanh( (x_i - t) / (2cs) )]
-    J --> K[sum_rho = Sum psi_i^2]
-    K --> L[v = sqrt( 2 * sum_rho / n ), s *= v]
-    L --> M{abs(v - 1) <= tol?}
+    H -- No --> J["u_i = (x_i - t) / (2cs), compute tanh(u_i)"]
+    J --> K["numer = Σtanh²/n − 0.5<br/>denom = (2/n)·Σ(u·tanh·sech²)"]
+    K --> L["Δs = s · numer / denom<br/>s ← s + Δs"]
+    L --> M{"|Δs|/s ≤ tol?"}
     M -- No --> J
     M -- Yes --> N([Return s])
 ```
@@ -300,16 +303,28 @@ The CI return type is a named list with `estimate`, `lower`, `upper`, and
 ### SIMD vectorization
 
 The logistic psi function satisfies $\psi_{\log}(x) = \tanh(x/2)$. `robscale`
-evaluates `tanh` in bulk using the fastest available platform backend:
+evaluates `tanh` in bulk using the fastest available platform backend.
+The `configure` script selects one of two vectorized `tanh` libraries at
+compile time; at runtime, CPUID selects the widest available instruction set:
 
 1. **Apple Accelerate** (`vvtanh`): array-wide SIMD on macOS.
-2. **glibc libmvec** (`_ZGVdN4v_tanh`): AVX2-vectorized `tanh` on Linux
-   x86\_64 with glibc $\geq$ 2.22 (Ubuntu 16.04+, Arch, Fedora 23+).
-3. **SLEEF**: AVX2-vectorized fallback when libmvec is absent at link time.
-4. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
-5. **Scalar** `std::tanh`: universal fallback.
+2. **glibc libmvec** (Linux x86\_64, glibc $\geq$ 2.35) or **SLEEF**
+   (fallback when libmvec is absent). Only one is linked per binary.
+   Within the linked library, CPUID dispatches to:
+   - **AVX-512 8-wide** (`_ZGVeN8v_tanh`): 8 doubles per iteration on
+     AVX-512F hardware.
+   - **AVX2 4-wide** (`_ZGVdN4v_tanh` or `Sleef_tanhd4_u10avx2`): 4
+     doubles per iteration.
+3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
+4. **Scalar** `std::tanh`: universal fallback.
 
-For $n < 8$, vectorized paths are bypassed.
+For $n < 8$, vectorized paths are bypassed; fewer than two full AVX2 vectors
+yield no net gain.
+
+The Gini mean difference uses a separate AVX2 FMA kernel
+(`_mm256_fmadd_pd`) for its weighted sum $\sum (2i - (n-1))\, x_{(i)}$,
+shared across the standalone `gmd()`, the ensemble bootstrap, and the BCa
+jackknife. This kernel activates for $n \geq 8$ on AVX2 hardware.
 
 ### $O(n)$ median selection
 
@@ -327,8 +342,8 @@ For $n < 8$, vectorized paths are bypassed.
 | 16 | 60 |
 
 - **$17 \leq n < 600$**: `std::nth_element` (introselect, $O(n)$ worst-case).
-- **$n \geq 600$**: Floyd--Rivest algorithm, which narrows the active window to
-  $O(n^{2/3})$ elements before partitioning.
+- **$n \geq 600$**: Floyd--Rivest algorithm [@floyd1975], which narrows the
+  active window to $O(n^{2/3})$ elements before partitioning.
 
 The crossover between Floyd--Rivest and pdqselect is derived at runtime from
 the per-core L2 cache size; each estimator uses its own threshold based on
@@ -344,8 +359,10 @@ working-set pressure:
 
 ### Stack-allocated memory arenas
 
-A 64-double micro-buffer covers $n \leq 64$; a 2,048-double buffer handles
-$n \leq 2{,}048$ --- both stack-allocated, eliminating heap traffic.
+A 128-double micro-buffer (1 KB) covers the smallest samples ($n \leq 128$
+for MAD, $n \leq 64$ for `robScale` and `robLoc`). For $n \leq 2{,}048$,
+two stack-allocated arrays of 2,048 doubles each (32 KB total) avoid heap
+allocation.
 
 **Fused single-buffer algorithm.** After median selection the working buffer
 holds a permutation of the input. Because MAD is order-invariant, absolute
@@ -368,10 +385,10 @@ costs only squaring and subtraction. Typical iteration counts:
 
 | $n$ | Scoring | Newton--Raphson |
 | ---: | ---: | ---: |
-| 4 | 7 | 3 |
-| 8 | 7 | 3 |
-| 20 | 6 | 3 |
-| 100 | 5 | 3 |
+| 4 | 7 | 2--4 |
+| 8 | 7 | 2--4 |
+| 20 | 6 | 2--4 |
+| 100 | 5 | 2--4 |
 
 **Fused AVX2 kernel for `robLoc()`.** `rob_loc_nr_step_avx2` collapses three
 passes into one. Two AVX2 accumulators advance in lockstep:
@@ -387,37 +404,38 @@ $$
 \sum \text{dpsi} = n - \sum p_i^2
 $$
 
-**`robScale`: Aitken $\Delta^2$ acceleration.** The multiplicative fixed-point
-iteration for scale (shown in the flowchart above) converges linearly.
-`robScale` applies Aitken's $\Delta^2$ process (Aitken 1926; Steffensen 1933)
-in Steffensen mode to accelerate it: after every two standard steps that produce
-the triplet $(s_0, s_1, s_2)$, the algorithm extrapolates to
+**`robScale`: Newton--Raphson.** Scale estimation also uses Newton--Raphson,
+applied to the M-scale estimating equation $n^{-1}\sum \rho(u_i) = 1/2$.
+The fused single-pass kernel (`nr_scale_step_avx2` / `nr_scale_step_scalar`)
+computes $\sum \tanh^2(u_i)$ and $\sum u_i \tanh(u_i)\,\text{sech}^2(u_i)$ in
+one read over the data, yielding the NR update
+$\Delta s = s \cdot (\bar\rho - \tfrac{1}{2}) / \bar{D}$
+where $\bar{D}$ is the scaled derivative sum. The same quadratic convergence as
+`robLoc` applies; typical iteration counts are 3--4. A degenerate-denominator
+guard falls back to a multiplicative half-step when $|\bar{D}|$ is near zero.
 
-$$
-s_{\text{acc}} = s_2 - \frac{(s_2 - s_1)^2}{s_2 - 2\,s_1 + s_0}
-$$
-
-This eliminates the dominant linear error term and converts the pair of steps
-into an effectively superlinear update. Two acceptance conditions protect the
-extrapolant: the sequence must be monotone and contracting
-($d_1 d_2 > 0$ and $|d_2| < |d_1|$ where $d_k = s_k - s_{k-1}$), and the
-candidate must be positive. When the sequence oscillates ($d_1 d_2 < 0$),
-$s_1$ and $s_2$ bracket $s^*$; the algorithm falls back to the geometric mean
-$\sqrt{s_1 s_2}$, which halves the log-distance to $s^*$ per outer iteration.
-Across typical data, Aitken acceleration reduces the iteration count by
-30--50\% at small $n$ and by approximately 20\% at large $n$.
-
-### TBB parallelism
+### TBB parallelism and ensemble design
 
 $Q_n$ and $S_n$ partition inner loops across TBB threads for $n$ above a
-runtime L2-derived threshold. `scale_robust()` parallelizes the
-$n_{\text{boot}}$ bootstrap iterations across cores.
+runtime L2-derived threshold. The ensemble bootstrap parallelizes across
+TBB threads when $n \times n_{\text{boot}} \geq 10{,}000$; with default
+settings ($n < 20$, $n_{\text{boot}} = 200$) the bootstrap runs serially.
+
+The ensemble bootstrap stores results in estimator-major layout
+($7 \times n_{\text{boot}}$): each estimator's replicates occupy a contiguous
+memory column, so the mean/variance reduction pass reads at stride-1 rather
+than stride-7. Within each replicate, the bootstrap resample is sorted once
+and reused by all seven estimators; pre-allocated workspace buffers eliminate
+per-replicate heap allocation for $S_n$ and $Q_n$. Bootstrap resampling uses
+a deterministic XorShift32 PRNG [@marsaglia2003] seeded per replicate for
+reproducibility.
 
 ### Numerical stability and compile-time optimizations
 
-- `sd_c4` uses Welford's one-pass algorithm for numerically stable variance.
-- Reciprocal constants ($1/\alpha$, $1/c$) are `constexpr`, replacing
-  inner-loop divisions with multiplications.
+- `sd_c4` uses Welford's one-pass algorithm [@welford1962] for numerically
+  stable variance.
+- The reciprocal constant $1/c$ is `constexpr`, replacing an inner-loop
+  division with multiplication.
 - Loop-invariant quantities (`inv_s`, `half_inv_s`, `inv_n`) are hoisted
   before the iteration loop.
 - Sorting-network entry points are instantiated in a single translation unit,
@@ -427,7 +445,7 @@ $n_{\text{boot}}$ bootstrap iterations across cores.
 
 ### Logistic psi function
 
-(Rousseeuw & Verboven 2002, Eq. 23):
+[@rousseeuw2002, Eq. 23]:
 
 $$
 \psi_{\log}(x) = \frac{e^x - 1}{e^x + 1} = \tanh(x/2)
@@ -444,7 +462,7 @@ scale at $\text{MAD}(x)$; `robScale` fixes location at $\text{median}(x)$.
 
 ### Rho function for scale
 
-(Rousseeuw & Verboven 2002, Eq. 26):
+[@rousseeuw2002, Eq. 26]:
 
 $$
 \rho_{\log}(x) = \psi_{\log}^2(x / c)
@@ -483,15 +501,17 @@ $O(n \log n)$ via sorted-array indexing.
 
 ### Ensemble weighting formula
 
+Weights are the normalized inverse bootstrap variances
+$w_j = (1/V_j) / \sum_k (1/V_k)$ where $V_j = \operatorname{Var}_{\text{boot}}(\hat\sigma_j)$:
+
 $$
-\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) / \hat\sigma_j^2}{\sum_{j=1}^{J} 1/\hat\sigma_j^2}
+\hat\sigma = \frac{\sum_{j=1}^{J} \hat\sigma_j(x) \,/\, \operatorname{Var}_{\mathrm{boot}}(\hat\sigma_j)}{\sum_{j=1}^{J} 1 \,/\, \operatorname{Var}_{\mathrm{boot}}(\hat\sigma_j)}
 $$
 
 ### Key constants (full double precision)
 
 | Symbol | Value | Definition |
 | :--- | :--- | :--- |
-| $\alpha$ | `0.413241928283814` | $\int \psi_{\log}'(u)\,d\Phi(u)$; scoring normalization constant |
 | $c$ | `0.37394112142347236` | Solution to $\int \rho_{\log}(u)\,d\Phi(u) = 0.5$; scale rho constant |
 | $C_{\text{ADM}}$ | `1.2533141373155001` | $\sqrt{\pi/2}$; ADM consistency constant |
 | $C_{\text{MAD}}$ | `1.482602218505602` | $1/\Phi^{-1}(3/4)$; MAD consistency constant |
@@ -513,8 +533,9 @@ robscale::robScale(x)   # same value
 ```
 
 Note: `revss` v3.1.0 updated its bias correction factors; `robscale` follows
-the original Rousseeuw & Verboven (2002) definitions, so results may differ at
-convergence tolerance.
+the @rousseeuw2002 estimating equations and constants but solves them via
+Newton--Raphson rather than the original multiplicative iteration, so results
+may differ at convergence tolerance.
 
 ### robustbase API
 
@@ -529,41 +550,3 @@ At tolerance $\sqrt{\epsilon_{\text{mach}}} \approx 1.49 \times 10^{-8}$,
 `tests/testthat/test-cross-check.R` for full test coverage.
 
 ## 10. References
-
-Aitken, A.C. (1926). On Bernoulli's numerical solution of algebraic equations.
-*Proceedings of the Royal Society of Edinburgh*, **46**, 289--305.
-<https://doi.org/10.2307/2333958>
-
-Bickel, P.J. and Lehmann, E.L. (1976). Descriptive Statistics for Nonparametric
-Models III. Dispersion. *Annals of Statistics*, **4**(6), 1139--1158.
-<https://doi.org/10.1214/aos/1176343648>
-
-Floyd, R.W. and Rivest, R.L. (1975). Expected time bounds for selection.
-*Communications of the ACM*, **18**(3), 165--172.
-<https://doi.org/10.1145/360680.360691>
-
-Gini, C. (1912). *Variabilita e mutabilita*. Bologna: Tipografia di Paolo
-Cuppini.
-
-Marsaglia, G. (2003). Xorshift RNGs. *Journal of Statistical Software*,
-**8**(14), 1--6. <https://doi.org/10.18637/jss.v008.i14>
-
-Nair, K.R. (1936). On the Mean Deviation. *Biometrika*, **28**(3/4), 428--436.
-
-Nair, K.R. (1947). A Note on the Mean Deviation from the Median. *Biometrika*,
-**34**(3/4), 360--362.
-
-Rousseeuw, P.J. and Croux, C. (1993). Alternatives to the Median Absolute
-Deviation. *Journal of the American Statistical Association*, **88**, 1273--1283.
-<https://doi.org/10.1080/01621459.1993.10476408>
-
-Rousseeuw, P.J. and Verboven, S. (2002). Robust estimation in very small
-samples. *Computational Statistics & Data Analysis*, **40**(4), 741--758.
-<https://doi.org/10.1016/S0167-9473(02)00078-6>
-
-Steffensen, J.F. (1933). Remarks on iteration. *Skandinavisk Aktuarietidskrift*,
-**16**, 64--72. <https://doi.org/10.1080/03461238.1933.10419209>
-
-Welford, B.P. (1962). Note on a Method for Calculating Corrected Sums of
-Squares and Products. *Technometrics*, **4**(3), 419--420.
-<https://doi.org/10.1080/00401706.1962.10490022>

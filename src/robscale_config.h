@@ -160,16 +160,29 @@ struct StackArena {
 };
 
 // --- Runtime SIMD dispatch ---
-// Per-function target attributes: the compiler emits AVX2/FMA instructions
-// for annotated functions without requiring -mavx2 globally.  This produces
-// a portable binary that activates AVX2 at runtime on capable hardware.
-// Supported by GCC 4.9+, all Clang, all Rtools MinGW-w64 GCC.
+// Per-function target attributes: the compiler emits AVX2/FMA or AVX-512F
+// instructions for annotated functions without requiring -mavx2 globally.
+// Produces a portable binary that activates the best available SIMD path
+// at runtime via CPUID.  Supported by GCC 4.9+, all Clang, Rtools MinGW GCC.
 #if (defined(__x86_64__) || defined(_M_X64)) && \
     (defined(__GNUC__) || defined(__clang__))
-  #define ROBSCALE_TARGET_AVX2  __attribute__((target("avx2,fma")))
-  #define ROBSCALE_HAS_AVX2_DISPATCH 1
+  #define ROBSCALE_TARGET_AVX2     __attribute__((target("avx2,fma")))
+  #define ROBSCALE_TARGET_AVX512F  __attribute__((target("avx512f")))
+  #define ROBSCALE_HAS_AVX2_DISPATCH   1
+  #define ROBSCALE_HAS_AVX512_DISPATCH 1
 #else
   #define ROBSCALE_TARGET_AVX2
+  #define ROBSCALE_TARGET_AVX512F
+#endif
+
+// Umbrella: any AVX2-vectorized tanh backend available.
+// Resolves to glibc libmvec _ZGVdN4v_tanh (preferred, 25-50% faster on
+// Zen/Skylake) or SLEEF Sleef_tanhd4_u10avx2 (fallback) via ROBSCALE_TANH4_AVX2.
+// libmvec works standalone without SLEEF; SLEEF is the fallback for older glibc
+// (< 2.35) or non-glibc platforms.
+#if defined(ROBSCALE_HAS_AVX2_DISPATCH) && \
+    (defined(ROBSCALE_HAS_GLIBC_MVEC) || defined(ROBSCALE_HAS_SLEEF))
+  #define ROBSCALE_HAS_AVX2_TANH 1
 #endif
 
 #endif // ROBSCALE_CONFIG_H

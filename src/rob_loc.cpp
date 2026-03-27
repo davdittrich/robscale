@@ -33,8 +33,7 @@
 // @param out_psi   [out] Σ tanh(u_i)
 // @param out_dpsi  [out] Σ (1 - tanh²(u_i)) = range_n - Σ tanh²(u_i)
 // ---------------------------------------------------------------------------
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
 ROBSCALE_TARGET_AVX2
 static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n,
                                   double t, double half_inv_s,
@@ -74,7 +73,7 @@ static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n
   *out_psi  = sum_psi;
   *out_dpsi = (double)range_n - sum_p2;   // Σ(1-p²) = range_n - Σp²
 }
-#endif // ROBSCALE_HAS_SLEEF && ROBSCALE_HAS_AVX2_DISPATCH
+#endif // ROBSCALE_HAS_AVX2_TANH
 
 // ---------------------------------------------------------------------------
 // OPT-L3: TBB parallel quadratic NR reduction
@@ -91,8 +90,7 @@ static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n
 // the previous t).  Only the inner sum per iteration is parallelized.
 // ---------------------------------------------------------------------------
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
-    defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+    defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
 
 struct NRAccum {
   double psi{0.0}, dpsi{0.0};
@@ -161,8 +159,7 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
   // OPT-L1+L2: hoist SIMD dispatch check once before the NR loop.
   // use_fused: dispatch to rob_loc_nr_step_avx2 (fused single-pass kernel).
   //   Scalar fallback (n<4 or non-AVX2): single-pass std::tanh loop.
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   const bool use_fused = (n >= 4) &&  // OPT-RL1: lowered from n>=8 to n>=4
     (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
      robscale::qnsn::SIMDLevel::AVX2);
@@ -171,8 +168,7 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
   for (int k = 0; k < maxit; ++k) {
     double sum_psi, sum_dpsi;
 
-#if defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
     if (use_fused) {
       rob_loc_nr_step_avx2(xp, (int)n, t, half_inv_s, &sum_psi, &sum_dpsi);
     } else
@@ -232,8 +228,7 @@ static double rob_loc_core(const double* ROBSCALE_RESTRICT xp, size_t n,
   // Condition: TBB+SLEEF+AVX2 compiled in, n >= rob_scale_parallel_threshold
   // (reusing robScale's threshold — same per-element work), AVX2 at runtime.
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
-    defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+    defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   {
     const auto& cfg = robscale::qnsn::RuntimeConfig::get();
     if (n >= cfg.rob_scale_parallel_threshold &&
@@ -342,8 +337,7 @@ double rob_loc_scalar_impl(Rcpp::NumericVector x) {
 // [[Rcpp::export]]
 bool rob_loc_has_parallel() {
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
-    defined(ROBSCALE_HAS_SLEEF) && !defined(ROBSCALE_HAS_ACCELERATE) && \
-    defined(ROBSCALE_HAS_AVX2_DISPATCH)
+    defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   return robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
          robscale::qnsn::SIMDLevel::AVX2;
 #else

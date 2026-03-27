@@ -68,12 +68,11 @@
 #' of 80 is a conservative safety limit.
 #'
 #' \strong{Performance and SIMD.}
-#' The underlying C++ core utilizes platform-specific SIMD (Single Instruction,
-#' Multiple Data) backends (glibc libmvec on Linux x86\_64, Apple Accelerate on
-#' macOS; SLEEF as Linux fallback) to
-#' vectorize the \code{tanh} evaluations. This architectural choice delivers
-#' substantial performance gains, particularly for large-scale or
-#' high-throughput workflows.
+#' The C++ kernel dispatches \code{tanh} to the fastest available backend:
+#' Apple Accelerate on macOS, glibc libmvec (AVX-512 8-wide or AVX2 4-wide)
+#' on Linux x86\_64, SLEEF when libmvec is absent, or \code{#pragma omp simd}
+#' as a portable fallback. A fused AVX2 kernel accumulates \eqn{\psi_i} and
+#' \eqn{\mathrm{d}\psi_i} in a single pass, halving memory reads.
 #'
 #' \strong{Fallback Mechanism.}
 #' For extremely small samples where iteration may be unreliable, the function

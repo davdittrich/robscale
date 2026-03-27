@@ -34,7 +34,7 @@ Defaults to \code{1e-4}. Passing a value of 0 disables implosion checks.}
 \code{x} before computation. If \code{FALSE} (the default), the presence
 of any \code{NA} raises an error.}
 
-\item{maxit}{Maximum number of iterations for the multiplicative algorithm.
+\item{maxit}{Maximum number of Newton--Raphson iterations.
 Defaults to 80.}
 
 \item{tol}{Convergence tolerance. Iteration stops when the relative
@@ -81,38 +81,25 @@ the logistic M-estimator of scale achieves an \bold{asymptotic relative
 efficiency (ARE) of 0.55} compared to the sample standard deviation.
 
 \strong{Numerical Computation.}
-The estimating equation is solved by multiplicative iteration (Rousseeuw &
-Verboven, 2002, Eq.\sspace{}27):
-
-\deqn{S^{(k+1)} = S^{(k)} \cdot \sqrt{2 \cdot \frac{1}{n} \sum \psi_{\mathrm{log}}^2 \left( \frac{x_i - T}{c \cdot S^{(k)}} \right)}}{S(k+1) = S(k) * sqrt(2 * mean(psi((x_i - T) / (c * S(k)))^2))}
-
-The algorithm starts at the Median Absolute Deviation (MAD). Because
-location is held fixed at the sample median, the estimator follows a
-"decoupled" approach that avoids the positive-feedback instabilities
-often seen in simultaneous location--scale estimation (Proposal 2)
-at very small sample sizes.
-
-\strong{Convergence.}
-The multiplicative update is a linearly converging fixed-point iteration:
-the contraction rate \eqn{T'(s^*)}{T'(s*)} lies strictly in \eqn{(0, 1)}{(0,1)}
-at the solution.  This contrasts with \code{\link{robLoc}}, where the
-Newton--Raphson denominator is the observed Hessian
-\eqn{\sum \operatorname{sech}^2\!\bigl((x_i - t)/(2s)\bigr)}{sum(sech^2((x_i-t)/(2s)))},
-obtainable for free as \eqn{1 - \tanh^2}{1 - tanh^2} and giving
-\eqn{T'(t^*) = 0}{T'(t*) = 0} (quadratic convergence).  Applying
-Newton--Raphson to the scale equation would require a second per-iteration
-accumulation --- \eqn{\sum z_i \rho'(z_i)}{sum(z_i*rho'(z_i))} --- not
-obtainable as a byproduct of the rho sum, unlike the location case.
-Aitken \eqn{\Delta^2}{Delta^2} (Steffensen) acceleration is applied instead,
-reducing iteration count by approximately 30--50\% at no additional kernel cost.
+The M-scale estimating equation \eqn{n^{-1}\sum\rho(u_i) = 1/2} is solved
+by Newton--Raphson iteration, starting from the MAD. Each step computes
+\eqn{u_i = (x_i - T)/(2cS)} and accumulates two sums in a single pass:
+\eqn{\sum \tanh^2(u_i)}{sum(tanh^2(u_i))} (the rho sum) and
+\eqn{\sum u_i \tanh(u_i)\operatorname{sech}^2(u_i)}{sum(u_i*tanh(u_i)*sech^2(u_i))}
+(the derivative sum). The NR update is
+\deqn{\Delta S = S \cdot \frac{\bar\rho - 1/2}{(2/n)\sum u_i \tanh(u_i)\operatorname{sech}^2(u_i)}}{dS = S * (mean_rho - 0.5) / ((2/n) * sum(u*tanh(u)*sech^2(u)))}
+with convergence test \eqn{|\Delta S|/S \le \mathrm{tol}}{|dS|/S <= tol}.
+When the derivative sum degenerates, the iteration falls back to a
+multiplicative half-step. Quadratic convergence yields 3--4 iterations
+on typical data. Location is held fixed at the sample median, following
+the decoupled approach of Rousseeuw and Verboven (2002) that avoids the
+positive-feedback instabilities of simultaneous location--scale estimation.
 
 \strong{Performance and SIMD.}
-The C++ implementation leverages platform-specific SIMD (Single Instruction,
-Multiple Data) backends (glibc libmvec on Linux x86\_64, Apple Accelerate on
-macOS; SLEEF as Linux fallback) to
-\eqn{\psi_{\mathrm{log}}} evaluations (via \code{tanh}). This specialized
-architecture typically yields an 11--39x speedup over pure-R code for
-samples of size \eqn{n \le 20}.
+The C++ kernel dispatches \code{tanh} to the fastest available backend:
+Apple Accelerate on macOS, glibc libmvec (AVX-512 8-wide or AVX2 4-wide)
+on Linux x86\_64, SLEEF when libmvec is absent, or \code{#pragma omp simd}
+as a portable fallback.
 
 \strong{Known location.}
 When \code{loc} is supplied, the observations are centered as

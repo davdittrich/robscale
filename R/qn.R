@@ -32,13 +32,13 @@
 #' \strong{Computational Performance.}
 #' While the naive calculation of \eqn{Q_n} requires \eqn{O(n^2)} space and
 #' time, this implementation employs a specialized \eqn{O(n \log n)} algorithm.
-#' The package utilizes a tiered execution strategy:
+#' The implementation uses a tiered execution strategy:
 #' \itemize{
 #'   \item \bold{Optimal sorting networks} for very small samples (\eqn{n \le 16}).
 #'     These networks eliminate branch misprediction in the target regimes of
 #'     extremely small samples.
-#'   \item A specialized \bold{Johnson--Mizoguchi selection} algorithm for
-#'     medium-sized datasets.
+#'   \item A \bold{Croux--Rousseeuw weighted-median refinement} algorithm
+#'     for medium and large datasets.
 #'   \item \bold{Cache-aware parallelization} via Intel TBB (Threading Building
 #'     Blocks) for large-scale data, with thresholds derived from the detected
 #'     per-core L2 cache size.

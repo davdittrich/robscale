@@ -52,10 +52,10 @@ transient infrastructure timeout unrelated to the package.
 
 ## DOI URLs
 
-Several reference DOIs (Rousseeuw & Croux 1993, Aitken 1926, Steffensen 1933)
-return HTTP 403 during automated URL checks because the publishers
-(Taylor & Francis, JSTOR) block crawler requests. The URLs resolve correctly
-in a browser. They are correct and permanent DOIs.
+The Rousseeuw & Croux (1993) DOI (doi:10.1080/01621459.1993.10476408)
+returns HTTP 403 during automated URL checks because Taylor & Francis blocks
+crawler requests. The URL resolves correctly in a browser. It is a correct
+and permanent DOI.
 
 ## Method references
 
@@ -64,8 +64,6 @@ Key references for the methods implemented:
 - Rousseeuw, P.J. & Croux, C. (1993). Alternatives to the Median Absolute
   Deviation. *Journal of the American Statistical Association*, 88, 1273-1283.
   doi:10.1080/01621459.1993.10476408
-- Aitken, A.C. (1926). On Bernoulli's numerical solution of algebraic equations.
-  *Proceedings of the Royal Society of Edinburgh*, 46, 289-305.
-  doi:10.2307/2333958
-- Steffensen, J.F. (1933). Remarks on iteration. *Skandinavisk Aktuarietidskrift*,
-  16, 64-72. doi:10.1080/03461238.1933.10419209
+- Rousseeuw, P.J. & Verboven, S. (2002). Robust estimation in very small
+  samples. *Computational Statistics & Data Analysis*, 40(4), 741-758.
+  doi:10.1016/S0167-9473(02)00078-6
