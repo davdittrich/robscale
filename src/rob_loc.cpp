@@ -77,13 +77,17 @@ static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n
 #endif // ROBSCALE_HAS_SLEEF && ROBSCALE_HAS_AVX2_DISPATCH
 
 // ---------------------------------------------------------------------------
-// OPT-L3: TBB parallel NR reduction
+// OPT-L3: TBB parallel quadratic NR reduction
 //
-// For n >= rob_scale_parallel_threshold, the per-NR-iteration sum over n
-// elements is embarrassingly parallel.  Each TBB chunk calls rob_loc_nr_step_avx2
-// on its sub-range; the NRAccum struct carries (psi, dpsi) partial sums.
+// Same quadratic NR as rob_loc_compute: sum_dpsi = Σ sech²((x_i−t)/(2s)) is
+// the observed Hessian, recomputed each iteration from the current t.
+// T'(t*) = 0 → quadratic local convergence (not linear IRLS).
 //
-// The NR loop itself is serial across iterations (each update to t depends on
+// For n >= rob_scale_parallel_threshold, the per-NR-iteration inner sum over
+// n elements is embarrassingly parallel.  Each TBB chunk calls
+// rob_loc_nr_step_avx2 on its sub-range; NRAccum carries (psi, dpsi) partials.
+//
+// The outer NR loop is serial across iterations (each update to t depends on
 // the previous t).  Only the inner sum per iteration is parallelized.
 // ---------------------------------------------------------------------------
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
@@ -131,6 +135,15 @@ static double rob_loc_parallel_compute(const double* ROBSCALE_RESTRICT xp,
 
 /**
  * Portably optimized robLoc NR kernel (serial).
+ *
+ * CONVERGENCE: Quadratic Newton-Raphson, not linear IRLS.
+ *   sum_dpsi = Σ sech²((x_i−t)/(2s)) is recomputed each iteration from the
+ *   current t (observed Hessian / observed Fisher information).  This gives
+ *   T'(t*) = 0 and quadratic local convergence, unlike IRLS which uses a
+ *   fixed expected-information denominator and converges linearly with
+ *   |T'(t*)| < 1.  Consequence: typically 2–4 iterations on real data;
+ *   maxit=80 is a safety limit only.  Aitken/Steffensen acceleration
+ *   provides no benefit and can increase evaluation count.
  *
  * OPT-L1: dispatch to fused AVX2 single-pass kernel when available.
  * OPT-L2: RuntimeConfig::get() hoisted once before the NR loop.

@@ -75,6 +75,21 @@ the Newton step is computationally efficient, requiring no additional
 transcendental calls beyond the \code{tanh} evaluations used for the psi
 function itself.
 
+The denominator of the Newton step is the \emph{observed Fisher information}
+
+\deqn{\hat{I}(t) = \sum_{i=1}^{n}
+  \operatorname{sech}^2\!\left(\frac{x_i - t}{2S_n}\right),}{
+  I.hat(t) = sum(sech^2((x_i - t) / (2 * Sn))),}
+
+recomputed at each iteration using the current estimate \eqn{t}{t}.  This
+distinguishes the implementation from IRLS (iteratively reweighted least
+squares), which uses a fixed expected-information denominator and converges
+linearly.  Using the observed Hessian yields true Newton--Raphson: the
+fixed-point derivative at the solution satisfies \eqn{T'(t^*) = 0}{T'(t*)
+= 0}, giving \emph{quadratic} local convergence.  On typical data,
+convergence is achieved in two to four iterations; the \code{maxit} bound
+of 80 is a conservative safety limit.
+
 \strong{Performance and SIMD.}
 The underlying C++ core utilizes platform-specific SIMD (Single Instruction,
 Multiple Data) backends (SLEEF on Linux, Apple Accelerate on macOS) to
