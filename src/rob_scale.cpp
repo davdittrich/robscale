@@ -321,6 +321,9 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
      defined(ROBSCALE_HAS_OMP_PARALLEL)) && \
     defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   // OPT-6: UNLIKELY — parallel threshold only crossed for large n (rare path).
+  // Uses xp with data_offset=t (signed deviations); serial path below uses w
+  // with data_offset=0 (OPT-F abs-deviations). Both equivalent: the NR sums
+  // (tanh² and u·tanh·sech²) are even functions of u.
   if (ROBSCALE_UNLIKELY(n >= cfg.rob_scale_parallel_threshold && avx2))
     return rob_scale_parallel_compute(xp, n, t, s_init, maxit, tol);
 #endif

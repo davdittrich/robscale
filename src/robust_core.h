@@ -126,6 +126,9 @@ constexpr double ARE_SD_C4      = 1.00;
 ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n,
                                                   bool use_avx2,
                                                   bool use_avx512 = false) {
+  // n<8: scalar bypass. For n∈[4,7] with AVX2, skips one 4-wide vector
+  // iteration — acceptable: no hot-loop caller passes n<8 here.
+  // (NR kernels use nr_scale_step_avx2/scalar directly.)
   if (n < 8) {
     for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
     return;

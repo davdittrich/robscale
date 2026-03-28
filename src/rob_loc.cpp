@@ -245,7 +245,7 @@ static double rob_loc_core(const double* ROBSCALE_RESTRICT xp, size_t n,
   // (reusing robScale's threshold — same per-element work), AVX2 at runtime.
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
     defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  if (n >= cfg.rob_scale_parallel_threshold && avx2)
+  if (ROBSCALE_UNLIKELY(n >= cfg.rob_scale_parallel_threshold && avx2))
     return rob_loc_parallel_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
 #endif
 
