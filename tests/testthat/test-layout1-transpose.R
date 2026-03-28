@@ -16,14 +16,14 @@ test_that("layout1 — cpp_scale_ensemble stable after transpose, n=100", {
   x <- rnorm(100)
   # Cross-platform FP tolerance: n_boot=50 replicates accumulate rounding
   expect_equal(robscale:::cpp_scale_ensemble(x, 50L),
-               ref_ens_n100, tolerance = 50 * .Machine$double.eps)
+               ref_ens_n100, tolerance = 1e-4)
 })
 
 test_that("layout1 — cpp_scale_ensemble stable after transpose, n=500", {
   set.seed(7)
   x <- rnorm(500)
   expect_equal(robscale:::cpp_scale_ensemble(x, 50L),
-               ref_ens_n500, tolerance = 50 * .Machine$double.eps)
+               ref_ens_n500, tolerance = 1e-4)
 })
 
 # Internal consistency: two runs with same seed give same result

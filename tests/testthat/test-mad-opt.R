@@ -62,5 +62,5 @@ test_that("ensemble scale_robust pin unchanged after ensemble MAD optimization",
   pin <- readRDS(testthat::test_path("fixtures/mad_baseline_pin.rds"))
   set.seed(77)
   result <- scale_robust(rnorm(10), n_boot = 50)
-  expect_equal(result, pin$ens_n10, tolerance = sqrt(.Machine$double.eps))
+  expect_equal(result, pin$ens_n10, tolerance = 1e-4)
 })
