@@ -59,14 +59,7 @@
 gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE,
                 ci = FALSE, level = 0.95) {
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
-  if (na.rm) {
-    x <- x[!is.na(x)]
-  } else {
-    if (anyNA(x)) {
-      stop("There are NAs in the data yet na.rm is FALSE")
-    }
-  }
-  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
+  if (na.rm) x <- x[!is.na(x)]
   n <- length(x)
   if (n == 0L) return(NA_real_)
   if (ci) {

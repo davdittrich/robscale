@@ -118,14 +118,7 @@ scale_robust <- function(x,
   boot_method <- match.arg(boot_method)
 
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
-  if (isTRUE(na.rm)) {
-    x <- x[!is.na(x)]
-  } else {
-    if (anyNA(x)) {
-      stop("There are NAs in the data yet na.rm is FALSE")
-    }
-  }
-  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
+  if (isTRUE(na.rm)) x <- x[!is.na(x)]
   n <- length(x)
   if (n < 2L) return(NA_real_)
 
