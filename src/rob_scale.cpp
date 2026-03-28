@@ -262,7 +262,7 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
  * Called by both the small-n and large-n entry points.
  */
 static double rob_scale_core(const double* xp, size_t n,
-                             double* w, double* dev,
+                             double* w,
                              bool has_loc, double loc_val,
                              double implbound, int maxit,
                              double tol, int fallback) {
@@ -313,7 +313,8 @@ static double rob_scale_core(const double* xp, size_t n,
       if (has_loc) {
         std::memcpy(w, xp, n * sizeof(double));
         double med_orig = robscale::adaptive_robscale_median_select(w, n);
-        double mad_orig = robscale::adaptive_mad_select(xp, (int)n, med_orig, dev);
+        double dev_local[4]; // n < minobs (3 when has_loc), always fits
+        double mad_orig = robscale::adaptive_mad_select(xp, (int)n, med_orig, dev_local);
         return (mad_orig <= implbound)
           ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY)
           : mad_orig;
@@ -356,8 +357,9 @@ static double rob_scale_impl_small(const double* xp, size_t n,
                                    double implbound, int maxit,
                                    double tol, int fallback) {
   // OPT-5: 32-byte alignment for AVX2 load/store paths.
+  // Arena holds w[] only — dev eliminated (allocated locally on rare fallback path)
   alignas(32) double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
-  return rob_scale_core(xp, n, arena, arena + n,
+  return rob_scale_core(xp, n, arena,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
 
@@ -378,18 +380,19 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
   // Large-n: stack or heap arena
   constexpr size_t SCALE_STACK_SIZE = 2048;
   // OPT-5: 32-byte alignment for AVX2 load/store paths.
-  alignas(32) double buf_stack[SCALE_STACK_SIZE * 2];
+  // Arena holds w[] only — dev eliminated (allocated locally on rare fallback path)
+  alignas(32) double buf_stack[SCALE_STACK_SIZE];
   std::unique_ptr<double[]> heap;
   double* arena;
 
   if (ROBSCALE_LIKELY(n <= SCALE_STACK_SIZE)) {
     arena = buf_stack;
   } else {
-    heap.reset(new double[n * 2]);
+    heap.reset(new double[n]);
     arena = heap.get();
   }
 
-  return rob_scale_core(xp, n, arena, arena + n,
+  return rob_scale_core(xp, n, arena,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
 
