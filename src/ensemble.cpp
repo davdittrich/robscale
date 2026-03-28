@@ -74,8 +74,10 @@ static void ensemble_one_replicate(
   };
 
   XorShift32 rng(static_cast<uint32_t>(r + 12345));
+  const uint32_t un32 = static_cast<uint32_t>(n);
   for (int i = 0; i < n; ++i) {
-    resample[i] = xp[rng.next() % n];
+    // Lemire's bias-free bounded random: (rng * n) >> 32
+    resample[i] = xp[static_cast<uint32_t>((static_cast<uint64_t>(rng.next()) * un32) >> 32)];
   }
 
   // Sort resample once — all estimators below exploit sorted order.
@@ -338,8 +340,9 @@ Rcpp::List cpp_single_estimator_ci_bounds(
 
     for (int r = 0; r < n_boot; ++r) {
       XorShift32 rng(static_cast<uint32_t>(r + 12345));
+      const uint32_t un32_ci = static_cast<uint32_t>(n);
       for (int i = 0; i < n; ++i)
-        resample[i] = xp[rng.next() % static_cast<uint32_t>(n)];
+        resample[i] = xp[static_cast<uint32_t>((static_cast<uint64_t>(rng.next()) * un32_ci) >> 32)];
 
       if (n <= 16) {
         robscale::small_sort(resample, n);

@@ -145,6 +145,8 @@ namespace robscale {
 /// N_MICRO: fits in L1 (hot path for very small n, zero malloc overhead).
 /// N_STACK: fits in L2 (medium n, no heap allocation).
 /// Falls back to heap for n > N_STACK.
+/// Stack budget: default (128+2048)*8 = 17,408 bytes (~17KB). Safe for R's
+/// 8MB default stack but avoid instantiating in deeply recursive call chains.
 template <size_t N_MICRO = 128, size_t N_STACK = 2048>
 struct StackArena {
   double buf_micro[N_MICRO];

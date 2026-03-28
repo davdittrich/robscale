@@ -40,16 +40,17 @@ static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n
                                   double* out_psi, double* out_dpsi) {
   const __m256d t4    = _mm256_set1_pd(t);
   const __m256d hinv4 = _mm256_set1_pd(half_inv_s);
-  __m256d acc_psi = _mm256_setzero_pd();
-  __m256d acc_p2  = _mm256_setzero_pd();
+  const __m256d one4  = _mm256_set1_pd(1.0);
+  __m256d acc_psi  = _mm256_setzero_pd();
+  __m256d acc_dpsi = _mm256_setzero_pd();  // S5: accumulate 1-p² directly
 
   int i = 0;
   for (; i + 4 <= range_n; i += 4) {
     __m256d d = _mm256_loadu_pd(xp + i);
     __m256d u = _mm256_mul_pd(_mm256_sub_pd(d, t4), hinv4);
     __m256d p = ROBSCALE_TANH4_AVX2(u);
-    acc_psi = _mm256_add_pd(acc_psi, p);
-    acc_p2  = _mm256_fmadd_pd(p, p, acc_p2);   // acc_p2 += p*p (one rounding step)
+    acc_psi  = _mm256_add_pd(acc_psi, p);
+    acc_dpsi = _mm256_fnmadd_pd(p, p, _mm256_add_pd(acc_dpsi, one4));  // acc_dpsi += 1-p²
   }
 
   // Horizontal sum of 4-wide SIMD accumulators
@@ -58,20 +59,20 @@ static void rob_loc_nr_step_avx2(const double* ROBSCALE_RESTRICT xp, int range_n
   __m128d s2_psi = _mm_add_pd(lo_psi, hi_psi);
   double sum_psi = _mm_cvtsd_f64(_mm_hadd_pd(s2_psi, s2_psi));
 
-  __m128d lo_p2  = _mm256_castpd256_pd128(acc_p2);
-  __m128d hi_p2  = _mm256_extractf128_pd(acc_p2, 1);
-  __m128d s2_p2  = _mm_add_pd(lo_p2, hi_p2);
-  double sum_p2  = _mm_cvtsd_f64(_mm_hadd_pd(s2_p2, s2_p2));
+  __m128d lo_dp  = _mm256_castpd256_pd128(acc_dpsi);
+  __m128d hi_dp  = _mm256_extractf128_pd(acc_dpsi, 1);
+  __m128d s2_dp  = _mm_add_pd(lo_dp, hi_dp);
+  double sum_dpsi = _mm_cvtsd_f64(_mm_hadd_pd(s2_dp, s2_dp));
 
   // Scalar tail for range_n % 4 remaining elements
   for (; i < range_n; ++i) {
     double p  = std::tanh((xp[i] - t) * half_inv_s);
     sum_psi  += p;
-    sum_p2   += p * p;
+    sum_dpsi += 1.0 - p * p;  // consistent with scalar path
   }
 
   *out_psi  = sum_psi;
-  *out_dpsi = (double)range_n - sum_p2;   // Σ(1-p²) = range_n - Σp²
+  *out_dpsi = sum_dpsi;
 }
 #endif // ROBSCALE_HAS_AVX2_TANH
 

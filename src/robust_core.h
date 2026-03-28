@@ -239,10 +239,11 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE void bulk_abs_diff(
     dst[i] = std::abs(src[i] - center);
 }
 
-// Median of pre-sorted array
+// Median of pre-sorted array. Precondition: n >= 1 (n=0 guard is defensive).
 ROBSCALE_HIDDEN ROBSCALE_INLINE double median_sorted(const double* x, size_t n) {
+  if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (n & 1) return x[n / 2];
-  return (x[(n / 2) - 1] + x[n / 2]) * 0.5;
+  return x[(n / 2) - 1] + (x[n / 2] - x[(n / 2) - 1]) * 0.5;  // overflow-safe
 }
 
 // Selection based median

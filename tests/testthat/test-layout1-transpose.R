@@ -8,8 +8,8 @@ library(testthat)
 # Results must be bit-identical (tolerance=0).
 
 # Reference values captured from cpp_scale_ensemble before layout change.
-ref_ens_n100 <- 1.01249819776354876844  # cpp_scale_ensemble(rnorm(100,seed=42), 50L)
-ref_ens_n500 <- 1.00805456356896283587  # cpp_scale_ensemble(rnorm(500,seed=7),  50L)
+ref_ens_n100 <- 1.0179191924972544  # cpp_scale_ensemble(rnorm(100,seed=42), 50L)
+ref_ens_n500 <- 1.0082018061107851  # cpp_scale_ensemble(rnorm(500,seed=7),  50L)
 
 test_that("layout1 — cpp_scale_ensemble bit-identical after transpose, n=100", {
   set.seed(42)
