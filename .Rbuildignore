@@ -79,3 +79,5 @@
 ^test_side_by_side\.R$
 ^qn_64\.out$
 ^sn_16k\.out$
+^report\.md$
+^email_draft.*\.md$

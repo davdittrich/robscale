@@ -6,7 +6,7 @@
 \usage{
 sn(
   x,
-  constant = 1.1926,
+  constant = 1.19259855312321,
   finite.corr = TRUE,
   na.rm = FALSE,
   ci = FALSE,

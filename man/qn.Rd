@@ -6,7 +6,7 @@
 \usage{
 qn(
   x,
-  constant = 2.2191,
+  constant = 2.21914446598508,
   finite.corr = TRUE,
   na.rm = FALSE,
   ci = FALSE,
