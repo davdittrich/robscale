@@ -291,14 +291,16 @@ ROBSCALE_INLINE double gmd_weighted_sum_avx2(
 }
 #endif
 
+// use_avx2: pre-hoisted AVX2 flag (from RuntimeConfig::get().hw.simd_level);
+// avoids a TLS read on every call.  Callers that run inside hot loops (e.g.
+// ensemble_one_replicate, cpp_single_estimator_ci_bounds) hoist once before
+// the loop and pass the flag here.  Default false keeps non-hot callers working.
 ROBSCALE_HIDDEN ROBSCALE_INLINE double gmd_weighted_sum(
-    const double* ROBSCALE_RESTRICT x, int n, double scale) {
+    const double* ROBSCALE_RESTRICT x, int n, double scale,
+    bool use_avx2 = false) {
 #if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  if (n >= 8) {
-    const auto lvl = robscale::qnsn::RuntimeConfig::get().hw.simd_level;
-    if (lvl >= robscale::qnsn::SIMDLevel::AVX2)
-      return gmd_weighted_sum_avx2(x, n, scale);
-  }
+  if (use_avx2 && n >= 8)
+    return gmd_weighted_sum_avx2(x, n, scale);
 #endif
   double sum = 0.0;
   const double w0 = -static_cast<double>(n - 1);

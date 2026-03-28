@@ -64,12 +64,16 @@ static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 // shifts: <<13, >>17, <<5), then sorted once in ascending order.  All seven
 // estimators (sd_c4, gmd, mad, iqr, sn, qn, adm) exploit the sorted order to
 // avoid redundant sorting passes.
+// use_avx2: pre-hoisted AVX2 flag (from RuntimeConfig once per thread);
+//   avoids a TLS read on every replicate call.
+// qn_ws_ptr: pre-assembled QnWorkspace pointer (or nullptr for large n);
+//   assembling the struct in the caller eliminates per-replicate struct init.
 static void ensemble_one_replicate(
     const double* xp, int n, int r,
     double* base, int nboot,
     double* resample, double* work1, double* work2,
-    float* qn_work, int32_t* qn_iweight,
-    int32_t* qn_left, int32_t* qn_right) {
+    bool use_avx2,
+    robscale::qnsn::QnWorkspace* qn_ws_ptr) {
   // Helper: write estimator j for replicate r.
   // base[j * nboot + r] in the 7×nboot column-major matrix.
   auto write_est = [base, nboot, r](int j, double v) {
@@ -101,11 +105,12 @@ static void ensemble_one_replicate(
 
   // 1: gmd — WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
   // OPT-G5: scale precomputed once outside the accumulation loop.
+  // use_avx2 is pre-hoisted by the caller (once per thread, not per replicate).
   {
     const double gmd_scale = (n < 2) ? 0.0
       : robscale::GMD_CONSISTENCY * 2.0
         / (static_cast<double>(n) * (n - 1));
-    write_est(1, robscale::gmd_weighted_sum(resample, n, gmd_scale));
+    write_est(1, robscale::gmd_weighted_sum(resample, n, gmd_scale, use_avx2));
   }
 
   // 2: mad — V-shaped O(log n) deviation median (OPT-M7)
@@ -141,23 +146,9 @@ static void ensemble_one_replicate(
   write_est(4, robscale::internal::sn_sorted(resample, n, work1));
 
   // 5: qn — sorted variant, skip redundant copy+sort
-  // Qn workspace uses correctly-typed arrays passed by caller (no aliasing UB).
-  // Guard: only for n <= QN_WS_THRESHOLD (2048); beyond that pass nullptr.
-  {
-    using WS = robscale::qnsn::QnWorkspace;
-    static constexpr size_t QN_WS_THRESHOLD = 2048;
-    const size_t un = static_cast<size_t>(n);
-    WS qn_ws{};
-    WS* qn_ws_ptr = nullptr;
-    if (un <= QN_WS_THRESHOLD && qn_work != nullptr) {
-      qn_ws.work    = qn_work;
-      qn_ws.iweight = qn_iweight;
-      qn_ws.left    = qn_left;
-      qn_ws.right   = qn_right;
-      qn_ws_ptr = &qn_ws;
-    }
-    write_est(5, robscale::internal::qn_sorted(resample, n, qn_ws_ptr));
-  }
+  // qn_ws_ptr pre-assembled by caller (once per thread or serial setup);
+  // eliminates per-replicate struct zero-init and pointer fill.
+  write_est(5, robscale::internal::qn_sorted(resample, n, qn_ws_ptr));
 
   // 6: robScale — OPT-9: rob_scale_sorted combines O(1) median + O(log n) MAD
   //    + Newton-Raphson in one call; resample is already sorted.
@@ -205,44 +196,74 @@ struct EnsembleCore {
     // --- Bootstrap loop ---
     double* br = boot_results;  // raw pointer safe to capture in lambda
 
+    // Hoist AVX2 flag once — invariant for process lifetime; safe across threads.
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+    const bool use_avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                           robscale::qnsn::SIMDLevel::AVX2);
+#else
+    const bool use_avx2 = false;
+#endif
+
 #ifdef USE_DIRECT_TBB
     if (static_cast<int64_t>(n) * nboot >= ENSEMBLE_PARALLEL_THRESHOLD) {
       tbb::parallel_for(
         tbb::blocked_range<int>(0, nboot),
-        [xp, n, br, n_boot](const tbb::blocked_range<int>& range) {
+        [xp, n, br, n_boot, use_avx2](const tbb::blocked_range<int>& range) {
+          using WS = robscale::qnsn::QnWorkspace;
           const size_t un = static_cast<size_t>(n);
           std::unique_ptr<double[]> ws(new double[3 * un]);
           double* resample = ws.get();
           double* work1 = resample + n;
           double* work2 = work1 + n;
           // Per-thread typed Qn workspace (no aliasing UB)
+          // Pre-assemble WS struct once per thread — passed by pointer per replicate.
           static constexpr size_t QN_WS_THRESHOLD = 2048;
           std::unique_ptr<float[]>   qn_w(un <= QN_WS_THRESHOLD ? new float[un] : nullptr);
           std::unique_ptr<int32_t[]> qn_iw(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
           std::unique_ptr<int32_t[]> qn_l(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
           std::unique_ptr<int32_t[]> qn_r(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+          WS qn_ws{};
+          WS* qn_ws_ptr = nullptr;
+          if (un <= QN_WS_THRESHOLD && qn_w) {
+            qn_ws.work    = qn_w.get();
+            qn_ws.iweight = qn_iw.get();
+            qn_ws.left    = qn_l.get();
+            qn_ws.right   = qn_r.get();
+            qn_ws_ptr = &qn_ws;
+          }
           for (int r = range.begin(); r < range.end(); ++r)
             ensemble_one_replicate(xp, n, r, br, n_boot, resample, work1, work2,
-                                   qn_w.get(), qn_iw.get(), qn_l.get(), qn_r.get());
+                                   use_avx2, qn_ws_ptr);
         }
       );
     } else
 #endif
     {
+      using WS = robscale::qnsn::QnWorkspace;
       const size_t un = static_cast<size_t>(n);
       std::unique_ptr<double[]> ws(new double[3 * un]);
       double* resample = ws.get();
       double* work1 = resample + n;
       double* work2 = work1 + n;
       // Typed Qn workspace (no aliasing UB)
+      // Pre-assemble WS struct once before the loop — passed by pointer per replicate.
       static constexpr size_t QN_WS_THRESHOLD = 2048;
       std::unique_ptr<float[]>   qn_w(un <= QN_WS_THRESHOLD ? new float[un] : nullptr);
       std::unique_ptr<int32_t[]> qn_iw(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
       std::unique_ptr<int32_t[]> qn_l(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
       std::unique_ptr<int32_t[]> qn_r(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+      WS qn_ws{};
+      WS* qn_ws_ptr = nullptr;
+      if (un <= QN_WS_THRESHOLD && qn_w) {
+        qn_ws.work    = qn_w.get();
+        qn_ws.iweight = qn_iw.get();
+        qn_ws.left    = qn_l.get();
+        qn_ws.right   = qn_r.get();
+        qn_ws_ptr = &qn_ws;
+      }
       for (int r = 0; r < nboot; ++r)
         ensemble_one_replicate(xp, n, r, br, nboot, resample, work1, work2,
-                               qn_w.get(), qn_iw.get(), qn_l.get(), qn_r.get());
+                               use_avx2, qn_ws_ptr);
     }
 
     // --- Mean and variance per estimator ---
@@ -331,11 +352,31 @@ Rcpp::List cpp_single_estimator_ci_bounds(
   std::vector<double> boot_vals(static_cast<size_t>(n_boot));
   const size_t un_ci = static_cast<size_t>(n);
   static constexpr size_t QN_CI_THRESHOLD = 2048;
+
+  // Hoist AVX2 flag once before the bootstrap loop — TLS read amortized.
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool use_avx2_ci = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                            robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool use_avx2_ci = false;
+#endif
+
   // Typed Qn workspace — allocated once before the loop (no aliasing UB).
+  // Pre-assemble WS struct once; pointer reused each replicate (no per-replicate init).
+  using WS_ci = robscale::qnsn::QnWorkspace;
   std::unique_ptr<float[]>   qn_w_ci(un_ci <= QN_CI_THRESHOLD ? new float[un_ci] : nullptr);
   std::unique_ptr<int32_t[]> qn_iw_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
   std::unique_ptr<int32_t[]> qn_l_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
   std::unique_ptr<int32_t[]> qn_r_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
+  WS_ci qn_ws_ci{};
+  WS_ci* qn_ws_ci_ptr = nullptr;
+  if (un_ci <= QN_CI_THRESHOLD && qn_w_ci) {
+    qn_ws_ci.work    = qn_w_ci.get();
+    qn_ws_ci.iweight = qn_iw_ci.get();
+    qn_ws_ci.left    = qn_l_ci.get();
+    qn_ws_ci.right   = qn_r_ci.get();
+    qn_ws_ci_ptr = &qn_ws_ci;
+  }
   {
     std::unique_ptr<double[]> ws(new double[3 * un_ci]);
     double* resample = ws.get();
@@ -360,9 +401,10 @@ Rcpp::List cpp_single_estimator_ci_bounds(
       switch (estimator_id) {
         case 0: {  // gmd
           // WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
+          // use_avx2_ci hoisted before the loop — no TLS read per replicate.
           const double gmd_scale = robscale::GMD_CONSISTENCY * 2.0
             / (static_cast<double>(n) * (n - 1));
-          val = robscale::gmd_weighted_sum(resample, n, gmd_scale);
+          val = robscale::gmd_weighted_sum(resample, n, gmd_scale, use_avx2_ci);
           break;
         }
         case 1:  // sd_c4
@@ -393,17 +435,8 @@ Rcpp::List cpp_single_estimator_ci_bounds(
           val = robscale::internal::sn_sorted(resample, n, work1);
           break;
         case 5: {  // qn
-          using WS = robscale::qnsn::QnWorkspace;
-          WS  qn_ws{};
-          WS* qn_ws_ptr = nullptr;
-          if (un_ci <= QN_CI_THRESHOLD) {
-            qn_ws.work    = qn_w_ci.get();
-            qn_ws.iweight = qn_iw_ci.get();
-            qn_ws.left    = qn_l_ci.get();
-            qn_ws.right   = qn_r_ci.get();
-            qn_ws_ptr = &qn_ws;
-          }
-          val = robscale::internal::qn_sorted(resample, n, qn_ws_ptr);
+          // qn_ws_ci_ptr pre-assembled before the loop; no per-replicate struct init.
+          val = robscale::internal::qn_sorted(resample, n, qn_ws_ci_ptr);
           break;
         }
         default:  // robScale (6)

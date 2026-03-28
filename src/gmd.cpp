@@ -12,9 +12,10 @@
 // OPT-G5: caller precomputes scale = constant * 2 / (n*(n-1)) once.
 // WU-GMD-1: delegates to gmd_weighted_sum in robust_core.h which dispatches
 // to AVX2 FMA 4-wide kernel or scalar fallback.
+// use_avx2: pre-hoisted flag from caller; avoids TLS read per call.
 static ROBSCALE_INLINE double gmd_sorted(const double* ROBSCALE_RESTRICT x,
-                                          int n, double scale) {
-  return robscale::gmd_weighted_sum(x, n, scale);
+                                          int n, double scale, bool use_avx2) {
+  return robscale::gmd_weighted_sum(x, n, scale, use_avx2);
 }
 
 // Shared sort+kernel logic.
@@ -28,7 +29,13 @@ static double gmd_core(const double* ROBSCALE_RESTRICT xp, int n,
     robscale::small_sort(buf, n);
   else
     robscale::qnsn::optimized_sort(buf, buf + n);
-  return gmd_sorted(buf, n, scale);
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool use_avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                         robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool use_avx2 = false;
+#endif
+  return gmd_sorted(buf, n, scale, use_avx2);
 }
 
 // OPT-G1: small-n path with minimal stack frame (1 KB arena only).

@@ -46,7 +46,13 @@ inline double gmd(double* buf, int n) {
   // WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
   const double scale = GMD_CONSISTENCY * 2.0
     / (static_cast<double>(n) * (n - 1));
-  return robscale::gmd_weighted_sum(buf, n, scale);
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool use_avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                         robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool use_avx2 = false;
+#endif
+  return robscale::gmd_weighted_sum(buf, n, scale, use_avx2);
 }
 
 // MAD from original data: fused single-buffer approach.

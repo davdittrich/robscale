@@ -154,18 +154,18 @@ static double rob_loc_parallel_compute(const double* ROBSCALE_RESTRICT xp,
  * sum_dpsi guard: if Σ sech²(u_i) underflows (all |u_i| >> 1, degenerate
  * scale), the NR step blows up. Break early with the current t.
  */
+// use_avx2: pre-hoisted AVX2 flag from rob_loc_core; avoids a second TLS read.
 static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp,
                                               size_t n, double t, double s,
-                                              int maxit, double tol) {
+                                              int maxit, double tol,
+                                              bool use_avx2) {
   const double half_inv_s = 0.5 / s;
 
-  // OPT-L1+L2: hoist SIMD dispatch check once before the NR loop.
+  // OPT-L1+L2: SIMD dispatch flag pre-hoisted by caller (rob_loc_core).
   // use_fused: dispatch to rob_loc_nr_step_avx2 (fused single-pass kernel).
   //   Scalar fallback (n<4 or non-AVX2): single-pass std::tanh loop.
 #if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  const bool use_fused = (n >= 4) &&  // OPT-RL1: lowered from n>=8 to n>=4
-    (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
-     robscale::qnsn::SIMDLevel::AVX2);
+  const bool use_fused = (n >= 4) && use_avx2;  // OPT-RL1: lowered from n>=8 to n>=4
 #endif
 
   for (int k = 0; k < maxit; ++k) {
@@ -227,20 +227,28 @@ static double rob_loc_core(const double* ROBSCALE_RESTRICT xp, size_t n,
   double s = has_scale ? scale_val : robscale::mad_select(buf, (int)n, med, dev);
   if (ROBSCALE_UNLIKELY(s == 0.0)) return med;
 
+  // Hoist RuntimeConfig::get() unconditionally — covers both the TBB path
+  // (guarded by TBB+AVX2+!ACCELERATE) and the serial AVX2 path (guarded by
+  // AVX2+!ACCELERATE).  A single TLS read here avoids a second read inside
+  // rob_loc_compute.  The IMPORTANT guard uses just #if AVX2 (not TBB+AVX2)
+  // so the hoisted flag covers both the parallel and serial dispatch paths.
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const auto& cfg = robscale::qnsn::RuntimeConfig::get();
+  const bool avx2 = (cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+
   // OPT-L3: dispatch to parallel NR for large n.
   // Condition: TBB+SLEEF+AVX2 compiled in, n >= rob_scale_parallel_threshold
   // (reusing robScale's threshold — same per-element work), AVX2 at runtime.
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
     defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  {
-    const auto& cfg = robscale::qnsn::RuntimeConfig::get();
-    if (n >= cfg.rob_scale_parallel_threshold &&
-        cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2)
-      return rob_loc_parallel_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
-  }
+  if (n >= cfg.rob_scale_parallel_threshold && avx2)
+    return rob_loc_parallel_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
 #endif
 
-  return rob_loc_compute(buf, n, med, s, maxit, tol);  // OPT-RL3: warm buf
+  return rob_loc_compute(buf, n, med, s, maxit, tol, avx2);  // OPT-RL3: warm buf
 }
 
 /**
