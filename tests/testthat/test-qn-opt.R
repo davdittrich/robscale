@@ -141,19 +141,19 @@ test_that("Q.10 edge case: n<2 returns NA", {
 # ---------------------------------------------------------------------------
 # Q.11 — Edge case: NaN input returns NA
 # ---------------------------------------------------------------------------
-test_that("Q.11 edge case: NaN input returns NA", {
+test_that("Q.11 edge case: NaN input errors (C++ validation)", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  expect_true(is.na(C_qn_fast(c(1, NaN, 2))),   label = "NaN in middle")
-  expect_true(is.na(C_qn_fast(c(NaN, NaN, NaN))), label = "all NaN")
+  expect_error(C_qn_fast(c(1, NaN, 2)),   "NAs")
+  expect_error(C_qn_fast(c(NaN, NaN, NaN)), "NAs")
 })
 
 # ---------------------------------------------------------------------------
 # Q.12 — Edge case: Inf input returns NA
 # ---------------------------------------------------------------------------
-test_that("Q.12 edge case: Inf input returns NA", {
+test_that("Q.12 edge case: Inf input errors (C++ validation)", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  expect_true(is.na(C_qn_fast(c(1, Inf, 2))),  label = "+Inf")
-  expect_true(is.na(C_qn_fast(c(1, -Inf, 2))), label = "-Inf")
+  expect_error(C_qn_fast(c(1, Inf, 2)),  "finite")
+  expect_error(C_qn_fast(c(1, -Inf, 2)), "finite")
 })
 
 # ---------------------------------------------------------------------------
@@ -308,17 +308,17 @@ test_that("Q.TIERED.3: equal values at n=10 return 0 (tiny path)", {
   expect_equal(C_qn_fast(rep(2.5, 10L)), 0.0, label = "all-equal n=10")
 })
 
-test_that("Q.TIERED.4: NaN propagates for n <= 16", {
+test_that("Q.TIERED.4: NaN errors for n <= 16 (C++ validation)", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  expect_true(is.na(C_qn_fast(c(1.0, NaN, 3.0))),  label = "NaN n=3")
-  expect_true(is.na(C_qn_fast(c(NaN, rep(1.0, 8L)))), label = "NaN n=9")
+  expect_error(C_qn_fast(c(1.0, NaN, 3.0)),  "NAs")
+  expect_error(C_qn_fast(c(NaN, rep(1.0, 8L))), "NAs")
 })
 
-test_that("Q.TIERED.5: Inf propagates for n <= 16", {
+test_that("Q.TIERED.5: Inf errors for n <= 16 (C++ validation)", {
   tryCatch(devtools::load_all(quiet = TRUE), error = function(e) invisible(NULL))
-  expect_true(is.na(C_qn_fast(c(1.0, Inf,  3.0))),  label = "+Inf n=3")
-  expect_true(is.na(C_qn_fast(c(1.0, -Inf, 3.0))),  label = "-Inf n=3")
-  expect_true(is.na(C_qn_fast(c(-Inf, rep(1.0, 8L)))), label = "-Inf n=9")
+  expect_error(C_qn_fast(c(1.0, Inf,  3.0)),  "finite")
+  expect_error(C_qn_fast(c(1.0, -Inf, 3.0)),  "finite")
+  expect_error(C_qn_fast(c(-Inf, rep(1.0, 8L))), "finite")
 })
 
 # ---------------------------------------------------------------------------

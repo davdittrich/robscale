@@ -1,8 +1,20 @@
 #include "robscale_config.h"
+#include "robust_core.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
 #include <cstring>
 #include <memory>
+
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
 
 // OPT-M1: Extract large-n path as ROBSCALE_NOINLINE so buf_stack[2048] is
 // never allocated in the entry frame when n <= 64.
@@ -33,6 +45,7 @@ double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
+  validate_finite(x.begin(), n);
   if (n <= static_cast<int>(ROBSCALE_MICRO_BUFFER_SIZE)) {
     double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
     const double* xp = x.begin();
@@ -64,6 +77,7 @@ double mad_impl_center(Rcpp::NumericVector x, double center, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
   if (n == 1) return 0.0;
+  validate_finite(x.begin(), n);
   if (n <= static_cast<int>(ROBSCALE_MICRO_BUFFER_SIZE)) {
     double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
     const double* xp = x.begin();

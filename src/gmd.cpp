@@ -5,6 +5,17 @@
 #include <cstring>
 #include <memory>
 
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
+
 // GMD sorted kernel: assumes x is already sorted ascending.
 // OPT-G6: ROBSCALE_RESTRICT allows the compiler to assume no aliasing.
 // OPT-G5: caller precomputes scale = constant * 2 / (n*(n-1)) once.
@@ -42,6 +53,7 @@ static double gmd_impl_small(const double* xp, int n, double constant) {
 double gmd_impl(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 2) return 0.0;
+  validate_finite(x.begin(), n);
   if (n <= ROBSCALE_MICRO_BUFFER_SIZE)
     return gmd_impl_small(x.begin(), n, constant);
   constexpr int STACK_SIZE = ROBSCALE_SN_STACK_THRESHOLD;

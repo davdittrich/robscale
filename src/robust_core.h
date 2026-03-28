@@ -57,6 +57,17 @@
 
 namespace robscale {
 
+// Scan for first non-finite element. Returns its index, or -1 if all finite.
+// No allocation; short-circuits on first bad value.
+// Callers that include Rcpp.h wrap this in a static validate_finite() helper
+// that issues Rcpp::stop with the appropriate message.
+ROBSCALE_HIDDEN ROBSCALE_INLINE
+int find_first_nonfinite(const double* ROBSCALE_RESTRICT xp, int n) {
+  for (int i = 0; i < n; ++i)
+    if (ROBSCALE_UNLIKELY(!std::isfinite(xp[i]))) return i;
+  return -1;
+}
+
 // --- Asymptotic Relative Efficiency (ARE) constants ---
 
 constexpr double ARE_ROBSCALE   = 0.55;

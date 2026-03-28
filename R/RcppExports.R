@@ -13,6 +13,18 @@ rob_scale_diag_impl <- function(x_r, maxit = 80L, tol = 1.4901161193847656e-8) {
     .Call(`_robscale_rob_scale_diag_impl`, x_r, maxit, tol)
 }
 
+C_sd_c4_val_cpp <- function(x) {
+    .Call(`_robscale_C_sd_c4_val_cpp`, x)
+}
+
+C_rob_scale_val_cpp <- function(x) {
+    .Call(`_robscale_C_rob_scale_val_cpp`, x)
+}
+
+C_qn_val_cpp <- function(x) {
+    .Call(`_robscale_C_qn_val_cpp`, x)
+}
+
 bench_median_net_impl <- function(x) {
     .Call(`_robscale_bench_median_net_impl`, x)
 }

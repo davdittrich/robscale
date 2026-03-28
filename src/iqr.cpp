@@ -1,9 +1,21 @@
 #include "robscale_config.h"
+#include "robust_core.h"
 #include "estimators_internal.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
 #include <cstring>
 #include <memory>
+
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
 
 // OPT-I1: Extract large-n path as ROBSCALE_NOINLINE so buf_stack[2048] is
 // never allocated in the entry frame when n <= IQR_INLINE_LIMIT.
@@ -56,6 +68,7 @@ double iqr_impl(Rcpp::NumericVector x, double constant) {
   if (n < 2) return 0.0;
 
   const double* xp = x.begin();
+  validate_finite(xp, n);
 
   // OPT-I6: LIKELY branch first so the n>16 pdqselect/micro-path code is laid
   // out inline (immediately after function entry). The n<=16 sort path is a

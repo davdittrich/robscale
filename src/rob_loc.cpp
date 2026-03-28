@@ -11,6 +11,17 @@
 #  include <tbb/blocked_range.h>
 #endif
 
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // OPT-L1: Fused AVX2 NR step
 //
@@ -260,6 +271,7 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
 
   const double* xp = x.begin();
+  validate_finite(xp, (int)n);
 
   // Small-n: dispatch to noinline helper with minimal stack frame
   if (n <= 64)

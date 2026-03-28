@@ -1,4 +1,5 @@
 #include "robscale_config.h"
+#include "robust_core.h"
 #include "vshaped_mad.h"
 #include "estimators_internal.h"
 #include <Rcpp.h>
@@ -13,6 +14,17 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
 #endif
+
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
 
 // XorShift32 PRNG for deterministic bootstrap resampling
 struct XorShift32 {
@@ -321,6 +333,7 @@ Rcpp::List cpp_single_estimator_ci_bounds(
   }
 
   const double* xp = x.begin();
+  validate_finite(xp, n);
   if (n_boot < 2) n_boot = 2;
 
   // --- Bootstrap loop ---
@@ -513,6 +526,7 @@ Rcpp::List cpp_single_estimator_ci_bounds(
 double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   int n = x.size();
   if (n < 2) return NA_REAL;
+  validate_finite(x.begin(), n);
   if (n_boot < 2) n_boot = 2;
 
   EnsembleCore core;
@@ -540,6 +554,7 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
       Rcpp::Named("boot_sds")    = Rcpp::NumericVector(N_ESTIMATORS + 1, NA_REAL)
     );
   }
+  validate_finite(x.begin(), n);
 
   // Reduce n_boot for parametric tier
   int actual_nboot = (method_code == 2) ? std::min(n_boot, 50) : n_boot;

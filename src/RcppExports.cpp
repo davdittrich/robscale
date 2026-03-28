@@ -48,6 +48,39 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// C_sd_c4_val_cpp
+double C_sd_c4_val_cpp(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_sd_c4_val_cpp(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_sd_c4_val_cpp(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_rob_scale_val_cpp
+double C_rob_scale_val_cpp(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_rob_scale_val_cpp(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_rob_scale_val_cpp(x));
+    return rcpp_result_gen;
+END_RCPP
+}
+// C_qn_val_cpp
+double C_qn_val_cpp(Rcpp::NumericVector x);
+RcppExport SEXP _robscale_C_qn_val_cpp(SEXP xSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
+    rcpp_result_gen = Rcpp::wrap(C_qn_val_cpp(x));
+    return rcpp_result_gen;
+END_RCPP
+}
 // bench_median_net_impl
 double bench_median_net_impl(Rcpp::NumericVector x);
 RcppExport SEXP _robscale_bench_median_net_impl(SEXP xSEXP) {
@@ -361,6 +394,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_rob_scale_diag_impl", (DL_FUNC) &_robscale_rob_scale_diag_impl, 3},
+    {"_robscale_C_sd_c4_val_cpp", (DL_FUNC) &_robscale_C_sd_c4_val_cpp, 1},
+    {"_robscale_C_rob_scale_val_cpp", (DL_FUNC) &_robscale_C_rob_scale_val_cpp, 1},
+    {"_robscale_C_qn_val_cpp", (DL_FUNC) &_robscale_C_qn_val_cpp, 1},
     {"_robscale_bench_median_net_impl", (DL_FUNC) &_robscale_bench_median_net_impl, 1},
     {"_robscale_bench_fr_select_impl", (DL_FUNC) &_robscale_bench_fr_select_impl, 1},
     {"_robscale_cpp_single_estimator_ci_bounds", (DL_FUNC) &_robscale_cpp_single_estimator_ci_bounds, 6},

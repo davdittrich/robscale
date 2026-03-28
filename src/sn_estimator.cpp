@@ -198,7 +198,12 @@ ROBSCALE_NOINLINE double C_sn_impl_large(const T* x_ptr, size_t n) {
 
   for (size_t i = 0; i < n; ++i) {
     if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
+        if (std::isnan(x_ptr[i]))
+          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+        else
+          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+      }
     }
     sorted_x[i] = x_ptr[i];
   }
@@ -218,7 +223,12 @@ ROBSCALE_NOINLINE double C_sn_impl_medium(const T* x_ptr, size_t n) {
   T sorted_x[SN_MAX_STACK];
   for (size_t i = 0; i < n; ++i) {
     if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
+        if (std::isnan(x_ptr[i]))
+          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+        else
+          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+      }
     }
     sorted_x[i] = x_ptr[i];
   }
@@ -241,7 +251,12 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     T sorted_x[SN_MICRO_SIZE];
     for (size_t i = 0; i < n; ++i) {
       if constexpr (std::is_floating_point_v<T>) {
-        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) return R_NaReal;
+        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
+          if (std::isnan(x_ptr[i]))
+            Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+          else
+            Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+        }
       }
       sorted_x[i] = x_ptr[i];
     }

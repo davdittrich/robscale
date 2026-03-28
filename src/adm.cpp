@@ -3,9 +3,23 @@
 #include <Rcpp.h>
 #include <memory>
 
+// Input validation helper: stops with a clear error on first non-finite value.
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
+
 // [[Rcpp::export]]
 double adm_impl(Rcpp::NumericVector x, double center, double constant) {
-  return robscale::adm_core(x.begin(), (int)x.size(), center, constant);
+  int n = (int)x.size();
+  const double* xp = x.begin();
+  validate_finite(xp, n);
+  return robscale::adm_core(xp, n, center, constant);
 }
 
 // Large-n helper: allocates its own stack/heap buffer so that adm_impl_auto's
@@ -35,6 +49,7 @@ double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (ROBSCALE_UNLIKELY(n == 1)) return 0.0;
+  validate_finite(x.begin(), n);
   if (n <= ROBSCALE_MICRO_BUFFER_SIZE) {
     // Only buf_micro lives in this frame — keeps the hot path stack-lean.
     double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
