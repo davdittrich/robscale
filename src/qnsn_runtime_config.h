@@ -72,11 +72,13 @@ private:
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
 
-    // rob_scale_parallel: fused AVX2 kernel reads n doubles per iteration.
-    // Divisor=4 gives threshold where one iteration's data fits in per-core L2
-    // with headroom for prefetch; floor at 4096 to guarantee TBB amortises.
+    // rob_scale_parallel: TBB overhead requires ~32K+ elements to amortise.
+    // Divisor=2: serial NR working set is w[]+xp[] = 2n doubles. Parallel
+    // becomes beneficial when 2n*8 exceeds per-core L2 and TBB distributes
+    // across cores. Recalibrated 2026-03-28 after dev buffer elimination
+    // and per-call overhead reduction (validate_finite + no RNGScope).
     rob_scale_parallel_threshold = (std::max)(size_t(4096),
-        per_core_l2 / (sizeof(double) * 4));
+        per_core_l2 / (sizeof(double) * 2));
 
     // --- Adaptive median-selection thresholds ---
     // Below threshold: FR-based selection wins (lower overhead at medium n).
