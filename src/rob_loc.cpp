@@ -259,7 +259,7 @@ static double rob_loc_impl_small(const double* xp, size_t n,
                                  bool has_scale, double scale_val,
                                  int maxit, double tol) {
   alignas(32) double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
-  return rob_loc_core(xp, n, arena, arena + n,
+  return rob_loc_core(xp, n, arena, has_scale ? nullptr : arena + n,
                       has_scale, scale_val, maxit, tol);
 }
 
@@ -285,11 +285,11 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
   if (ROBSCALE_LIKELY(n <= SCALE_STACK_SIZE)) {
     arena = buf_stack;
   } else {
-    heap.reset(new double[n * 2]);
+    heap.reset(new double[has_scale ? n : n * 2]);
     arena = heap.get();
   }
 
-  return rob_loc_core(xp, n, arena, arena + n,
+  return rob_loc_core(xp, n, arena, has_scale ? nullptr : arena + n,
                       has_scale, scale_val, maxit, tol);
 }
 
