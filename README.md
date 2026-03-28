@@ -17,13 +17,13 @@ variance-weighted bootstrap ensemble for small samples ($n < 20$) and
 auto-switches to the GMD for larger ones. `get_consistency_constant()`
 exposes the finite-sample bias-correction factors used throughout.
 
-Against `revss`, `robscale` achieves **1.6–1.9x** speedups for
-`robScale()` and **3.5–4.0x** for `robLoc()` at small $n$, with
-**1.4–7.0x** for `adm()` at $n \ge 128$. Against `robustbase`, `qn` and
-`sn` run at **1.6–5.5x** and **2.0–9.1x** respectively, peaking near
+Against `revss`, `robscale` achieves **3.8–4.5x** speedups for
+`robScale()` and **4.0–4.3x** for `robLoc()` at small $n$, with
+**1.6–7.1x** for `adm()` at $n \ge 128$. Against `robustbase`, `qn` and
+`sn` run at **1.7–6.1x** and **2.1–9.1x** respectively, peaking near
 **9.1x** at $n = 10^7$ as TBB parallelism engages. `gmd`, `iqr_scaled`,
-and `mad_scaled` beat their base R counterparts by **2.7–19.5x**,
-**2.9–33.9x**, and **4.1–20.7x** respectively.
+and `mad_scaled` beat their base R counterparts by **2.8–22.1x**,
+**2.9–37.8x**, and **4.2–26.3x** respectively.
 
 Speed comes from C++17 kernels with platform-specific SIMD
 vectorization, $O(n)$ selection algorithms, stack-allocated memory
@@ -535,14 +535,14 @@ of TBB parallelism at large $n$.
 
 ### M-estimators (`adm`, `robLoc`, `robScale`)
 
-`robScale()` and `robLoc()` reach **1.6–1.9x** and **3.5–4.0x** over
+`robScale()` and `robLoc()` reach **3.8–4.5x** and **4.0–4.3x** over
 `revss` in the small-sample regime ($n \le 20$). Newton–Raphson
 quadratic convergence (~3 iterations vs. 6–8), the fused single-pass
 AVX2 kernel, stack-allocated arenas, and optimal sorting networks for
 $n \le 16$ drive these gains. `adm()` matches `revss` at small $n$ (both
 ~1.5–2.0 µs, dominated by the R→C++ `.Call()` boundary) and leads by
-**1.4–7.0x** at $n \ge 128$ as computation overtakes boundary cost. At
-$n = 16{,}384$, all three NR estimators retain **3.3–5.1x** gains
+**1.6–7.1x** at $n \ge 128$ as computation overtakes boundary cost. At
+$n = 16{,}384$, all three NR estimators retain **2.8–5.3x** gains
 because `revss` interpreter overhead scales with iteration count, not
 just vector length.
 
@@ -554,12 +554,12 @@ Table 3
 
 |      $n$ | `robustbase::Qn` | `robscale::qn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 9.8 µs           | 2.0 µs         | **5.0x** |
-|       16 | 10.6 µs          | 2.0 µs         | **5.4x** |
-|       64 | 14.5 µs          | 5.7 µs         | **2.6x** |
-|     1024 | 451.9 µs         | 223.8 µs       | **2.0x** |
-|    65536 | 45969.5 µs       | 11262.6 µs     | **4.1x** |
-| 10000000 | 10.2 s           | 2.1 s          | **4.8x** |
+|        8 | 9.8 µs           | 1.6 µs         | **6.1x** |
+|       16 | 10.6 µs          | 1.7 µs         | **6.1x** |
+|       64 | 14.5 µs          | 5.3 µs         | **2.8x** |
+|     1024 | 451.9 µs         | 218.6 µs       | **2.1x** |
+|    65536 | 45969.5 µs       | 10924.3 µs     | **4.2x** |
+| 10000000 | 10.2 s           | 2.1 s          | **4.9x** |
 
 </div>
 
@@ -569,19 +569,19 @@ Table 4
 
 |      $n$ | `robustbase::Sn` | `robscale::sn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 4.4 µs           | 2.0 µs         | **2.3x** |
-|       16 | 4.9 µs           | 2.0 µs         | **2.5x** |
-|       64 | 6.1 µs           | 2.4 µs         | **2.5x** |
-|     1024 | 35.7 µs          | 17.5 µs        | **2.0x** |
-|    65536 | 6893.7 µs        | 916.9 µs       | **7.5x** |
-| 10000000 | 1.5 s            | 0.2 s          | **8.9x** |
+|        8 | 4.4 µs           | 1.6 µs         | **2.7x** |
+|       16 | 4.9 µs           | 1.7 µs         | **3.0x** |
+|       64 | 6.1 µs           | 2.1 µs         | **2.8x** |
+|     1024 | 35.7 µs          | 17.1 µs        | **2.1x** |
+|    65536 | 6893.7 µs        | 909.4 µs       | **7.5x** |
+| 10000000 | 1.5 s            | 0.2 s          | **9.1x** |
 
 </div>
 
-For small to medium $n$, `robscale` leads by **1.6–5.5x** for `qn` and
-**2.0–9.1x** for `sn`, primarily from eliminating R dispatch overhead
+For small to medium $n$, `robscale` leads by **1.7–6.1x** for `qn` and
+**2.1–9.1x** for `sn`, primarily from eliminating R dispatch overhead
 and using stack memory. At $n = 10^7$, `qn` runs in 2.1 s vs. 10.2 s
-(**4.8x**) and `sn` in 0.2 s vs. 1.5 s (**8.9x**), as TBB parallelism
+(**4.9x**) and `sn` in 0.2 s vs. 1.5 s (**9.1x**), as TBB parallelism
 scales across cores.
 
 ### Single-pass estimators (`gmd`, `iqr_scaled`, `mad_scaled`)
@@ -592,39 +592,39 @@ Table 5
 
 |      $n$ | Comparison             | Speedup   |
 |---------:|:-----------------------|:----------|
-|       64 | gmd vs GiniDistance    | **11.2x** |
-|       64 | gmd vs Hmisc           | **16.8x** |
-|       64 | iqr_scaled vs collapse | **4.1x**  |
-|       64 | iqr_scaled vs stats    | **27.0x** |
-|       64 | mad_scaled vs collapse | **4.9x**  |
-|       64 | mad_scaled vs stats    | **20.0x** |
-|     1024 | gmd vs GiniDistance    | **3.6x**  |
-|     1024 | gmd vs Hmisc           | **5.1x**  |
-|     1024 | iqr_scaled vs collapse | **2.4x**  |
-|     1024 | iqr_scaled vs stats    | **12.5x** |
+|       64 | gmd vs GiniDistance    | **13.6x** |
+|       64 | gmd vs Hmisc           | **20.5x** |
+|       64 | iqr_scaled vs collapse | **4.8x**  |
+|       64 | iqr_scaled vs stats    | **31.0x** |
+|       64 | mad_scaled vs collapse | **5.4x**  |
+|       64 | mad_scaled vs stats    | **22.2x** |
+|     1024 | gmd vs GiniDistance    | **3.7x**  |
+|     1024 | gmd vs Hmisc           | **5.3x**  |
+|     1024 | iqr_scaled vs collapse | **2.6x**  |
+|     1024 | iqr_scaled vs stats    | **13.8x** |
 |     1024 | mad_scaled vs collapse | **1.8x**  |
-|     1024 | mad_scaled vs stats    | **6.2x**  |
-|    65536 | gmd vs GiniDistance    | **3.1x**  |
+|     1024 | mad_scaled vs stats    | **6.4x**  |
+|    65536 | gmd vs GiniDistance    | **3.2x**  |
 |    65536 | gmd vs Hmisc           | **4.0x**  |
-|    65536 | iqr_scaled vs collapse | **4.3x**  |
-|    65536 | iqr_scaled vs stats    | **5.7x**  |
-|    65536 | mad_scaled vs collapse | **5.4x**  |
-|    65536 | mad_scaled vs stats    | **7.3x**  |
+|    65536 | iqr_scaled vs collapse | **4.4x**  |
+|    65536 | iqr_scaled vs stats    | **5.9x**  |
+|    65536 | mad_scaled vs collapse | **5.5x**  |
+|    65536 | mad_scaled vs stats    | **7.5x**  |
 | 10000000 | gmd vs GiniDistance    | **4.1x**  |
 | 10000000 | gmd vs Hmisc           | **5.7x**  |
-| 10000000 | iqr_scaled vs collapse | **2.4x**  |
+| 10000000 | iqr_scaled vs collapse | **2.5x**  |
 | 10000000 | iqr_scaled vs stats    | **2.9x**  |
-| 10000000 | mad_scaled vs collapse | **3.6x**  |
-| 10000000 | mad_scaled vs stats    | **4.7x**  |
+| 10000000 | mad_scaled vs collapse | **3.8x**  |
+| 10000000 | mad_scaled vs stats    | **4.9x**  |
 
 </div>
 
-`gmd` beats `Hmisc::GiniMd` by **2.7–19.5x** (C++ vs. pure R) and
-`GiniDistance::gmd` by **2.2–13.0x** (both compiled, with `robscale`’s
+`gmd` beats `Hmisc::GiniMd` by **2.8–22.1x** (C++ vs. pure R) and
+`GiniDistance::gmd` by **2.3–14.7x** (both compiled, with `robscale`’s
 edge from sorting networks). `iqr_scaled` leads `stats::IQR` by
-**2.9–33.9x** (dual $O(n)$ pdqselect vs. full sort) and
-`collapse::fquantile` by **1.4–5.0x**. `mad_scaled` leads `stats::mad`
-by **4.1–20.7x** and a `collapse::fmedian`-based MAD by **1.1–5.8x**
+**2.9–37.8x** (dual $O(n)$ pdqselect vs. full sort) and
+`collapse::fquantile` by **1.4–5.5x**. `mad_scaled` leads `stats::mad`
+by **4.2–26.3x** and a `collapse::fmedian`-based MAD by **1.1–6.5x**
 (adaptive $O(n)$ selection vs. sorting).
 
 > \[!NOTE\] **Source builds recommended.** Installing from source
