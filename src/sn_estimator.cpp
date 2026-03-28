@@ -14,6 +14,17 @@
 #include <type_traits>
 #include <cassert>
 
+// Input validation helper (same as other .cpp files; consolidated in WU-OPT-3)
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
+
 namespace robscale::qnsn {
 
 constexpr size_t SN_MAX_STACK = ROBSCALE_SN_STACK_THRESHOLD;
@@ -195,18 +206,8 @@ template <typename T>
 ROBSCALE_NOINLINE double C_sn_impl_large(const T* x_ptr, size_t n) {
   std::unique_ptr<T[]> sorted_buf(new T[n]);
   T* sorted_x = sorted_buf.get();
-
-  for (size_t i = 0; i < n; ++i) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
-        if (std::isnan(x_ptr[i]))
-          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-        else
-          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-      }
-    }
-    sorted_x[i] = x_ptr[i];
-  }
+  // Caller (C_sn_impl) already validated finite; clean copy
+  std::memcpy(sorted_x, x_ptr, n * sizeof(T));
   // n > sn_stack_threshold >= SN_MICRO_SIZE (128) > 16, so n <= 16 is
   // structurally unreachable here — optimized_sort is always correct.
   optimized_sort(sorted_x, sorted_x + n);
@@ -221,17 +222,8 @@ template <typename T>
 ROBSCALE_NOINLINE double C_sn_impl_medium(const T* x_ptr, size_t n) {
   assert(n <= SN_MAX_STACK);
   T sorted_x[SN_MAX_STACK];
-  for (size_t i = 0; i < n; ++i) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
-        if (std::isnan(x_ptr[i]))
-          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-        else
-          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-      }
-    }
-    sorted_x[i] = x_ptr[i];
-  }
+  // Caller (C_sn_impl) already validated finite; clean copy
+  std::memcpy(sorted_x, x_ptr, n * sizeof(T));
   // n > SN_MICRO_SIZE (128) > 16 — small_sort branch is structurally unreachable.
   optimized_sort(sorted_x, sorted_x + n);
   return sn_kernel(sorted_x, n);
@@ -243,23 +235,18 @@ double C_sn_impl(const T* x_ptr, size_t n) {
   if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 overflows 64-bit boundaries.");
   }
+  // Validate at boundary — enables clean memcpy in tier copy loops
+  if constexpr (std::is_floating_point_v<T>) {
+    validate_finite(x_ptr, static_cast<int>(n));
+  }
 
   const auto& config = RuntimeConfig::get();
 
   // OPT-S3: Tier 1 — micro path: n <= SN_MICRO_SIZE (128). sorted_x fits in ~1 KB (L1-resident).
   if (n <= SN_MICRO_SIZE) {
     T sorted_x[SN_MICRO_SIZE];
-    for (size_t i = 0; i < n; ++i) {
-      if constexpr (std::is_floating_point_v<T>) {
-        if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
-          if (std::isnan(x_ptr[i]))
-            Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-          else
-            Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-        }
-      }
-      sorted_x[i] = x_ptr[i];
-    }
+    // Caller (C_sn_impl) already validated finite; clean copy
+    std::memcpy(sorted_x, x_ptr, n * sizeof(T));
     if (n <= 16) {
       robscale::small_sort(sorted_x, n);
     } else {

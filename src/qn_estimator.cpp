@@ -18,6 +18,17 @@
 #include <cassert>
 #include <vector>
 
+// Input validation helper (same as other .cpp files; consolidated in WU-OPT-3)
+static void validate_finite(const double* xp, int n) {
+  int idx = robscale::find_first_nonfinite(xp, n);
+  if (ROBSCALE_UNLIKELY(idx >= 0)) {
+    if (std::isnan(xp[idx]))
+      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
+    else
+      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
+  }
+}
+
 namespace robscale::qnsn {
 
 // --- QN ESTIMATOR HELPERS ---
@@ -202,17 +213,8 @@ double qn_brute_force_kernel(const T* sorted_x, size_t n) {
 template <typename T>
 double qn_brute_force_exact(const T* x_ptr, size_t n) {
   T sorted_buf[64];
-  for (size_t i = 0; i < n; i++) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
-        if (std::isnan(x_ptr[i]))
-          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-        else
-          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-      }
-    }
-    sorted_buf[i] = x_ptr[i];
-  }
+  // Caller (C_qn_impl) already validated finite; clean copy
+  std::memcpy(sorted_buf, x_ptr, n * sizeof(T));
   if (n <= 16) {
     robscale::small_sort(sorted_buf, n);
   } else {
@@ -489,17 +491,8 @@ ROBSCALE_NOINLINE double C_qn_impl_large(const T* x_ptr, size_t n) {
     Rcpp::stop("robscale Out of Memory: failed to allocate Qn sorted buffer.");
   }
   T* sorted_x = sorted_x_buf.get();
-  for (size_t i = 0; i < n; i++) {
-    if constexpr (std::is_floating_point_v<T>) {
-      if (ROBSCALE_UNLIKELY(!std::isfinite(x_ptr[i]))) {
-        if (std::isnan(x_ptr[i]))
-          Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-        else
-          Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-      }
-    }
-    sorted_x[i] = x_ptr[i];
-  }
+  // Caller (C_qn_impl) already validated finite; clean copy
+  std::memcpy(sorted_x, x_ptr, n * sizeof(T));
   optimized_sort(sorted_x, sorted_x + n);
   return qn_refinement_kernel(sorted_x, n);
 }
@@ -509,6 +502,10 @@ double C_qn_impl(const T* x_ptr, size_t n) {
   if (ROBSCALE_UNLIKELY(n < 2)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(n > 6060000000ULL)) {
     Rcpp::stop("robscale Error: sample size n > 6.06 * 10^9 natively overflows 64-bit boundaries.");
+  }
+  // Validate at boundary — enables clean memcpy in copy loops below
+  if constexpr (std::is_floating_point_v<T>) {
+    validate_finite(x_ptr, static_cast<int>(n));
   }
   const auto& config = RuntimeConfig::get();
   if (n <= config.qn_exact_threshold) {
