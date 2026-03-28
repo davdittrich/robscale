@@ -155,6 +155,7 @@ static double rob_loc_parallel_compute(const double* ROBSCALE_RESTRICT xp,
  * scale), the NR step blows up. Break early with the current t.
  */
 // use_avx2: pre-hoisted AVX2 flag from rob_loc_core; avoids a second TLS read.
+// On non-AVX2 builds, always false from caller; kept for consistent interface.
 static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp,
                                               size_t n, double t, double s,
                                               int maxit, double tol,

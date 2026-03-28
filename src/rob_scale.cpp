@@ -280,11 +280,10 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
     std::memcpy(w, xp, n * sizeof(double));
     t = is_small ? robscale::median_net(w, n)
                  : robscale::adaptive_robscale_median_select(w, n);
-    // OPT-3: compute deviations from original xp (not permuted w); no aliasing.
-    // OPT-F: overwrite w[] with |xp[i]-t| so rob_scale_compute gets
-    // pre-subtracted data with offset=0, saving one VSUB per element per
-    // iteration in the AVX2 kernel.  MAD is permutation-invariant, so using
-    // xp[] here gives the same MAD as using the permuted w[].
+    // OPT-3: compute deviations from xp (source), overwrite w (destination).
+    // w was permuted by median_select; xp preserves original order.
+    // OPT-F: pre-subtract so rob_scale_compute gets offset=0, saving one
+    // VSUB per element per NR iteration.  MAD is permutation-invariant.
     robscale::bulk_abs_diff(w, xp, (int)n, t);
     s_init = robscale::MAD_CONSISTENCY *
         (is_small ? robscale::median_net(w, n)
