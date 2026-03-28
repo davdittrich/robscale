@@ -120,42 +120,7 @@ constexpr double ARE_SD_C4      = 1.00;
   }
 #endif
 
-// Bulk tanh: vectorized via Accelerate (macOS), AVX-512 8-wide, AVX2 4-wide,
-// OpenMP SIMD, or scalar std::tanh. Dispatch order: AVX-512 > AVX2 > OMP > scalar.
-// Scalar bypass for n<8: SIMD overhead exceeds gain (fewer than 2 AVX2 vectors).
-ROBSCALE_HIDDEN inline void bulk_tanh(double* inout, int n) {
-  if (n < 8) {
-    for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
-    return;
-  }
-#if defined(ROBSCALE_HAS_ACCELERATE)
-  vvtanh(inout, inout, &n);
-#elif defined(ROBSCALE_HAS_AVX512_TANH) || defined(ROBSCALE_HAS_AVX2_TANH)
-  {
-    const auto lvl = robscale::qnsn::RuntimeConfig::get().hw.simd_level;
-#if defined(ROBSCALE_HAS_AVX512_TANH)
-    if (lvl >= robscale::qnsn::SIMDLevel::AVX512) {
-      bulk_tanh_avx512(inout, n);
-      return;
-    }
-#endif
-#if defined(ROBSCALE_HAS_AVX2_TANH)
-    if (lvl >= robscale::qnsn::SIMDLevel::AVX2) {
-      bulk_tanh_avx2(inout, n);
-      return;
-    }
-#endif
-  }
-  for (int i = 0; i < n; i++) inout[i] = std::tanh(inout[i]);
-#else
-  #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
-    #pragma omp simd
-  #endif
-  for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
-#endif
-}
-
-// OPT-L2: dispatch variant with pre-hoisted flags to avoid TLS reads per NR iter.
+// Bulk tanh with pre-hoisted SIMD flags — no TLS read per call.
 // use_avx2: true when AVX2 confirmed; use_avx512: true when AVX-512 confirmed.
 // CPUID features are invariant for process lifetime; hoisting is safe.
 ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n,

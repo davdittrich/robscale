@@ -308,7 +308,7 @@ struct EnsembleCore {
 //                  are non-finite.
 //
 // Returns List with ci_lower and ci_upper.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List cpp_single_estimator_ci_bounds(
     Rcpp::NumericVector x, double est, int estimator_id,
     int n_boot, double level, int method_code) {
@@ -513,7 +513,7 @@ Rcpp::List cpp_single_estimator_ci_bounds(
   );
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   int n = x.size();
   if (n < 2) return NA_REAL;
@@ -525,7 +525,7 @@ double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot) {
   return core.ensemble_est;
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
                                  double level, int method_code) {
   int n = x.size();

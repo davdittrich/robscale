@@ -70,7 +70,6 @@ Rcpp::List cpp_single_estimator_ci_bounds(Rcpp::NumericVector x, double est, int
 RcppExport SEXP _robscale_cpp_single_estimator_ci_bounds(SEXP xSEXP, SEXP estSEXP, SEXP estimator_idSEXP, SEXP n_bootSEXP, SEXP levelSEXP, SEXP method_codeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
     Rcpp::traits::input_parameter< double >::type est(estSEXP);
     Rcpp::traits::input_parameter< int >::type estimator_id(estimator_idSEXP);
@@ -86,7 +85,6 @@ double cpp_scale_ensemble(Rcpp::NumericVector x, int n_boot);
 RcppExport SEXP _robscale_cpp_scale_ensemble(SEXP xSEXP, SEXP n_bootSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
     Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
     rcpp_result_gen = Rcpp::wrap(cpp_scale_ensemble(x, n_boot));
@@ -98,7 +96,6 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot, double level
 RcppExport SEXP _robscale_cpp_scale_ensemble_ci(SEXP xSEXP, SEXP n_bootSEXP, SEXP levelSEXP, SEXP method_codeSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
     Rcpp::traits::input_parameter< int >::type n_boot(n_bootSEXP);
     Rcpp::traits::input_parameter< double >::type level(levelSEXP);
