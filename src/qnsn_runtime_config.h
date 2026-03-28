@@ -72,13 +72,14 @@ private:
     sn_parallel_threshold = (std::max)(size_t(4096),
         per_core_l2 / (sizeof(double) * 2));
 
-    // rob_scale_parallel: TBB overhead requires ~32K+ elements to amortise.
-    // Divisor=2: serial NR working set is w[]+xp[] = 2n doubles. Parallel
-    // becomes beneficial when 2n*8 exceeds per-core L2 and TBB distributes
-    // across cores. Recalibrated 2026-03-28 after dev buffer elimination
-    // and per-call overhead reduction (validate_finite + no RNGScope).
+    // rob_scale_parallel: fused AVX2 NR kernel reads w[] once per iteration.
+    // With ~4-5 NR iterations typical, effective cache pressure is ~4-5 × n×8.
+    // Divisor=4: threshold where one iteration's data fits in L2 with headroom
+    // for prefetch and xp[] residual pressure. Floor at 4096 for TBB amortisation.
+    // Note: empirical crossover may differ per machine — this is a first-principles
+    // estimate. Benchmark bench/rob_scale_parallel_recalibrate.R to validate.
     rob_scale_parallel_threshold = (std::max)(size_t(4096),
-        per_core_l2 / (sizeof(double) * 2));
+        per_core_l2 / (sizeof(double) * 4));
 
     // --- Adaptive median-selection thresholds ---
     // Below threshold: FR-based selection wins (lower overhead at medium n).
