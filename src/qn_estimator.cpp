@@ -556,17 +556,17 @@ template double C_qn_impl<int>(const int*, size_t);
 
 // --- R EXPORTS ---
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_qn_fast(Rcpp::NumericVector x) {
   return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size()));
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_qn_int_fast(Rcpp::IntegerVector x) { 
   return robscale::qnsn::C_qn_impl(x.begin(), static_cast<size_t>(x.size())); 
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List get_qnsn_config() {
   const auto& config = robscale::qnsn::RuntimeConfig::get();
   return Rcpp::List::create(
@@ -601,7 +601,7 @@ Rcpp::List get_qnsn_config() {
   );
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_get_qn_factor(int n) {
   return robscale::qnsn::get_qn_factor(static_cast<size_t>(n));
 }

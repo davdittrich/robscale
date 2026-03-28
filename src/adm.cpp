@@ -14,7 +14,7 @@ static void validate_finite(const double* xp, int n) {
   }
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double adm_impl(Rcpp::NumericVector x, double center, double constant) {
   int n = (int)x.size();
   const double* xp = x.begin();
@@ -44,7 +44,7 @@ double adm_large_n(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
   return robscale::adm_core(buf, n, med, constant);
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;

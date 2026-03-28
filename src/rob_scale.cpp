@@ -370,7 +370,7 @@ static double rob_scale_impl_small(const double* xp, size_t n,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
                       double implbound, int maxit, double tol, int fallback) {
   size_t n = (size_t)x.size();
@@ -407,7 +407,7 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
 // C_rob_scale_fast retained for SOLO gate (WU-RS2/RS3).
 // ---------------------------------------------------------------------------
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_rob_scale_fast(Rcpp::NumericVector x) {
   // Thin wrapper → production rob_scale_impl (has_loc=false, default params).
   // Always reflects the current production path; after WU-RS1 calls 8-wide kernel.

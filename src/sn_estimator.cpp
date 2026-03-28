@@ -335,17 +335,17 @@ template double C_sn_impl_sorted<double>(const double*, size_t, double*);
 
 } // namespace robscale::qnsn
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_sn_fast(Rcpp::NumericVector x) { 
   return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size())); 
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_sn_int_fast(Rcpp::IntegerVector x) { 
   return robscale::qnsn::C_sn_impl(x.begin(), static_cast<size_t>(x.size())); 
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double C_get_sn_factor(int n) {
   return robscale::qnsn::get_sn_factor(static_cast<size_t>(n));
 }

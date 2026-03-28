@@ -78,7 +78,7 @@ static double nr_scale_diag(const double* data, size_t n, double t,
   return s;
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
                                 int maxit = 80,
                                 double tol = 1.4901161193847656e-8) {
@@ -170,13 +170,13 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
 //   robscale:::bench_fr_select_impl(x)
 // ---------------------------------------------------------------------------
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double bench_median_net_impl(Rcpp::NumericVector x) {
   std::vector<double> buf(x.begin(), x.end());
   return robscale::median_net(buf.data(), buf.size());
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double bench_fr_select_impl(Rcpp::NumericVector x) {
   // Uses median_select from robust_core.h which:
   //   n <= ROBSCALE_SORT_NETWORK_THRESHOLD: calls median_net (same as above)

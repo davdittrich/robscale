@@ -62,7 +62,7 @@ double iqr_impl_small(const double* ROBSCALE_RESTRICT xp, int n, double constant
   return (q3 - q1) * constant;
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double iqr_impl(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 2) return 0.0;

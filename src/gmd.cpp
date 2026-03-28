@@ -49,7 +49,7 @@ static double gmd_impl_small(const double* xp, int n, double constant) {
   return gmd_core(xp, n, arena, constant);
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double gmd_impl(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 2) return 0.0;

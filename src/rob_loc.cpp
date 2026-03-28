@@ -264,7 +264,7 @@ static double rob_loc_impl_small(const double* xp, size_t n,
                       has_scale, scale_val, maxit, tol);
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
                     int maxit, double tol) {
   size_t n = (size_t)x.size();
@@ -301,7 +301,7 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
 // Phase 3 gate (test 0.3): always uses scalar 3-pass NR path.
 // robLoc() dispatches to rob_loc_nr_step_avx2 when AVX2 is present.
 // Assert: |rob_loc_scalar_impl(x) - robLoc(x)| < 2*sqrt(eps).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double rob_loc_scalar_impl(Rcpp::NumericVector x) {
   static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
   static const int    MAXIT = 80;
@@ -347,7 +347,7 @@ double rob_loc_scalar_impl(Rcpp::NumericVector x) {
 
 // Phase 4 gate (test 0.5): returns TRUE if TBB parallel path is compiled and
 // AVX2 is confirmed at runtime.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 bool rob_loc_has_parallel() {
 #if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
     defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
@@ -360,7 +360,7 @@ bool rob_loc_has_parallel() {
 
 // Phase 4 gate (test 0.5): forces the serial rob_loc_compute path, bypassing
 // the parallel dispatch in rob_loc_core.  Used to cross-check parallel result.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double rob_loc_serial_impl(Rcpp::NumericVector x) {
   static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
   static const int    MAXIT = 80;
@@ -391,7 +391,7 @@ double rob_loc_serial_impl(Rcpp::NumericVector x) {
 // plain-NR reference after WU-RL-A2 applies Aitken to that function.
 // Assert: |rob_loc_noaitken_impl(x) - robLoc(x)| < 2*sqrt(eps)
 // after WU-RL-A2 (same fixed point, different convergence path).
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double rob_loc_noaitken_impl(Rcpp::NumericVector x) {
   static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
   static const int    MAXIT = 80;

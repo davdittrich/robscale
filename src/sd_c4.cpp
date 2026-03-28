@@ -14,7 +14,7 @@ static void validate_finite(const double* xp, int n) {
   }
 }
 
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double sd_c4_impl(Rcpp::NumericVector x) {
   int n = x.size();
   if (n < 2) return NA_REAL;

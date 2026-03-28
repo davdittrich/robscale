@@ -40,7 +40,7 @@ double mad_impl_auto_large(const double* ROBSCALE_RESTRICT xp, int n, double con
 // After median selection, w is a permutation of x. Compute deviations
 // in-place: {|w[i] - med|} == {|x[i] - med|} as multisets, and MAD
 // is order-invariant. This halves memory from 2n to n doubles.
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double mad_impl_auto(Rcpp::NumericVector x, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
@@ -72,7 +72,7 @@ double mad_impl_center_large(const double* ROBSCALE_RESTRICT xp, int n,
 }
 
 // MAD with user-supplied center
-// [[Rcpp::export]]
+// [[Rcpp::export(rng = false)]]
 double mad_impl_center(Rcpp::NumericVector x, double center, double constant) {
   int n = x.size();
   if (n < 1) return NA_REAL;
