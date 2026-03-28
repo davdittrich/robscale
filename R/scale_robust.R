@@ -114,7 +114,9 @@ scale_robust <- function(x,
                          level = 0.95,
                          boot_method = c("auto", "bca", "percentile",
                                          "parametric", "analytical")) {
-  method <- match.arg(method)
+  if (length(method) > 1L) method <- method[1L]
+  if (!method %in% c("ensemble", "gmd", "sd", "mad", "iqr", "sn", "qn", "robScale"))
+    stop("'method' must be one of: ensemble, gmd, sd, mad, iqr, sn, qn, robScale")
 
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) x <- x[!is.na(x)]
@@ -128,7 +130,9 @@ scale_robust <- function(x,
     effective_method <- "gmd"
 
   if (ci) {
-    boot_method <- match.arg(boot_method)
+    if (length(boot_method) > 1L) boot_method <- boot_method[1L]
+    if (!boot_method %in% c("auto", "bca", "percentile", "parametric", "analytical"))
+      stop("'boot_method' must be one of: auto, bca, percentile, parametric, analytical")
     if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
       stop("'level' must be a single numeric value in (0, 1)")
 

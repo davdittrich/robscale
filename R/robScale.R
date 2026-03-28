@@ -135,8 +135,9 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
   n <- length(x)
   if (n == 0L) return(NA_real_)
 
-  fallback <- match.arg(fallback)
-  fallback_code <- if (fallback == "adm") 0L else 1L
+  if (length(fallback) > 1L) fallback <- fallback[1L]
+  fallback_code <- if (fallback == "adm") 0L else if (fallback == "na") 1L else
+    stop("'fallback' must be \"adm\" or \"na\"")
 
   if (!is.null(loc)) {
     if (!is.numeric(loc) || length(loc) != 1L)
