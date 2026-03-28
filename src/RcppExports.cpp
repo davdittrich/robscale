@@ -225,45 +225,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// rob_loc_scalar_impl
-double rob_loc_scalar_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_rob_loc_scalar_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rob_loc_scalar_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// rob_loc_has_parallel
-bool rob_loc_has_parallel();
-RcppExport SEXP _robscale_rob_loc_has_parallel() {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    rcpp_result_gen = Rcpp::wrap(rob_loc_has_parallel());
-    return rcpp_result_gen;
-END_RCPP
-}
-// rob_loc_serial_impl
-double rob_loc_serial_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_rob_loc_serial_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rob_loc_serial_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// rob_loc_noaitken_impl
-double rob_loc_noaitken_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_rob_loc_noaitken_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(rob_loc_noaitken_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
 // rob_scale_impl
 double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val, double implbound, int maxit, double tol, int fallback);
 RcppExport SEXP _robscale_rob_scale_impl(SEXP xSEXP, SEXP has_locSEXP, SEXP loc_valSEXP, SEXP implboundSEXP, SEXP maxitSEXP, SEXP tolSEXP, SEXP fallbackSEXP) {
@@ -351,10 +312,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_get_qnsn_config", (DL_FUNC) &_robscale_get_qnsn_config, 0},
     {"_robscale_C_get_qn_factor", (DL_FUNC) &_robscale_C_get_qn_factor, 1},
     {"_robscale_rob_loc_impl", (DL_FUNC) &_robscale_rob_loc_impl, 5},
-    {"_robscale_rob_loc_scalar_impl", (DL_FUNC) &_robscale_rob_loc_scalar_impl, 1},
-    {"_robscale_rob_loc_has_parallel", (DL_FUNC) &_robscale_rob_loc_has_parallel, 0},
-    {"_robscale_rob_loc_serial_impl", (DL_FUNC) &_robscale_rob_loc_serial_impl, 1},
-    {"_robscale_rob_loc_noaitken_impl", (DL_FUNC) &_robscale_rob_loc_noaitken_impl, 1},
     {"_robscale_rob_scale_impl", (DL_FUNC) &_robscale_rob_scale_impl, 7},
     {"_robscale_C_rob_scale_fast", (DL_FUNC) &_robscale_C_rob_scale_fast, 1},
     {"_robscale_sd_c4_impl", (DL_FUNC) &_robscale_sd_c4_impl, 1},

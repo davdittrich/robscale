@@ -250,7 +250,7 @@ ROBSCALE_NOINLINE
 static double rob_loc_impl_small(const double* xp, size_t n,
                                  bool has_scale, double scale_val,
                                  int maxit, double tol) {
-  double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
+  alignas(32) double arena[ROBSCALE_MICRO_BUFFER_SIZE]; // 128 doubles = 1KB
   return rob_loc_core(xp, n, arena, arena + n,
                       has_scale, scale_val, maxit, tol);
 }
@@ -270,7 +270,7 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
 
   // Large-n: stack or heap arena
   constexpr size_t SCALE_STACK_SIZE = 2048;
-  double buf_stack[SCALE_STACK_SIZE * 2];
+  alignas(32) double buf_stack[SCALE_STACK_SIZE * 2];
   std::unique_ptr<double[]> heap;
   double* arena;
 
@@ -285,185 +285,6 @@ double rob_loc_impl(Rcpp::NumericVector x, bool has_scale, double scale_val,
                       has_scale, scale_val, maxit, tol);
 }
 
-// ---------------------------------------------------------------------------
-// Diagnostic exports — Phase 3+4 TDD gates
-// ---------------------------------------------------------------------------
-
-// Phase 3 gate (test 0.3): always uses scalar 3-pass NR path.
-// robLoc() dispatches to rob_loc_nr_step_avx2 when AVX2 is present.
-// Assert: |rob_loc_scalar_impl(x) - robLoc(x)| < 2*sqrt(eps).
-// [[Rcpp::export(rng = false)]]
-double rob_loc_scalar_impl(Rcpp::NumericVector x) {
-  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
-  static const int    MAXIT = 80;
-
-  const size_t n = (size_t)x.size();
-  if (n == 0) return 0.0;
-
-  const double* xp = x.begin();
-
-  std::unique_ptr<double[]> arena(new double[n * 2]);
-  double* buf = arena.get();
-  double* dev = arena.get() + n;
-
-  std::memcpy(buf, xp, n * sizeof(double));
-  double med = robscale::median_select(buf, n);
-  if (n < 4) return med;
-
-  double s = robscale::mad_select(buf, (int)n, med, dev);
-  if (s == 0.0) return med;
-
-  // 3-pass scalar NR — no SIMD dispatch
-  const double half_inv_s = 0.5 / s;
-  double t = med;
-
-  for (int k = 0; k < MAXIT; ++k) {
-    for (size_t i = 0; i < n; ++i)
-      buf[i] = (xp[i] - t) * half_inv_s;
-    for (size_t i = 0; i < n; ++i)
-      buf[i] = std::tanh(buf[i]);
-    double sum_psi = 0.0, sum_dpsi = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-      double p = buf[i];
-      sum_psi  += p;
-      sum_dpsi += 1.0 - p * p;
-    }
-    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
-    double v = 2.0 * s * sum_psi / sum_dpsi;
-    t += v;
-    if (std::abs(v) <= TOL) break;
-  }
-  return t;
-}
-
-// Phase 4 gate (test 0.5): returns TRUE if TBB parallel path is compiled and
-// AVX2 is confirmed at runtime.
-// [[Rcpp::export(rng = false)]]
-bool rob_loc_has_parallel() {
-#if (defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)) && \
-    defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  return robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
-         robscale::qnsn::SIMDLevel::AVX2;
-#else
-  return false;
-#endif
-}
-
-// Phase 4 gate (test 0.5): forces the serial rob_loc_compute path, bypassing
-// the parallel dispatch in rob_loc_core.  Used to cross-check parallel result.
-// [[Rcpp::export(rng = false)]]
-double rob_loc_serial_impl(Rcpp::NumericVector x) {
-  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
-  static const int    MAXIT = 80;
-
-  const size_t n = (size_t)x.size();
-  if (n == 0) return 0.0;
-
-  const double* xp = x.begin();
-
-  std::unique_ptr<double[]> arena(new double[n * 2]);
-  double* buf = arena.get();
-  double* dev = arena.get() + n;
-
-  std::memcpy(buf, xp, n * sizeof(double));
-  double med = robscale::median_select(buf, n);
-  if (n < 4) return med;
-
-  double s = robscale::mad_select(buf, (int)n, med, dev);
-  if (s == 0.0) return med;
-
-  // Call serial rob_loc_compute directly (no TBB dispatch).
-  // Intentionally passes xp (original data order) — serial reference for cross-checking.
-  return rob_loc_compute(xp, n, med, s, MAXIT, TOL);
-}
-
-// Aitken correctness cross-check — plain NR, no Aitken acceleration.
-// Self-contained: does NOT call rob_loc_compute, so it remains an unmodified
-// plain-NR reference after WU-RL-A2 applies Aitken to that function.
-// Assert: |rob_loc_noaitken_impl(x) - robLoc(x)| < 2*sqrt(eps)
-// after WU-RL-A2 (same fixed point, different convergence path).
-// [[Rcpp::export(rng = false)]]
-double rob_loc_noaitken_impl(Rcpp::NumericVector x) {
-  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
-  static const int    MAXIT = 80;
-
-  const size_t n = (size_t)x.size();
-  if (n == 0) return 0.0;
-
-  const double* xp = x.begin();
-
-  std::unique_ptr<double[]> arena(new double[n * 2]);
-  double* buf = arena.get();
-  double* dev = arena.get() + n;
-
-  std::memcpy(buf, xp, n * sizeof(double));
-  double med = robscale::median_select(buf, n);
-  if (n < 4) return med;
-
-  double s = robscale::mad_select(buf, (int)n, med, dev);
-  if (s == 0.0) return med;
-
-  // Single-pass scalar NR — matches the production scalar fallback in rob_loc_compute
-  // (OPT-RL2 pattern: accumulators in registers, no tmp[] writes), no SIMD, no Aitken.
-  const double half_inv_s = 0.5 / s;
-  double t = med;
-
-  for (int k = 0; k < MAXIT; ++k) {
-    double sum_psi = 0.0, sum_dpsi = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-      double p = std::tanh((xp[i] - t) * half_inv_s);
-      sum_psi  += p;
-      sum_dpsi += 1.0 - p * p;
-    }
-    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
-    double v = 2.0 * s * sum_psi / sum_dpsi;
-    t += v;
-    if (std::abs(v) <= TOL) break;
-  }
-  return t;
-}
-
-// Returns the number of NR evaluations for plain NR.
-// Finding (WU-RL-A2): robLoc uses quadratic NR (observed Hessian sum_dpsi = Σ sech²),
-// NOT linearly converging IRLS. Aitken was therefore not added to the production path.
-// This diagnostic confirms ≤ 4 evaluations on typical data.
-// Not exported (test 0.46 guards against re-export).
-int rob_loc_noaitken_iters(Rcpp::NumericVector x) {
-  static const double TOL   = std::sqrt(std::numeric_limits<double>::epsilon());
-  static const int    MAXIT = 80;
-
-  const size_t n = (size_t)x.size();
-  if (n == 0) return 0;
-
-  const double* xp = x.begin();
-
-  std::unique_ptr<double[]> arena(new double[n * 2]);
-  double* buf = arena.get();
-  double* dev = arena.get() + n;
-
-  std::memcpy(buf, xp, n * sizeof(double));
-  double med = robscale::median_select(buf, n);
-  if (n < 4) return 0;
-
-  double s = robscale::mad_select(buf, (int)n, med, dev);
-  if (s == 0.0) return 0;
-
-  const double half_inv_s = 0.5 / s;
-  double t = med;
-  int neval = 0;
-
-  for (int k = 0; k < MAXIT; ++k) {
-    ++neval;
-    double sum_psi = 0.0, sum_dpsi = 0.0;
-    for (size_t i = 0; i < n; ++i) {
-      double p = std::tanh((xp[i] - t) * half_inv_s);
-      sum_psi  += p;
-      sum_dpsi += 1.0 - p * p;
-    }
-    if (ROBSCALE_UNLIKELY(sum_dpsi < std::numeric_limits<double>::min())) break;
-    double v = 2.0 * s * sum_psi / sum_dpsi;
-    t += v;
-    if (std::abs(v) <= TOL) break;
-  }
-  return neval;
-}
+// Diagnostic exports removed — rob_loc_scalar_impl, rob_loc_has_parallel,
+// rob_loc_serial_impl, rob_loc_noaitken_impl, rob_loc_noaitken_iters all
+// deleted. Tests use expect_false(exists(...)) absence guards.

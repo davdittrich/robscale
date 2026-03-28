@@ -77,22 +77,6 @@ rob_loc_impl <- function(x, has_scale, scale_val, maxit, tol) {
     .Call(`_robscale_rob_loc_impl`, x, has_scale, scale_val, maxit, tol)
 }
 
-rob_loc_scalar_impl <- function(x) {
-    .Call(`_robscale_rob_loc_scalar_impl`, x)
-}
-
-rob_loc_has_parallel <- function() {
-    .Call(`_robscale_rob_loc_has_parallel`)
-}
-
-rob_loc_serial_impl <- function(x) {
-    .Call(`_robscale_rob_loc_serial_impl`, x)
-}
-
-rob_loc_noaitken_impl <- function(x) {
-    .Call(`_robscale_rob_loc_noaitken_impl`, x)
-}
-
 rob_scale_impl <- function(x, has_loc, loc_val, implbound, maxit, tol, fallback) {
     .Call(`_robscale_rob_scale_impl`, x, has_loc, loc_val, implbound, maxit, tol, fallback)
 }
