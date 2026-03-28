@@ -644,34 +644,38 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
     }
 
     // Step 2: Jackknife acceleration
-    std::vector<double> jack_flat(static_cast<size_t>(n) * N_ESTIMATORS);
+    // Column-major layout: jack_flat[j * n + i] — sequential per-estimator reads.
+    // Matches boot_results layout (WU-LAYOUT-1).
+    const size_t un = static_cast<size_t>(n);
+    std::vector<double> jack_flat(un * N_ESTIMATORS);
     {
       std::unique_ptr<double[]> loo(new double[n - 1]);
       std::unique_ptr<double[]> jw1(new double[n]);
       std::unique_ptr<double[]> jw2(new double[n]);
+      double res[N_ESTIMATORS];
       for (int i = 0; i < n; ++i) {
         int k = 0;
         for (int ii = 0; ii < n; ++ii)
           if (ii != i) loo[k++] = x[ii];
-        compute_all_estimators(loo.get(), n - 1,
-                               &jack_flat[static_cast<size_t>(i) * N_ESTIMATORS],
-                               jw1.get(), jw2.get());
+        compute_all_estimators(loo.get(), n - 1, res, jw1.get(), jw2.get());
+        for (int j = 0; j < N_ESTIMATORS; ++j)
+          jack_flat[static_cast<size_t>(j) * un + i] = res[j];
       }
     }
 
-    // Per-estimator acceleration
-    // kEstIdToAllIdx remaps API estimator_id order (0=gmd,1=sd) to
-    // compute_all_estimators order (0=sd_c4,1=gmd) in the jack_flat array.
+    // Per-estimator acceleration — sequential reads per column (j * n + i).
+    // kEstIdToAllIdx remaps API order (0=gmd,1=sd) to compute_all_estimators
+    // order (0=sd_c4,1=gmd) in the jack_flat columns.
     for (int j = 0; j < N_ESTIMATORS; ++j) {
       const int jj = kEstIdToAllIdx[j];
+      const double* col = jack_flat.data() + static_cast<size_t>(jj) * un;
       double jack_mean = 0.0;
       for (int i = 0; i < n; ++i)
-        jack_mean += jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + jj];
+        jack_mean += col[i];
       jack_mean /= n;
       double sum2 = 0.0, sum3 = 0.0;
       for (int i = 0; i < n; ++i) {
-        double L = jack_mean -
-                   jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + jj];
+        double L = jack_mean - col[i];
         double L2 = L * L;
         sum2 += L2;
         sum3 += L2 * L;
@@ -684,7 +688,7 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
       for (int i = 0; i < n; ++i) {
         double val = 0.0;
         for (int j = 0; j < N_ESTIMATORS; ++j) {
-          double v = jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + j];
+          double v = jack_flat[static_cast<size_t>(j) * un + i];
           if (std::isfinite(v) && v > 0.0) val += weights[j] * v;
         }
         ens_jack[i] = val;

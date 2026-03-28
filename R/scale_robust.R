@@ -166,7 +166,6 @@ scale_robust <- function(x,
         .analytical_ci(est, n, .are_values[[result_method]], level,
                        result_method)
       }
-      ci_obj$boot_method <- "analytical"
       return(ci_obj)
     }
 
