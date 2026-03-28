@@ -11,9 +11,10 @@
 #'   \code{x} before computation.  If \code{FALSE} (the default), the presence
 #'   of any \code{NA} raises an error.
 #' @param maxit Maximum number of Newton--Raphson iterations.  Defaults to 80.
-#' @param tol Convergence tolerance.  Iteration stops when the absolute
-#'   Newton step falls below \code{tol}.  Defaults to
-#'   \code{sqrt(.Machine$double.eps)}.
+#' @param tol Convergence tolerance.  Iteration stops when the Newton step
+#'   satisfies \code{|v| <= tol * max(|t|, 1.0)}, scaling the tolerance by the
+#'   location magnitude to ensure convergence for large-valued data.  Defaults
+#'   to \code{sqrt(.Machine$double.eps)}.
 #'
 #' @details
 #' The M-estimate of location \eqn{T_n}{Tn} is defined as the solution to the

@@ -455,7 +455,7 @@ robScale(c(1, 2, 3, 5, 7, 8))
 robScale(c(5, 5, 5, 5, 6), fallback = "na")   # returns NA (revss compatibility)
 ```
 
-### `qn(x, constant = 2.2191, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
+### `qn(x, constant = 2.21914446598508, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the $Q_n$ estimator of scale [@rousseeuw1993]. Unlike
 M-estimators, $Q_n$ requires no location estimate and achieves a 50% breakdown
@@ -468,7 +468,7 @@ qn(c(1, 2, 3, 5, 7, 8))
 qn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 ```
 
-### `sn(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
+### `sn(x, constant = 1.19259855312321, finite.corr = TRUE, na.rm = FALSE, ci = FALSE, level = 0.95)`
 
 Computes the $S_n$ estimator of scale [@rousseeuw1993]. $S_n$ is more
 statistically efficient than the MAD and maintains a 50% breakdown point.
@@ -625,11 +625,12 @@ for the specific working-set size of that estimator.
 
 **Stack-allocated memory arenas.** A 128-double micro-buffer (1 KB) covers the
 smallest samples ($n \leq 128$ for MAD, $n \leq 64$ for `robScale`/`robLoc`).
-For $n \leq 2{,}048$, two stack-allocated arrays of 2,048 doubles each (32 KB
-total) avoid heap allocation. `mad_scaled()` and `robScale()` use fused
-single-buffer algorithms that compute median and absolute deviations in-place on
-the same array, reducing cache pressure in the ensemble where multiple estimators
-share working memory.
+For $n \leq 2{,}048$, stack-allocated arrays avoid heap allocation: `robScale`
+uses one 2,048-double array (16 KB); `robLoc` uses one 4,096-double array (32 KB,
+split into equal-sized buffer and deviation halves). `mad_scaled()` and
+`robScale()` use fused single-buffer algorithms that compute median and absolute
+deviations in-place on the same array, reducing cache pressure in the ensemble
+where multiple estimators share working memory.
 
 **Iteration convergence.** Both M-estimators use Newton--Raphson iteration
 (quadratic convergence, 2--4 iterations), replacing the scoring fixed-point

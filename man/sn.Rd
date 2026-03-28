@@ -16,7 +16,7 @@ sn(
 \arguments{
 \item{x}{A numeric vector of observations.}
 
-\item{constant}{Consistency constant. Default is \eqn{1.1926}.}
+\item{constant}{Consistency constant. Default is \eqn{1.1926} (full precision: 1.19259855312321).}
 
 \item{finite.corr}{Logical; if \code{TRUE}, a finite-sample correction factor is applied.}
 

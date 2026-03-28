@@ -235,7 +235,7 @@ flowchart TD
     J --> K[psi_i = tanh( (x_i - t) / 2s )]
     K --> L[sum_psi = Sum psi_i, sum_dpsi = Sum (1 - psi_i^2)]
     L --> M[t += 2s * sum_psi / sum_dpsi]
-    M --> N{abs(v) <= tol?}
+    M --> N{"|v| <= tol * max(|t|, 1)?"}
     N -- No --> K
     N -- Yes --> O([Return t])
 ```
@@ -273,10 +273,17 @@ flowchart TD
     H -- Yes --> F
     H -- No --> J["u_i = (x_i - t) / (2cs), compute tanh(u_i)"]
     J --> K["numer = Σtanh²/n − 0.5<br/>denom = (2/n)·Σ(u·tanh·sech²)"]
-    K --> L["Δs = s · numer / denom<br/>s ← s + Δs"]
-    L --> M{"|Δs|/s ≤ tol?"}
-    M -- No --> J
-    M -- Yes --> N([Return s])
+    L --> LG{"|denom| <= 1e-14 * s?"}
+    LG -- Yes --> LF["s *= sqrt(2 * mean_tanh²)"]
+    LF --> J
+    LG -- No --> MM["Δs = s · numer / denom"]
+    MM --> MG{"s + Δs <= 0?"}
+    MG -- Yes --> MH["s /= 2"]
+    MH --> J
+    MG -- No --> MS["s ← s + Δs"]
+    MS --> N{"|Δs|/s ≤ tol?"}
+    N -- No --> J
+    N -- Yes --> O([Return s])
 ```
 
 ## 6. Confidence Intervals
@@ -318,8 +325,8 @@ compile time; at runtime, CPUID selects the widest available instruction set:
 3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
 4. **Scalar** `std::tanh`: universal fallback.
 
-For $n < 8$, vectorized paths are bypassed; fewer than two full AVX2 vectors
-yield no net gain.
+For the bulk tanh dispatcher, vectorization requires $n \geq 8$. However,
+`robLoc`'s fused AVX2 NR kernel activates at $n \geq 4$ (one full 4-wide vector).
 
 The Gini mean difference uses a separate AVX2 FMA kernel
 (`_mm256_fmadd_pd`) for its weighted sum $\sum (2i - (n-1))\, x_{(i)}$,
@@ -361,8 +368,9 @@ working-set pressure:
 
 A 128-double micro-buffer (1 KB) covers the smallest samples ($n \leq 128$
 for MAD, $n \leq 64$ for `robScale` and `robLoc`). For $n \leq 2{,}048$,
-two stack-allocated arrays of 2,048 doubles each (32 KB total) avoid heap
-allocation.
+stack-allocated arrays avoid heap allocation: `robScale` uses one 2,048-double
+array (16 KB); `robLoc` uses one 4,096-double array (32 KB, split into
+equal-sized buffer and deviation halves).
 
 **Fused single-buffer algorithm.** After median selection the working buffer
 holds a permutation of the input. Because MAD is order-invariant, absolute
@@ -394,15 +402,13 @@ costs only squaring and subtraction. Typical iteration counts:
 passes into one. Two AVX2 accumulators advance in lockstep:
 
 $$
-\texttt{acc\_psi} \mathrel{+}= p_i, \qquad \texttt{acc\_p2} \mathrel{+}= p_i^2
+\texttt{acc\_psi} \mathrel{+}= p_i, \qquad \texttt{acc\_dpsi} \mathrel{+}= (1 - p_i^2)
 $$
 
-where $p_i = \tanh(u_i)$ is evaluated once. The derivative sum follows from
-$\text{sech}^2(u) = 1 - \tanh^2(u)$:
-
-$$
-\sum \text{dpsi} = n - \sum p_i^2
-$$
+where $p_i = \tanh(u_i)$ is evaluated once. The derivative accumulator uses a
+fused negative multiply-add (fnmadd) to accumulate $1 - p_i^2$ directly,
+avoiding the catastrophic cancellation that would arise from subtracting two
+large numbers ($n - \sum p_i^2$) when all $|u_i| \gg 1$.
 
 **`robScale`: Newton--Raphson.** Scale estimation also uses Newton--Raphson,
 applied to the M-scale estimating equation $n^{-1}\sum \rho(u_i) = 1/2$.
@@ -412,7 +418,12 @@ one read over the data, yielding the NR update
 $\Delta s = s \cdot (\bar\rho - \tfrac{1}{2}) / \bar{D}$
 where $\bar{D}$ is the scaled derivative sum. The same quadratic convergence as
 `robLoc` applies; typical iteration counts are 3--4. A degenerate-denominator
-guard falls back to a multiplicative half-step when $|\bar{D}|$ is near zero.
+guard applies two protections: when the denominator is degenerate
+($|\bar{D}| \leq 10^{-14} \times s$), a multiplicative fallback
+$s \leftarrow s \times \sqrt{2 \times \overline{\tanh^2}}$ replaces the Newton
+step, avoiding the catastrophic cancellation of subtracting two large numbers.
+A separate guard halves $s$ when the proposed update would make $s$
+non-positive ($s + \Delta s \leq 0$).
 
 ### TBB parallelism and ensemble design
 

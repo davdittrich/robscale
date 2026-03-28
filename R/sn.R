@@ -3,7 +3,7 @@
 #' Computes the robust estimator of scale \eqn{S_n} proposed by Rousseeuw and Croux (1993).
 #'
 #' @param x A numeric vector of observations.
-#' @param constant Consistency constant. Default is \eqn{1.1926}.
+#' @param constant Consistency constant. Default is \eqn{1.1926} (full precision: 1.19259855312321).
 #' @param finite.corr Logical; if \code{TRUE}, a finite-sample correction factor is applied.
 #' @param na.rm Logical; if \code{TRUE}, \code{NA} values are removed before computation.
 #' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object

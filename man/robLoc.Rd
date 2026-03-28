@@ -25,9 +25,10 @@ of any \code{NA} raises an error.}
 
 \item{maxit}{Maximum number of Newton--Raphson iterations.  Defaults to 80.}
 
-\item{tol}{Convergence tolerance.  Iteration stops when the absolute
-Newton step falls below \code{tol}.  Defaults to
-\code{sqrt(.Machine$double.eps)}.}
+\item{tol}{Convergence tolerance.  Iteration stops when the Newton step
+satisfies \code{|v| <= tol * max(|t|, 1.0)}, scaling the tolerance by the
+location magnitude to ensure convergence for large-valued data.  Defaults
+to \code{sqrt(.Machine$double.eps)}.}
 }
 \value{
 A single numeric value: the robust M-estimate of location.

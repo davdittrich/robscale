@@ -3,7 +3,7 @@
 #' Computes the robust estimator of scale \eqn{Q_n} proposed by Rousseeuw and Croux (1993).
 #'
 #' @param x A numeric vector of observations.
-#' @param constant Consistency constant. Default is \eqn{2.2191}.
+#' @param constant Consistency constant. Default is \eqn{2.2191} (full precision: 2.21914446598508).
 #' @param finite.corr Logical; if \code{TRUE}, a finite-sample correction factor is applied.
 #' @param na.rm Logical; if \code{TRUE}, \code{NA} values are removed before computation.
 #' @param ci Logical. If \code{TRUE}, return a \code{"robscale_ci"} object
