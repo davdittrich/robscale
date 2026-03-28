@@ -125,7 +125,7 @@ static double rob_loc_parallel_compute(const double* ROBSCALE_RESTRICT xp,
 
     double v = 2.0 * s * acc.psi / acc.dpsi;
     t += v;
-    if (std::abs(v) <= tol) break;
+    if (std::abs(v) <= tol * std::max(std::abs(t), 1.0)) break;
   }
   return t;
 }
@@ -192,7 +192,7 @@ static ROBSCALE_INLINE double rob_loc_compute(const double* ROBSCALE_RESTRICT xp
 
     double v = 2.0 * s * sum_psi / sum_dpsi;
     t += v;
-    if (std::abs(v) <= tol) break;
+    if (std::abs(v) <= tol * std::max(std::abs(t), 1.0)) break;
   }
   return t;
 }
