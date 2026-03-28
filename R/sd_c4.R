@@ -55,6 +55,7 @@
 #' @keywords univar
 #' @export
 sd_c4 <- function(x, na.rm = FALSE, ci = FALSE, level = 0.95) {
+  if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -62,8 +63,13 @@ sd_c4 <- function(x, na.rm = FALSE, ci = FALSE, level = 0.95) {
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
+  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
   n <- length(x)
-  if (n == 0L) return(NA_real_)
+  if (n < 2L) return(NA_real_)
+  if (ci) {
+    if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
+      stop("'level' must be a single numeric value in (0, 1)")
+  }
   res <- sd_c4_impl(x)
   if (ci) return(.chisq_ci(res, n, level))
   res

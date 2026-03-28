@@ -117,6 +117,7 @@ scale_robust <- function(x,
   method      <- match.arg(method)
   boot_method <- match.arg(boot_method)
 
+  if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (isTRUE(na.rm)) {
     x <- x[!is.na(x)]
   } else {
@@ -124,6 +125,7 @@ scale_robust <- function(x,
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
+  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
   n <- length(x)
   if (n < 2L) return(NA_real_)
 
@@ -132,6 +134,11 @@ scale_robust <- function(x,
   effective_method <- method
   if (method == "ensemble" && auto_switch && n >= threshold)
     effective_method <- "gmd"
+
+  if (ci) {
+    if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
+      stop("'level' must be a single numeric value in (0, 1)")
+  }
 
   # "analytical" CI is not defined for the ensemble (which has no single ARE).
   if (boot_method == "analytical" && effective_method == "ensemble")

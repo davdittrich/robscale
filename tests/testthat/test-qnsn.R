@@ -33,9 +33,10 @@ test_that("qn() works for basic cases", {
 
 test_that("sn() and qn() handle NA correctly", {
   x <- c(1, 2, 4, NA, 16)
-  expect_true(is.na(sn(x)))
-  expect_true(is.na(qn(x)))
-  
+  # R7: now errors on NA with na.rm=FALSE (consistent with all other wrappers)
+  expect_error(sn(x), "NAs")
+  expect_error(qn(x), "NAs")
+
   expect_equal(sn(x, na.rm = TRUE), sn(x[!is.na(x)]))
   expect_equal(qn(x, na.rm = TRUE), qn(x[!is.na(x)]))
 })

@@ -84,6 +84,7 @@
 #' @export
 adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
                 ci = FALSE, level = 0.95) {
+  if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -91,7 +92,12 @@ adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
+  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
   if (length(x) == 0L) return(NA_real_)
+  if (ci) {
+    if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
+      stop("'level' must be a single numeric value in (0, 1)")
+  }
   if (is.null(center)) {
     res <- .Call(`_robscale_adm_impl_auto`, x, constant)
   } else {

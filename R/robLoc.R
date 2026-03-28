@@ -118,6 +118,7 @@
 #' @export
 robLoc <- function(x, scale = NULL, na.rm = FALSE, maxit = 80L,
                    tol = sqrt(.Machine$double.eps)) {
+  if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -125,6 +126,7 @@ robLoc <- function(x, scale = NULL, na.rm = FALSE, maxit = 80L,
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
+  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
   if (length(x) == 0L) return(NA_real_)
   has_scale <- !is.null(scale)
   scale_val <- if (has_scale) scale else 0.0

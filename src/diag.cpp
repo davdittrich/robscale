@@ -19,10 +19,10 @@
 // ---------------------------------------------------------------------------
 // M-scale iteration diagnostics
 //
-// Mirrors rob_scale_core/rob_scale_compute exactly but counts:
-//   - outer_iters: number of while-loop passes in aitken_iterate
-//   - aitken_fires: number of times Aitken extrapolation was accepted
-//   - rho_evals: total rho_sum calls (= 2 * outer_iters, always)
+// Mirrors rob_scale_core/nr_scale_compute (Newton-Raphson) and counts:
+//   - outer_iters: number of NR iteration steps
+//   - aitken_fires: always 0 (NR has no Aitken; field retained for API compat)
+//   - rho_evals: number of NR steps (= outer_iters)
 //
 // Called only via robscale:::rob_scale_diag_impl(x).
 // ---------------------------------------------------------------------------
@@ -33,44 +33,47 @@ struct DiagStats {
   int rho_evals    = 0;
 };
 
-// Instrumented version of aitken_iterate.  Identical logic; adds stat
-// bookkeeping.  Kept here (not in rob_scale.cpp) to avoid touching
-// production code before the RED tests are written.
-template <typename RhoSum>
-static double aitken_iterate_diag(RhoSum&& rho_sum, double s,
-                                   int maxit, double tol, double inv_n,
-                                   DiagStats& stats) {
-  int k = 0;
-  while (k < maxit) {
+// Instrumented version of nr_scale_compute (Newton-Raphson).
+// Mirrors the production scalar NR path exactly, with stat bookkeeping.
+static double nr_scale_diag(const double* data, size_t n, double t,
+                             double s, int maxit, double tol,
+                             DiagStats& stats) {
+  const double inv_n = 1.0 / static_cast<double>(n);
+  const double hisc_pre = 0.5 * robscale::INV_RHO_SCALE_CONST;
+
+  for (int iter = 0; iter < maxit; ++iter) {
     ++stats.outer_iters;
-
-    const double s0 = s;
-    const double v0 = std::sqrt(2.0 * rho_sum(s0) * inv_n);
     ++stats.rho_evals;
-    ++k;
-    const double s1 = s0 * v0;
-    if (std::abs(v0 - 1.0) <= tol) { s = s1; break; }
-    if (k >= maxit)                 { s = s1; break; }
 
-    const double v1 = std::sqrt(2.0 * rho_sum(s1) * inv_n);
-    ++stats.rho_evals;
-    ++k;
-    const double s2 = s1 * v1;
-    if (std::abs(v1 - 1.0) <= tol) { s = s2; break; }
+    const double hisc = hisc_pre / s;
+    double sum_tanh2 = 0.0;
+    double sum_u_tanh_sech2 = 0.0;
 
-    const double d1    = s1 - s0;
-    const double d2    = s2 - s1;
-    const double denom = d2 - d1;
-    if (d1 * d2 > 0.0 && std::abs(d2) < std::abs(d1) &&
-        std::abs(denom) > 1e-30 * s0 && k < maxit) {
-      const double candidate = s2 - d2 * d2 / denom;
-      if (candidate > 0.0) {
-        ++stats.aitken_fires;
-        s = candidate;
-        continue;
-      }
+    for (size_t i = 0; i < n; ++i) {
+      double u = (data[i] - t) * hisc;
+      double p = std::tanh(u);
+      double p2 = p * p;
+      sum_tanh2 += p2;
+      sum_u_tanh_sech2 += u * p * (1.0 - p2);
     }
-    s = (d1 * d2 < 0.0) ? std::sqrt(s1 * s2) : s2;
+
+    // Match production: numer = sum_tanh2 * inv_n - 0.5
+    const double numer = sum_tanh2 * inv_n - 0.5;
+    const double denom = 2.0 * inv_n * sum_u_tanh_sech2;
+
+    // GP guard: denominator degenerate → multiplicative fallback
+    if (std::abs(denom) <= 1e-14 * s) {
+      s *= std::sqrt(2.0 * sum_tanh2 * inv_n);
+      continue;
+    }
+
+    const double delta_s = s * numer / denom;
+
+    // Neg-s guard: proposed update non-positive → halve
+    if (s + delta_s <= 0.0) { s /= 2.0; continue; }
+
+    s += delta_s;
+    if (std::abs(delta_s) / s <= tol) break;
   }
   return s;
 }
@@ -124,33 +127,26 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
     );
   }
 
-  // --- Instrumented iteration ---
-  const double inv_n = 1.0 / static_cast<double>(n);
+  // --- Instrumented NR iteration ---
   DiagStats stats;
-
-  // Use scalar rho_sum (matches rob_scale_compute scalar path for portability)
   const double* data = x_r.begin();
-  auto rho_sum = [&](double sc) -> double {
-    const double hisc = 0.5 * robscale::INV_RHO_SCALE_CONST / sc;
-    std::vector<double> tmp(n);
-    for (size_t i = 0; i < n; ++i) tmp[i] = (data[i] - t) * hisc;
-    robscale::bulk_tanh(tmp.data(), static_cast<int>(n));
-    double sr = 0.0;
-    for (size_t i = 0; i < n; ++i) sr += tmp[i] * tmp[i];
-    return sr;
-  };
 
-  double s_final = aitken_iterate_diag(rho_sum, s_init, maxit, tol, inv_n, stats);
+  double s_final = nr_scale_diag(data, n, t, s_init, maxit, tol, stats);
 
-  // Determine convergence: re-evaluate v at s_final
+  // Determine convergence: check final NR step size
   const double hisc_final = 0.5 * robscale::INV_RHO_SCALE_CONST / s_final;
-  std::vector<double> tmp(n);
-  for (size_t i = 0; i < n; ++i) tmp[i] = (data[i] - t) * hisc_final;
-  robscale::bulk_tanh(tmp.data(), static_cast<int>(n));
-  double sr_final = 0.0;
-  for (size_t i = 0; i < n; ++i) sr_final += tmp[i] * tmp[i];
-  const double v_final = std::sqrt(2.0 * sr_final * inv_n);
-  bool converged = std::abs(v_final - 1.0) <= tol;
+  double sum_tanh2_f = 0.0, sum_ut_f = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    double u = (data[i] - t) * hisc_final;
+    double p = std::tanh(u);
+    double p2 = p * p;
+    sum_tanh2_f += p2;
+    sum_ut_f += u * p * (1.0 - p2);
+  }
+  double inv_n = 1.0 / static_cast<double>(n);
+  double denom_f = 2.0 * inv_n * sum_ut_f;
+  bool converged = (std::abs(denom_f) <= 1e-14 * s_final) ||
+                   (std::abs(s_final * (1.0 - 2.0 * inv_n * sum_tanh2_f) / denom_f) / s_final <= tol);
 
   return Rcpp::List::create(
     Rcpp::Named("scale")        = s_final,

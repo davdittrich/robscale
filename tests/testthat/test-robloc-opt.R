@@ -343,13 +343,11 @@ test_that("0.27 — right-skewed distribution: robLoc lies below mean", {
   expect_lt(loc, mn, label="robust location below non-robust mean on right-skewed data")
 })
 
-test_that("0.27b — Inf in input: result is not NaN (no crash or NaN propagation)", {
-  # With one Inf value: MAD(x_inf) = Inf → half_inv_s = 0 → u_i = 0 → tanh(0)=0
-  # → sum_psi=0 → NR step=0 → returns median. Verify no crash and no NaN.
+test_that("0.27b — Inf in input: now errors (S8 input validation)", {
   x_inf <- c(1.0, 2.0, 3.0, Inf, 5.0)
-  expect_false(is.nan(robLoc(x_inf)), label="Inf input: result must not be NaN")
+  expect_error(robLoc(x_inf), "finite")
   x_neginf <- c(1.0, 2.0, 3.0, -Inf, 5.0)
-  expect_false(is.nan(robLoc(x_neginf)), label="-Inf input: result must not be NaN")
+  expect_error(robLoc(x_neginf), "finite")
 })
 
 test_that("0.27c — NaN in input with na.rm=TRUE strips NaN before computation", {

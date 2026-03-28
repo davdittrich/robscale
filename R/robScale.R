@@ -130,6 +130,7 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
                      implbound = 1e-4, na.rm = FALSE,
                      maxit = 80L, tol = sqrt(.Machine$double.eps),
                      ci = FALSE, level = 0.95) {
+  if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) {
     x <- x[!is.na(x)]
   } else {
@@ -137,16 +138,21 @@ robScale <- function(x, loc = NULL, fallback = c("adm", "na"),
       stop("There are NAs in the data yet na.rm is FALSE")
     }
   }
+  if (any(!is.finite(x))) stop("'x' must not contain non-finite values (Inf, -Inf, NaN)")
   n <- length(x)
   if (n == 0L) return(NA_real_)
 
-  # Detect "user didn't specify fallback" via match.arg's default behavior:
-  # when both choices are present (length 2), the user left it at default.
-  fallback_code <- if (length(fallback) == 2L) {
-    0L  # default: "adm"
-  } else {
-    fallback <- match.arg(fallback)
-    if (fallback == "adm") 0L else 1L
+  fallback <- match.arg(fallback)
+  fallback_code <- if (fallback == "adm") 0L else 1L
+
+  if (!is.null(loc)) {
+    if (!is.numeric(loc) || length(loc) != 1L)
+      stop("'loc' must be a single numeric value")
+  }
+
+  if (ci) {
+    if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
+      stop("'level' must be a single numeric value in (0, 1)")
   }
 
   has_loc <- !is.null(loc)
