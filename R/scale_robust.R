@@ -114,13 +114,14 @@ scale_robust <- function(x,
                          level = 0.95,
                          boot_method = c("auto", "bca", "percentile",
                                          "parametric", "analytical")) {
-  method      <- match.arg(method)
-  boot_method <- match.arg(boot_method)
+  method <- match.arg(method)
 
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
-  if (isTRUE(na.rm)) x <- x[!is.na(x)]
+  if (na.rm) x <- x[!is.na(x)]
   n <- length(x)
   if (n < 2L) return(NA_real_)
+
+  boot_method <- match.arg(boot_method)
 
   # Resolve effective estimator: auto_switch only applies to the ensemble path.
   # Named methods (gmd, sd, …) are always dispatched as requested.
@@ -207,7 +208,6 @@ scale_robust <- function(x,
   # Analytical CIs for each component estimator
   estimator_names <- c("sd_c4", "gmd", "mad_scaled", "iqr_scaled",
                        "sn", "qn", "robScale")
-  are_values <- c(1.00, 0.98, 0.368, 0.37, 0.58, 0.82, 0.55)
 
   analytical_lower <- numeric(7L)
   analytical_upper <- numeric(7L)
@@ -215,7 +215,8 @@ scale_robust <- function(x,
     if (j == 1L) {
       ci_obj <- .chisq_ci(raw$estimates[j], n, level)
     } else {
-      ci_obj <- .analytical_ci(raw$estimates[j], n, are_values[j],
+      ci_obj <- .analytical_ci(raw$estimates[j], n,
+                               .are_values[[estimator_names[j]]],
                                level, estimator_names[j])
     }
     analytical_lower[j] <- ci_obj$ci[["lower"]]

@@ -18,10 +18,11 @@
   se <- estimate / sqrt(2 * n * are)
   structure(
     list(
-      estimate = estimate,
-      ci       = c(lower = estimate - z * se, upper = estimate + z * se),
-      level    = level,
-      method   = method
+      estimate    = estimate,
+      ci          = c(lower = estimate - z * se, upper = estimate + z * se),
+      level       = level,
+      method      = method,
+      boot_method = "analytical"
     ),
     class = "robscale_ci"
   )

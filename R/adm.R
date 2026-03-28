@@ -86,7 +86,8 @@ adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
                 ci = FALSE, level = 0.95) {
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) x <- x[!is.na(x)]
-  if (length(x) == 0L) return(NA_real_)
+  n <- length(x)
+  if (n == 0L) return(NA_real_)
   if (ci) {
     if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
       stop("'level' must be a single numeric value in (0, 1)")
@@ -96,6 +97,6 @@ adm <- function(x, center = NULL, constant = 1.2533141373155001, na.rm = FALSE,
   } else {
     res <- .Call(`_robscale_adm_impl`, x, center, constant)
   }
-  if (ci) return(.analytical_ci(res, length(x), are = .are_values[["adm"]], level, "adm"))
+  if (ci) return(.analytical_ci(res, n, are = .are_values[["adm"]], level, "adm"))
   res
 }

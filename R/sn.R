@@ -64,7 +64,7 @@
 #' sn(x, ci = TRUE)
 #'
 #' @export
-sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE,
+sn <- function(x, constant = 1.19259855312321, finite.corr = TRUE, na.rm = FALSE,
                ci = FALSE, level = 0.95) {
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
   if (na.rm) x <- x[!is.na(x)]
@@ -76,21 +76,17 @@ sn <- function(x, constant = 1.1926, finite.corr = TRUE, na.rm = FALSE,
       stop("'level' must be a single numeric value in (0, 1)")
   }
 
-  fast <- !ci && identical(constant, 1.1926) && finite.corr
+  fast <- !ci && constant == 1.19259855312321 && finite.corr
 
   if (is.double(x)) {
     if (fast) return(.Call(`_robscale_C_sn_fast`, x))
     res <- .Call(`_robscale_C_sn_fast`, x)
-  } else if (is.integer(x)) {
+  } else {
     if (fast) return(.Call(`_robscale_C_sn_int_fast`, x))
     res <- .Call(`_robscale_C_sn_int_fast`, x)
-  } else {
-    x <- as.double(x)
-    if (fast) return(.Call(`_robscale_C_sn_fast`, x))
-    res <- .Call(`_robscale_C_sn_fast`, x)
   }
 
-  if (!identical(constant, 1.1926)) {
+  if (constant != 1.19259855312321) {
     res <- res * (constant / 1.19259855312321)
   }
 

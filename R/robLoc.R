@@ -119,6 +119,10 @@
 robLoc <- function(x, scale = NULL, na.rm = FALSE, maxit = 80L,
                    tol = sqrt(.Machine$double.eps)) {
   if (!is.numeric(x)) stop("'x' must be a numeric vector")
+  if (!is.null(scale)) {
+    if (!is.numeric(scale) || length(scale) != 1L)
+      stop("'scale' must be a single numeric value")
+  }
   if (na.rm) x <- x[!is.na(x)]
   if (length(x) == 0L) return(NA_real_)
   has_scale <- !is.null(scale)
