@@ -15,16 +15,7 @@
 #include <tbb/blocked_range.h>
 #endif
 
-// Input validation helper: stops with a clear error on first non-finite value.
-static void validate_finite(const double* xp, int n) {
-  int idx = robscale::find_first_nonfinite(xp, n);
-  if (ROBSCALE_UNLIKELY(idx >= 0)) {
-    if (std::isnan(xp[idx]))
-      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-    else
-      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-  }
-}
+#include "validate_finite.h"
 
 // XorShift32 PRNG for deterministic bootstrap resampling
 struct XorShift32 {

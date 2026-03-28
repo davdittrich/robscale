@@ -66,7 +66,7 @@ gmd <- function(x, constant = 0.886226925452758, na.rm = FALSE,
     if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
       stop("'level' must be a single numeric value in (0, 1)")
   }
-  res <- gmd_impl(x, constant)
+  res <- .Call(`_robscale_gmd_impl`, x, constant)
   if (ci) return(.analytical_ci(res, n, are = .are_values[["gmd"]], level, "gmd"))
   res
 }

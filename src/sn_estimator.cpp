@@ -14,16 +14,7 @@
 #include <type_traits>
 #include <cassert>
 
-// Input validation helper (same as other .cpp files; consolidated in WU-OPT-3)
-static void validate_finite(const double* xp, int n) {
-  int idx = robscale::find_first_nonfinite(xp, n);
-  if (ROBSCALE_UNLIKELY(idx >= 0)) {
-    if (std::isnan(xp[idx]))
-      Rcpp::stop("There are NAs in the data yet na.rm is FALSE");
-    else
-      Rcpp::stop("'x' must not contain non-finite values (Inf, -Inf, NaN)");
-  }
-}
+#include "validate_finite.h"
 
 namespace robscale::qnsn {
 

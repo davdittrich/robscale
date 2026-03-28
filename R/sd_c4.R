@@ -63,7 +63,7 @@ sd_c4 <- function(x, na.rm = FALSE, ci = FALSE, level = 0.95) {
     if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
       stop("'level' must be a single numeric value in (0, 1)")
   }
-  res <- sd_c4_impl(x)
+  res <- .Call(`_robscale_sd_c4_impl`, x)
   if (ci) return(.chisq_ci(res, n, level))
   res
 }
