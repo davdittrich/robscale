@@ -542,9 +542,9 @@ AVX2 kernel, stack-allocated arenas, and optimal sorting networks for
 $n \le 16$ drive these gains. `adm()` matches `revss` at small $n$ (both
 ~1.5–2.0 µs, dominated by the R→C++ `.Call()` boundary) and leads by
 **1.6–7.1x** at $n \ge 128$ as computation overtakes boundary cost. At
-$n = 16{,}384$, all three NR estimators retain **2.8–5.3x** gains
-because `revss` interpreter overhead scales with iteration count, not
-just vector length.
+$n = 16{,}384$, all three estimators retain **2.8–5.3x** gains because
+`revss` interpreter overhead scales with iteration count, not just
+vector length.
 
 ### Rousseeuw–Croux estimators (`qn`, `sn`)
 
