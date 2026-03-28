@@ -39,7 +39,7 @@ inline double vshaped_mad(const double* s, int n, double m, double* tmp) {
   } else {
     double lo = kth_of_two_sorted(L, la, R, lb, k);
     double hi = kth_of_two_sorted(L, la, R, lb, k + 1);
-    return (lo + hi) * 0.5;
+    return lo + (hi - lo) * 0.5;  // overflow-safe averaging
   }
 }
 

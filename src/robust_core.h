@@ -195,22 +195,22 @@ ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
   return constant * (s0 + s1 + s2 + s3) * (1.0 / n);
 }
 
-// ADM core for pre-sorted input: constant * mean(|x - center|) without abs().
+// ADM core for pre-sorted input: constant * mean(|x - center|).
 // PRECONDITION: x is sorted ascending AND center = exact median of x.
-// Algorithm: sum|x_i - center| = upper_sum - lower_sum (verified formula):
-//   lower_sum = sum(x[0..k-1]), upper_sum = sum(x[k+(n&1)..n-1]), k = n/2.
+// Algorithm: accumulate (center - x[i]) for lower half and (x[i] - center) for
+// upper half. Each term is a small difference from center, avoiding catastrophic
+// cancellation that occurs with the upper_sum - lower_sum formula when data is
+// at large magnitude (e.g., 1e15 + small deviations).
 // Two independent SIMD-friendly accumulation loops: no branches, no abs().
-// center parameter retained for API symmetry and precondition visibility.
 ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
 ROBSCALE_INLINE double adm_core_sorted(const double* ROBSCALE_RESTRICT x, int n,
                                        double center, double constant) {
   if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;  // n=0: avoid 1.0/0=Inf; n=1: trivially 0
-  (void)center;  // only documents the precondition; not used in computation
   int k = n / 2;
-  double lower_sum = 0.0, upper_sum = 0.0;
-  for (int i = 0; i < k; ++i)             lower_sum += x[i];
-  for (int i = k + (n & 1); i < n; ++i)   upper_sum += x[i];
-  return constant * (upper_sum - lower_sum) * (1.0 / n);
+  double sum_abs = 0.0;
+  for (int i = 0; i < k; ++i)             sum_abs += center - x[i];
+  for (int i = k + (n & 1); i < n; ++i)   sum_abs += x[i] - center;
+  return constant * sum_abs * (1.0 / n);
 }
 
 // Absolute-deviation kernel (in-place): w[i] = |w[i] - center|.
