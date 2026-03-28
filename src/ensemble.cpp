@@ -64,7 +64,9 @@ static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 static void ensemble_one_replicate(
     const double* xp, int n, int r,
     double* base, int nboot,
-    double* resample, double* work1, double* work2) {
+    double* resample, double* work1, double* work2,
+    float* qn_work, int32_t* qn_iweight,
+    int32_t* qn_left, int32_t* qn_right) {
   // Helper: write estimator j for replicate r.
   // base[j * nboot + r] in the 7×nboot column-major matrix.
   auto write_est = [base, nboot, r](int j, double v) {
@@ -134,22 +136,19 @@ static void ensemble_one_replicate(
   write_est(4, robscale::internal::sn_sorted(resample, n, work1));
 
   // 5: qn — sorted variant, skip redundant copy+sort
-  // OPT-Q6: workspace reuse — reinterpret work1/work2 as Qn arena to avoid
-  // per-bootstrap heap allocation inside qn_refinement_kernel.
-  // Layout: work1 -> float work[n] + int32_t iweight[n] (4n+4n = 8n bytes)
-  //         work2 -> int32_t left[n] + int32_t right[n] (4n+4n = 8n bytes)
-  // Guard: only for n <= sn_stack_threshold (2048); beyond that pass nullptr.
+  // Qn workspace uses correctly-typed arrays passed by caller (no aliasing UB).
+  // Guard: only for n <= QN_WS_THRESHOLD (2048); beyond that pass nullptr.
   {
     using WS = robscale::qnsn::QnWorkspace;
     static constexpr size_t QN_WS_THRESHOLD = 2048;
     const size_t un = static_cast<size_t>(n);
     WS qn_ws{};
     WS* qn_ws_ptr = nullptr;
-    if (un <= QN_WS_THRESHOLD) {
-      qn_ws.work    = reinterpret_cast<float*>(work1);
-      qn_ws.iweight = reinterpret_cast<int32_t*>(work1) + un;
-      qn_ws.left    = reinterpret_cast<int32_t*>(work2);
-      qn_ws.right   = reinterpret_cast<int32_t*>(work2) + un;
+    if (un <= QN_WS_THRESHOLD && qn_work != nullptr) {
+      qn_ws.work    = qn_work;
+      qn_ws.iweight = qn_iweight;
+      qn_ws.left    = qn_left;
+      qn_ws.right   = qn_right;
       qn_ws_ptr = &qn_ws;
     }
     write_est(5, robscale::internal::qn_sorted(resample, n, qn_ws_ptr));
@@ -206,23 +205,39 @@ struct EnsembleCore {
       tbb::parallel_for(
         tbb::blocked_range<int>(0, nboot),
         [xp, n, br, n_boot](const tbb::blocked_range<int>& range) {
-          std::unique_ptr<double[]> ws(new double[3 * static_cast<size_t>(n)]);
+          const size_t un = static_cast<size_t>(n);
+          std::unique_ptr<double[]> ws(new double[3 * un]);
           double* resample = ws.get();
           double* work1 = resample + n;
           double* work2 = work1 + n;
+          // Per-thread typed Qn workspace (no aliasing UB)
+          static constexpr size_t QN_WS_THRESHOLD = 2048;
+          std::unique_ptr<float[]>   qn_w(un <= QN_WS_THRESHOLD ? new float[un] : nullptr);
+          std::unique_ptr<int32_t[]> qn_iw(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+          std::unique_ptr<int32_t[]> qn_l(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+          std::unique_ptr<int32_t[]> qn_r(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
           for (int r = range.begin(); r < range.end(); ++r)
-            ensemble_one_replicate(xp, n, r, br, n_boot, resample, work1, work2);
+            ensemble_one_replicate(xp, n, r, br, n_boot, resample, work1, work2,
+                                   qn_w.get(), qn_iw.get(), qn_l.get(), qn_r.get());
         }
       );
     } else
 #endif
     {
-      std::unique_ptr<double[]> ws(new double[3 * static_cast<size_t>(n)]);
+      const size_t un = static_cast<size_t>(n);
+      std::unique_ptr<double[]> ws(new double[3 * un]);
       double* resample = ws.get();
       double* work1 = resample + n;
       double* work2 = work1 + n;
+      // Typed Qn workspace (no aliasing UB)
+      static constexpr size_t QN_WS_THRESHOLD = 2048;
+      std::unique_ptr<float[]>   qn_w(un <= QN_WS_THRESHOLD ? new float[un] : nullptr);
+      std::unique_ptr<int32_t[]> qn_iw(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+      std::unique_ptr<int32_t[]> qn_l(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
+      std::unique_ptr<int32_t[]> qn_r(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
       for (int r = 0; r < nboot; ++r)
-        ensemble_one_replicate(xp, n, r, br, nboot, resample, work1, work2);
+        ensemble_one_replicate(xp, n, r, br, nboot, resample, work1, work2,
+                               qn_w.get(), qn_iw.get(), qn_l.get(), qn_r.get());
     }
 
     // --- Mean and variance per estimator ---
@@ -308,8 +323,15 @@ Rcpp::List cpp_single_estimator_ci_bounds(
 
   // --- Bootstrap loop ---
   std::vector<double> boot_vals(static_cast<size_t>(n_boot));
+  const size_t un_ci = static_cast<size_t>(n);
+  static constexpr size_t QN_CI_THRESHOLD = 2048;
+  // Typed Qn workspace — allocated once before the loop (no aliasing UB).
+  std::unique_ptr<float[]>   qn_w_ci(un_ci <= QN_CI_THRESHOLD ? new float[un_ci] : nullptr);
+  std::unique_ptr<int32_t[]> qn_iw_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
+  std::unique_ptr<int32_t[]> qn_l_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
+  std::unique_ptr<int32_t[]> qn_r_ci(un_ci <= QN_CI_THRESHOLD ? new int32_t[un_ci] : nullptr);
   {
-    std::unique_ptr<double[]> ws(new double[3 * static_cast<size_t>(n)]);
+    std::unique_ptr<double[]> ws(new double[3 * un_ci]);
     double* resample = ws.get();
     double* work1    = resample + n;
     double* work2    = work1   + n;
@@ -365,15 +387,13 @@ Rcpp::List cpp_single_estimator_ci_bounds(
           break;
         case 5: {  // qn
           using WS = robscale::qnsn::QnWorkspace;
-          static constexpr size_t QN_WS_THRESHOLD = 2048;
-          const size_t un = static_cast<size_t>(n);
           WS  qn_ws{};
           WS* qn_ws_ptr = nullptr;
-          if (un <= QN_WS_THRESHOLD) {
-            qn_ws.work    = reinterpret_cast<float*>(work1);
-            qn_ws.iweight = reinterpret_cast<int32_t*>(work1) + un;
-            qn_ws.left    = reinterpret_cast<int32_t*>(work2);
-            qn_ws.right   = reinterpret_cast<int32_t*>(work2) + un;
+          if (un_ci <= QN_CI_THRESHOLD) {
+            qn_ws.work    = qn_w_ci.get();
+            qn_ws.iweight = qn_iw_ci.get();
+            qn_ws.left    = qn_l_ci.get();
+            qn_ws.right   = qn_r_ci.get();
             qn_ws_ptr = &qn_ws;
           }
           val = robscale::internal::qn_sorted(resample, n, qn_ws_ptr);
