@@ -27,6 +27,12 @@ struct XorShift32 {
 };
 
 static constexpr int N_ESTIMATORS = 7;
+
+// Remap estimator_id (API order: 0=gmd, 1=sd_c4, 2=mad, ...) to the
+// compute_all_estimators results[] order (0=sd_c4, 1=gmd, 2=mad, ...).
+// Only indices 0 and 1 are swapped; 2-6 are identity.
+static const int kEstIdToAllIdx[N_ESTIMATORS] = {1, 0, 2, 3, 4, 5, 6};
+
 #ifdef USE_DIRECT_TBB
 static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
 #endif
@@ -408,7 +414,7 @@ Rcpp::List cpp_single_estimator_ci_bounds(
           if (ii != i) loo[k++] = xp[ii];
         double res[N_ESTIMATORS];
         compute_all_estimators(loo.get(), n - 1, res, jw1.get(), jw2.get());
-        jv[i] = res[estimator_id];
+        jv[i] = res[kEstIdToAllIdx[estimator_id]];
       }
       double jack_mean = 0.0;
       for (int i = 0; i < n; ++i) jack_mean += jv[i];
@@ -592,15 +598,18 @@ Rcpp::List cpp_scale_ensemble_ci(Rcpp::NumericVector x, int n_boot,
     }
 
     // Per-estimator acceleration
+    // kEstIdToAllIdx remaps API estimator_id order (0=gmd,1=sd) to
+    // compute_all_estimators order (0=sd_c4,1=gmd) in the jack_flat array.
     for (int j = 0; j < N_ESTIMATORS; ++j) {
+      const int jj = kEstIdToAllIdx[j];
       double jack_mean = 0.0;
       for (int i = 0; i < n; ++i)
-        jack_mean += jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + j];
+        jack_mean += jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + jj];
       jack_mean /= n;
       double sum2 = 0.0, sum3 = 0.0;
       for (int i = 0; i < n; ++i) {
         double L = jack_mean -
-                   jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + j];
+                   jack_flat[static_cast<size_t>(i) * N_ESTIMATORS + jj];
         double L2 = L * L;
         sum2 += L2;
         sum3 += L2 * L;
