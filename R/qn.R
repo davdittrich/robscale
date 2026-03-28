@@ -79,13 +79,9 @@ qn <- function(x, constant = 2.21914446598508, finite.corr = TRUE, na.rm = FALSE
 
   fast <- !ci && constant == 2.21914446598508 && finite.corr
 
-  if (is.double(x)) {
-    if (fast) return(.Call(`_robscale_C_qn_fast`, x))
-    res <- .Call(`_robscale_C_qn_fast`, x)
-  } else {
-    if (fast) return(.Call(`_robscale_C_qn_int_fast`, x))
-    res <- .Call(`_robscale_C_qn_int_fast`, x)
-  }
+  res <- if (is.double(x)) .Call(`_robscale_C_qn_fast`, x)
+         else .Call(`_robscale_C_qn_int_fast`, x)
+  if (fast) return(res)
 
   if (constant != 2.21914446598508) {
     res <- res * (constant / 2.21914446598508)

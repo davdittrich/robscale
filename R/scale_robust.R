@@ -121,8 +121,6 @@ scale_robust <- function(x,
   n <- length(x)
   if (n < 2L) return(NA_real_)
 
-  boot_method <- match.arg(boot_method)
-
   # Resolve effective estimator: auto_switch only applies to the ensemble path.
   # Named methods (gmd, sd, …) are always dispatched as requested.
   effective_method <- method
@@ -130,13 +128,14 @@ scale_robust <- function(x,
     effective_method <- "gmd"
 
   if (ci) {
+    boot_method <- match.arg(boot_method)
     if (!is.numeric(level) || length(level) != 1L || level <= 0 || level >= 1)
       stop("'level' must be a single numeric value in (0, 1)")
-  }
 
-  # "analytical" CI is not defined for the ensemble (which has no single ARE).
-  if (boot_method == "analytical" && effective_method == "ensemble")
-    stop('"analytical" CI is not available for method = "ensemble"')
+    # "analytical" CI is not defined for the ensemble (which has no single ARE).
+    if (boot_method == "analytical" && effective_method == "ensemble")
+      stop('"analytical" CI is not available for method = "ensemble"')
+  }
 
   # ── Individual estimator path ────────────────────────────────────────
   if (effective_method != "ensemble") {
@@ -172,9 +171,8 @@ scale_robust <- function(x,
     }
 
     # Bootstrap CI for individual estimator
-    estimator_id <- match(effective_method,
-                          c("gmd", "sd", "mad", "iqr", "sn", "qn",
-                            "robScale")) - 1L
+    estimator_id <- switch(effective_method,
+      gmd = 0L, sd = 1L, mad = 2L, iqr = 3L, sn = 4L, qn = 5L, robScale = 6L)
     method_code  <- switch(boot_method, bca = 0L, percentile = 1L,
                             parametric = 2L)
     bounds <- cpp_single_estimator_ci_bounds(x, est, estimator_id, n_boot,
@@ -205,23 +203,23 @@ scale_robust <- function(x,
 
   raw <- cpp_scale_ensemble_ci(x, n_boot, level, method_code)
 
-  # Analytical CIs for each component estimator
+  # Analytical CIs for each component estimator (vectorized)
   estimator_names <- c("sd_c4", "gmd", "mad_scaled", "iqr_scaled",
                        "sn", "qn", "robScale")
 
-  analytical_lower <- numeric(7L)
-  analytical_upper <- numeric(7L)
-  for (j in seq_len(7L)) {
-    if (j == 1L) {
-      ci_obj <- .chisq_ci(raw$estimates[j], n, level)
-    } else {
-      ci_obj <- .analytical_ci(raw$estimates[j], n,
-                               .are_values[[estimator_names[j]]],
-                               level, estimator_names[j])
-    }
-    analytical_lower[j] <- ci_obj$ci[["lower"]]
-    analytical_upper[j] <- ci_obj$ci[["upper"]]
-  }
+  # ARE values for j=2..7; j=1 (sd_c4) uses chi-squared — placeholder here.
+  are_vec <- c(1.0, unname(.are_values[estimator_names[-1L]]))
+
+  z   <- qnorm(1 - (1 - level) / 2)
+  se  <- raw$estimates / sqrt(2 * n * are_vec)
+  analytical_lower <- raw$estimates - z * se
+  analytical_upper <- raw$estimates + z * se
+
+  # Fix sd_c4 (j=1) with exact chi-squared bounds
+  alpha <- 1 - level
+  df    <- n - 1L
+  analytical_lower[1L] <- raw$estimates[1L] * sqrt(df / qchisq(1 - alpha / 2, df))
+  analytical_upper[1L] <- raw$estimates[1L] * sqrt(df / qchisq(alpha / 2, df))
 
   boot_method_name <- c("bca", "percentile", "parametric")[method_code + 1L]
 

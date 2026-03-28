@@ -34,13 +34,14 @@
   df <- n - 1L
   structure(
     list(
-      estimate = estimate,
-      ci       = c(
+      estimate    = estimate,
+      ci          = c(
         lower = estimate * sqrt(df / qchisq(1 - alpha / 2, df)),
         upper = estimate * sqrt(df / qchisq(alpha / 2, df))
       ),
-      level    = level,
-      method   = "sd_c4"
+      level       = level,
+      method      = "sd_c4",
+      boot_method = "analytical"
     ),
     class = "robscale_ci"
   )
