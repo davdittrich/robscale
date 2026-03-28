@@ -746,7 +746,7 @@ Transformation in R*. <https://doi.org/10.5281/zenodo.8433090>.
 
 Maechler, Martin, Peter Rousseeuw, Christophe Croux, et al. 2026.
 *Robustbase: Basic Robust Statistics*.
-<http://robustbase.r-forge.r-project.org/>.
+<https://CRAN.R-project.org/package=robustbase>.
 
 </div>
 
