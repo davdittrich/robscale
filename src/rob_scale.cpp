@@ -14,31 +14,16 @@
 #include "validate_finite.h"
 
 // ---------------------------------------------------------------------------
-// Phase 2: Fused single-pass NR step kernel (WU-FUSE-1)
+// Fused single-pass NR step kernels
 //
-// The fused kernel collapses the 3-pass loop (scale → tanh → accumulate)
-// into a single pass: reads data[] once, computes u_i inline, evaluates
-// ROBSCALE_TANH4_AVX2 in 4-wide vectors, and accumulates sum_tanh2 and
-// sum_u_tanh_sech2 via FMA — never touching a scratch buffer.
+// nr_scale_step_scalar — portable fallback, std::tanh per element
+// nr_scale_step_avx2   — AVX2+FMA, 4-wide, scalar tail for n%4
 //
-// Benefit: eliminates the per-iteration heap/stack scratch allocation in
-// rob_scale_compute and the thread_local scratch in the parallel kernels.
-// ~1.3–1.5x speedup on the NR iteration loop.
-//
-// Two variants:
-//   nr_scale_step_avx2   — AVX2+FMA, 4-wide, scalar tail for n%4
-//   nr_scale_step_scalar — portable fallback, std::tanh per element
+// Each reads data[] once, computes u_i, tanh(u_i), and accumulates
+// sum_tanh2 and sum_u_tanh_sech2 via FMA — no scratch buffer.
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Phase 4: TBB/OMP parallel NR iteration kernel (WU-FUSE-1 updated)
-//
-// Each NR iteration dispatches nr_scale_step_avx2 per grain — no thread-local
-// scratch. Grains are reduced via struct Accum (TBB) or OMP reduction.
-// ---------------------------------------------------------------------------
-
-// Scalar single-pass NR step: reads data[] once, computes u_i, std::tanh(u_i),
-// and accumulates sum_tanh2 and sum_u_tanh_sech2 without a scratch buffer.
+// Scalar single-pass NR step.
 static void nr_scale_step_scalar(const double* ROBSCALE_RESTRICT data,
                                   int n, double data_offset, double hisc,
                                   double* out_sum_tanh2,
@@ -261,8 +246,8 @@ double rob_scale_compute(const double* ROBSCALE_RESTRICT data,
  * Shared core: median, MAD, fallback, iteration.
  * Called by both the small-n and large-n entry points.
  */
-static double rob_scale_core(const double* xp, size_t n,
-                             double* w,
+static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
+                             double* ROBSCALE_RESTRICT w,
                              bool has_loc, double loc_val,
                              double implbound, int maxit,
                              double tol, int fallback) {
@@ -396,11 +381,7 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
                         has_loc, loc_val, implbound, maxit, tol, fallback);
 }
 
-// ---------------------------------------------------------------------------
-// WU-RS2a: C_rob_scale_orig removed (H2H gate cleared in WU-RS1).
-// C_rob_scale_fast retained for SOLO gate (WU-RS2/RS3).
-// ---------------------------------------------------------------------------
-
+// Thin wrapper for gate benchmarks — calls production rob_scale_impl directly.
 // [[Rcpp::export(rng = false)]]
 double C_rob_scale_fast(Rcpp::NumericVector x) {
   // Thin wrapper → production rob_scale_impl (has_loc=false, default params).
