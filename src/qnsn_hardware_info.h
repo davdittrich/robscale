@@ -16,8 +16,9 @@
 #include <windows.h>
 #endif
 
-#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) ||             \
-    defined(_M_IX86)
+// R4: guard <cpuid.h> with GCC/Clang — MSVC uses <intrin.h> and __cpuid()
+#if (defined(__x86_64__) || defined(__i386__)) && \
+    (defined(__GNUC__) || defined(__clang__))
 #include <cpuid.h>
 #endif
 
@@ -86,7 +87,8 @@ private:
         long l2_sc = sysconf(_SC_LEVEL2_CACHE_SIZE);
         if (l2_sc > 0) {
           l2_cache_size = (size_t)l2_sc;
-          l2_per_core = l2_cache_size;  // sysconf is also per-core
+          // S10: sysconf may return total L2 on some kernels; divide as conservative estimate
+          l2_per_core = l2_cache_size / std::max(num_logical_cores, size_t(1));
         }
       }
 #endif
@@ -113,7 +115,7 @@ private:
     } catch (...) {
       l2_per_core = L2_FALLBACK_KB * 1024;
       l2_cache_size = l2_per_core;
-      num_logical_cores = 1;
+      // R5: preserve num_logical_cores from hardware_concurrency() (line 43)
     }
   }
 
@@ -122,9 +124,12 @@ private:
   // Falls back to the HardwareInfo default (256 KB) if sysctl is unavailable.
   void discover_macos() {
 #ifdef __APPLE__
-    size_t len = sizeof(size_t);
+    size_t len;
+    len = sizeof(l2_cache_size);
     sysctlbyname("hw.l2cachesize", &l2_cache_size, &len, NULL, 0);
+    len = sizeof(cache_line_size);
     sysctlbyname("hw.cachelinesize", &cache_line_size, &len, NULL, 0);
+    len = sizeof(num_physical_cores);
     sysctlbyname("hw.physicalcpu", &num_physical_cores, &len, NULL, 0);
 
     // hw.l2cachesize returns total L2; derive per-core
