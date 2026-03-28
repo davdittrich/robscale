@@ -118,8 +118,10 @@ test_that("median_net<double> is not an exported (PLT-routed) symbol", {
   # weak globals; only the dispatcher matters for PLT overhead.
   dyn_syms <- tryCatch(
     system2("nm", c("-D", "-C", so), stdout = TRUE, stderr = FALSE),
+    warning = function(w) character(0),
     error = function(e) character(0)
   )
+  skip_if(length(dyn_syms) == 0L, "nm -D not available on this platform")
   # Match demangled dispatcher: "robscale::median_net<double>(double*,"
   # This does NOT match "median_net_7", "median_net_8", etc.
   mn_dyn <- grep("robscale::median_net<double>\\(", dyn_syms, value = TRUE)
