@@ -334,20 +334,24 @@ jackknife. This kernel activates for $n \geq 8$ on AVX2 hardware.
 
 `robscale` uses a tiered strategy rather than `sort()`:
 
-- **$n \leq 16$**: optimal sorting networks (verified minimal comparator counts,
-  compiled to branchless machine code at `-O2`):
+- **$n \in \{8, 16, 32\}$ on AVX2 hardware**: SIMD selection networks
+  (bitonic merge, 23--58% faster than scalar selection networks).
+- **$n \leq 36$**: scalar selection networks for median computation.
+- **$n \leq 56$**: branchless sorting networks for full-sort paths (GMD,
+  $Q_n$ exact, $S_n$), compiled to conditional-move instructions at `-O2`:
 
 | $n$ | Comparators |
 | ---: | ---: |
 | 3 | 3 |
 | 4 | 5 |
 | 8 | 19 |
-| 12 | 39 |
 | 16 | 60 |
+| 32 | 185 |
+| 56 | 438 |
 
-- **$17 \leq n < 600$**: `std::nth_element` (introselect, $O(n)$ worst-case).
-- **$n \geq 600$**: Floyd--Rivest algorithm [@floyd1975], which narrows the
-  active window to $O(n^{2/3})$ elements before partitioning.
+- **$37 \leq n$ (selection) / $57 \leq n$ (sort)**: Floyd--Rivest algorithm
+  [@floyd1975] or pdqselect, chosen per-estimator based on a runtime
+  L2-cache-derived crossover threshold.
 
 The crossover between Floyd--Rivest and pdqselect is derived at runtime from
 the per-core L2 cache size; each estimator uses its own threshold based on
