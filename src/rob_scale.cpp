@@ -2,6 +2,7 @@
 #include "robust_core.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
+#include <cmath>
 #include <memory>
 #include <RcppParallel.h>
 #if defined(ROBSCALE_HAS_SYSTEM_TBB)

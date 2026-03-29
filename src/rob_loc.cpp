@@ -1,6 +1,7 @@
 #include "robscale_config.h"
 #include "robust_core.h"
 #include <Rcpp.h>
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <RcppParallel.h>
