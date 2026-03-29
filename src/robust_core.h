@@ -38,21 +38,19 @@
     !defined(ROBSCALE_HAS_ACCELERATE)
   #include <immintrin.h>
   // AVX2 4-wide backend
-  // Declarations carry target("avx2,fma") so clang 21+ accepts __m256d
-  // parameter/return types without global -mavx2 (ABI compatibility).
   #if defined(ROBSCALE_HAS_GLIBC_MVEC)
-    extern "C" ROBSCALE_TARGET_AVX2 __m256d _ZGVdN4v_tanh(__m256d);
+    extern "C" __m256d _ZGVdN4v_tanh(__m256d);
     #define ROBSCALE_TANH4_AVX2 _ZGVdN4v_tanh
   #elif defined(ROBSCALE_HAS_SLEEF)
     // sleef.h guards Sleef_tanhd4_u10avx2 behind #ifdef __AVX2__, which is
     // absent without global -mavx2.  The symbol exists in libsleef regardless;
     // declare it here so the target-attributed wrapper can call it.
-    extern "C" ROBSCALE_TARGET_AVX2 __m256d Sleef_tanhd4_u10avx2(__m256d);
+    extern "C" __m256d Sleef_tanhd4_u10avx2(__m256d);
     #define ROBSCALE_TANH4_AVX2 Sleef_tanhd4_u10avx2
   #endif
   // AVX-512 8-wide backend (glibc libmvec, same -lmvec as the 4-wide variant)
   #if defined(ROBSCALE_HAS_AVX512_TANH)
-    extern "C" ROBSCALE_TARGET_AVX512F __m512d _ZGVeN8v_tanh(__m512d);
+    extern "C" __m512d _ZGVeN8v_tanh(__m512d);
     #define ROBSCALE_TANH8_AVX512 _ZGVeN8v_tanh
   #endif
 #endif
