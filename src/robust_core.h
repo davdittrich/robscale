@@ -98,7 +98,16 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core_scalar(const double* ROBSCALE_RE
 ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
 ROBSCALE_INLINE double adm_core_avx2(const double* ROBSCALE_RESTRICT x, int n,
                                      double center, double constant) {
-  return adm_core_scalar(x, n, center, constant);
+  double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
+  int i = 0;
+  for (; i + 3 < n; i += 4) {
+    s0 += std::abs(x[i]   - center);
+    s1 += std::abs(x[i+1] - center);
+    s2 += std::abs(x[i+2] - center);
+    s3 += std::abs(x[i+3] - center);
+  }
+  for (; i < n; ++i) s0 += std::abs(x[i] - center);
+  return constant * (s0 + s1 + s2 + s3) * (1.0 / n);
 }
 
 // ADM core dispatch: AVX2 if available, scalar otherwise.
@@ -128,7 +137,12 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core_sorted_scalar(const double* ROBS
 ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
 ROBSCALE_INLINE double adm_core_sorted_avx2(const double* ROBSCALE_RESTRICT x, int n,
                                             double center, double constant) {
-  return adm_core_sorted_scalar(x, n, center, constant);
+  if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;
+  int k = n / 2;
+  double sum_abs = 0.0;
+  for (int i = 0; i < k; ++i)             sum_abs += center - x[i];
+  for (int i = k + (n & 1); i < n; ++i)   sum_abs += x[i] - center;
+  return constant * sum_abs * (1.0 / n);
 }
 
 // ADM core for pre-sorted input dispatch.
