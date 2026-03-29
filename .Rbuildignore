@@ -81,3 +81,4 @@
 ^sn_16k\.out$
 ^report\.md$
 ^email_draft.*\.md$
+^mastodon_draft\.md$

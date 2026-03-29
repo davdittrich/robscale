@@ -5,7 +5,13 @@
 #include "qnsn_runtime_config.h"
 #include <algorithm>
 #include <boost/sort/spreadsort/spreadsort.hpp>
-#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
+// RcppParallel.h must be included before any system TBB headers so that
+// RcppParallel's bundled TBB 2019 include guards fire first, preventing
+// symbol clashes when the system oneTBB headers are subsequently included.
+#include <RcppParallel.h>
+#if defined(ROBSCALE_HAS_SYSTEM_TBB)
+#include <oneapi/tbb/parallel_sort.h>
+#elif defined(USE_DIRECT_TBB)
 #include <tbb/parallel_sort.h>
 #endif
 #include <type_traits>

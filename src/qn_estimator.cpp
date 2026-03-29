@@ -85,7 +85,7 @@ struct QnCountWorker : public WorkerBase {
   QnCountWorker(const QnCountWorker& other, SplitType)
       : x(other.x), n(other.n), trial(other.trial), sumP(0), sumQ(0) {}
 
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
   void operator()(const tbb::blocked_range<size_t>& r) {
     operator()(r.begin(), r.end());
   }
@@ -261,7 +261,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
   // OPT-Q7: hoist block_offsets allocation outside the refinement loop.
   // num_blocks is constant (grain_size is a RuntimeConfig constant); allocating
   // inside the loop wasted O(n/grain) vector construction per iteration.
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
   const size_t blk_g = config.grain_size;
   const size_t num_blocks_cand = (n > 1) ? (n - 1 + blk_g - 1) / blk_g : 0;
   std::vector<size_t> block_offsets(num_blocks_cand, 0);
@@ -271,7 +271,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
     // --- Candidate generation: collect weighted medians ---
     size_t m = 0;
     bool used_parallel = false;
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
     if (n > config.qn_parallel_threshold) {
       // Explicit block-index parallel_for: each block_idx maps to a fixed
       // [begin, end) range, so count phase and fill phase see identical splits.
@@ -333,7 +333,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
     // --- Count P/Q sums ---
     QnCountWorker<T> countWorker(sorted_x, n, trial);
     if (n > config.qn_parallel_threshold) {
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
       tbb::parallel_reduce(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)), countWorker);
 #else
       RcppParallel::parallelReduce(1, n, countWorker, config.get_dynamic_grain_size(n));
@@ -351,7 +351,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, true, right);
       if (n > config.qn_parallel_threshold) {
         size_t g = config.get_dynamic_grain_size(n);
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
         tbb::parallel_for(tbb::blocked_range<size_t>(1, n, g),
                           [&refineWorker](const tbb::blocked_range<size_t>& r) { refineWorker(r.begin(), r.end()); });
 #else
@@ -364,7 +364,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
       if (countWorker.sumQ <= nL) break;
       QnRefineWorker<T> refineWorker(sorted_x, n, trial, false, left);
       if (n > config.qn_parallel_threshold) {
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
         tbb::parallel_for(tbb::blocked_range<size_t>(1, n, config.get_dynamic_grain_size(n)),
                           [&refineWorker](const tbb::blocked_range<size_t>& r) { refineWorker(r.begin(), r.end()); });
 #else
@@ -384,7 +384,7 @@ double qn_refinement_kernel(const T* sorted_x, size_t n, const QnWorkspace* ws =
 #ifdef ROBSCALE_HAS_AVX2_DISPATCH
   const bool use_avx2 = (config.hw.simd_level >= SIMDLevel::AVX2);
 #endif
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
   if (n > config.qn_parallel_threshold) {
     // Explicit block-index parallel_for — same pattern as candidate generation.
     size_t g = config.get_dynamic_grain_size(n);

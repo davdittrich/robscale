@@ -131,7 +131,7 @@ ROBSCALE_NOINLINE double sn_kernel_large(const T* sorted_x, size_t n) {
     worker(0, n);
   } else {
     SnWorker<T> worker(sorted_x, n, inner_medians);
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
                       [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
 #else
@@ -283,7 +283,7 @@ double sn_kernel(const T* sorted_x, size_t n, T* workspace) {
     worker(0, n);
   } else {
     SnWorker<T> worker(sorted_x, n, inner_medians);
-#ifdef USE_DIRECT_TBB
+#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
     tbb::parallel_for(tbb::blocked_range<size_t>(0, n, config.grain_size),
                       [&worker](const tbb::blocked_range<size_t>& r) { worker(r.begin(), r.end()); });
 #else
