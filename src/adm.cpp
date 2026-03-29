@@ -1,3 +1,4 @@
+#include "robscale_config.h"
 #include "robust_core.h"
 #include "pdq_select.h"   // for adaptive_median_select — same pattern as mad.cpp:2
 #include <Rcpp.h>

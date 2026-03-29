@@ -1,6 +1,7 @@
 #ifndef ROBSCALE_QNSN_KERNELS_H
 #define ROBSCALE_QNSN_KERNELS_H
 
+#include "robscale_config.h"
 #include <algorithm>
 #include <cmath>
 #include <type_traits>
