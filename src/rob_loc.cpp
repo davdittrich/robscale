@@ -212,12 +212,10 @@ static double rob_loc_core(const double* ROBSCALE_RESTRICT xp, size_t n,
                            int maxit, double tol) {
   std::memcpy(buf, xp, n * sizeof(double));
 
-  // OPT-RL5: hoist small-n dispatch check — avoids repeated branch inside
-  // median_select.  For n <= ROBSCALE_SORT_NETWORK_THRESHOLD (16), call
-  // median_net directly (mirrors rob_scale_core pattern).
-  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
-  double med = is_small ? robscale::median_net(buf, n)
-                        : robscale::median_select(buf, n);
+  // For n < 8, call median_net directly (no SIMD kernel below 8).
+  // For n >= 8, route through median_select so SIMD dispatch fires at 8/16/32.
+  double med = (n < 8) ? robscale::median_net(buf, n)
+                       : robscale::median_select(buf, n);
 
   int minobs = has_scale ? 3 : 4;
   if (ROBSCALE_UNLIKELY(n < (size_t)minobs)) return med;

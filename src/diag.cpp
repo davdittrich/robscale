@@ -9,12 +9,16 @@
 
 #include "robust_core.h"
 #include "sort_net.h"
+#include "simd_median.h"
 #include "pdq_select.h"
 #include "robscale_config.h"
+#include "qnsn_runtime_config.h"
 #include <Rcpp.h>
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
+#include <cstring>
 
 // ---------------------------------------------------------------------------
 // M-scale iteration diagnostics
@@ -97,11 +101,10 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
   std::vector<double> w(x_r.begin(), x_r.end());
   std::vector<double> dev(n);
 
-  // Median: for n > ROBSCALE_SORT_NETWORK_THRESHOLD use FR-based select,
-  // else use median_net.  Must match the current threshold.
-  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
+  // Median: n < 8 direct median_net (no SIMD kernel); n >= 8 through
+  // adaptive dispatch (SIMD fires at 8/16/32, median_net for other small n).
   double t;
-  if (is_small) {
+  if (n < 8) {
     t = robscale::median_net(w.data(), n);
   } else {
     t = robscale::adaptive_robscale_median_select(w.data(), n);
@@ -110,7 +113,7 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
   for (size_t i = 0; i < n; ++i) dev[i] = std::abs(w[i] - t);
 
   double s_init;
-  if (is_small) {
+  if (n < 8) {
     s_init = robscale::MAD_CONSISTENCY * robscale::median_net(dev.data(), n);
   } else {
     s_init = robscale::MAD_CONSISTENCY *
@@ -193,4 +196,216 @@ double bench_fr_select_impl(Rcpp::NumericVector x) {
   double v1 = buf[h];
   double v2 = *std::min_element(buf.data() + h + 1, buf.data() + n);
   return (v1 + v2) * 0.5;
+}
+
+// ---------------------------------------------------------------------------
+// SIMD bitonic median benchmark helpers
+// ---------------------------------------------------------------------------
+
+// Forces AVX2 SIMD path (falls back to scalar median_net on non-x86).
+// [[Rcpp::export(rng = false)]]
+double bench_simd_median_avx2_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  return robscale::simd::simd_median_dispatch_avx2(buf.data(), buf.size());
+#else
+  return robscale::median_net(buf.data(), buf.size());
+#endif
+}
+
+// SIMD selection network (hybrid: SIMD early stages + scalar tail).
+// [[Rcpp::export(rng = false)]]
+double bench_simd_median_sel_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  return robscale::simd::simd_median_sel_dispatch_avx2(buf.data(), buf.size());
+#else
+  return robscale::median_net(buf.data(), buf.size());
+#endif
+}
+
+// Auto-dispatch: uses best available SIMD tier, falls back to scalar.
+// [[Rcpp::export(rng = false)]]
+double bench_simd_median_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+  size_t n = buf.size();
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  const auto& cfg = robscale::qnsn::RuntimeConfig::get();
+  if (cfg.hw.simd_level >= robscale::qnsn::SIMDLevel::AVX2)
+    return robscale::simd::simd_median_dispatch_avx2(buf.data(), n);
+#endif
+  return robscale::median_net(buf.data(), n);
+}
+
+// ---------------------------------------------------------------------------
+// Full-sort benchmark helpers: SIMD bitonic vs scalar sort_net vs std::sort
+// ---------------------------------------------------------------------------
+
+// SIMD bitonic full sort (AVX2). Pads to next power-of-2 with +inf.
+// Returns buf[0] (minimum) as a correctness check value.
+// [[Rcpp::export(rng = false)]]
+double bench_simd_sort_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+  size_t n = buf.size();
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  robscale::simd::simd_sort_dispatch_avx2(buf.data(), n);
+#else
+  robscale::small_sort(buf.data(), n);
+#endif
+  return buf[0];
+}
+
+// SIMD hybrid sorting network (SIMD early stages + scalar tail).
+// [[Rcpp::export(rng = false)]]
+double bench_simd_sort_net_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  robscale::simd::simd_sort_net_dispatch_avx2(buf.data(), buf.size());
+#else
+  robscale::small_sort(buf.data(), buf.size());
+#endif
+  return buf[0];
+}
+
+// Scalar sorting network (sort_net_N via small_sort).
+// [[Rcpp::export(rng = false)]]
+double bench_sort_net_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+  robscale::small_sort(buf.data(), buf.size());
+  return buf[0];
+}
+
+// std::sort baseline.
+// [[Rcpp::export(rng = false)]]
+double bench_std_sort_impl(Rcpp::NumericVector x) {
+  std::vector<double> buf(x.begin(), x.end());
+  std::sort(buf.data(), buf.data() + buf.size());
+  return buf[0];
+}
+
+// ---------------------------------------------------------------------------
+// Tight-loop sort benchmark: times only the sort, zero R overhead.
+//
+// Pre-fills `reps` copies of the input array, then times the sort loop
+// using std::chrono.  Returns per-sort nanoseconds.
+//
+// method: 0 = scalar sort_net (small_sort)
+//         1 = std::sort
+//         2 = SIMD hybrid sort_net
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Tight-loop median benchmark: times only the median, zero R overhead.
+//
+// method: 0 = scalar median_net
+//         1 = Floyd-Rivest / nth_element
+//         2 = SIMD hybrid selection network
+// ---------------------------------------------------------------------------
+
+// [[Rcpp::export(rng = false)]]
+Rcpp::NumericVector bench_median_timed_impl(Rcpp::NumericVector x,
+                                            int reps, int method) {
+  const size_t n = static_cast<size_t>(x.size());
+  const size_t stride = n;
+
+  std::vector<double> pool(stride * reps);
+  for (int r = 0; r < reps; ++r)
+    std::memcpy(pool.data() + r * stride, x.begin(), n * sizeof(double));
+
+  volatile double sink = 0.0;
+
+  auto t0 = std::chrono::high_resolution_clock::now();
+  switch (method) {
+    case 0:  // scalar median_net
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        sink += robscale::median_net(buf, n);
+      }
+      break;
+    case 1:  // Floyd-Rivest / nth_element
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        if (n == 0) { sink += 0.0; break; }
+        size_t h = (n - 1) / 2;
+        robscale::floyd_rivest_select(buf, buf + h, buf + n);
+        if (n & 1) { sink += buf[h]; }
+        else {
+          double v1 = buf[h];
+          double v2 = *std::min_element(buf + h + 1, buf + n);
+          sink += (v1 + v2) * 0.5;
+        }
+      }
+      break;
+    case 2:  // SIMD hybrid selection network
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        sink += robscale::simd::simd_median_sel_dispatch_avx2(buf, n);
+      }
+#else
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        sink += robscale::median_net(buf, n);
+      }
+#endif
+      break;
+  }
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  double total_ns = std::chrono::duration<double, std::nano>(t1 - t0).count();
+  (void)sink;
+  return Rcpp::NumericVector::create(total_ns / reps);
+}
+
+// [[Rcpp::export(rng = false)]]
+Rcpp::NumericVector bench_sort_timed_impl(Rcpp::NumericVector x,
+                                          int reps, int method) {
+  const size_t n = static_cast<size_t>(x.size());
+  const size_t stride = n;
+
+  // Pre-fill reps copies (each sort is destructive, needs fresh data)
+  std::vector<double> pool(stride * reps);
+  for (int r = 0; r < reps; ++r)
+    std::memcpy(pool.data() + r * stride, x.begin(), n * sizeof(double));
+
+  volatile double sink = 0.0;  // prevent dead-code elimination
+
+  auto t0 = std::chrono::high_resolution_clock::now();
+  switch (method) {
+    case 0:
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        robscale::small_sort(buf, n);
+        sink += buf[0];
+      }
+      break;
+    case 1:
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        std::sort(buf, buf + n);
+        sink += buf[0];
+      }
+      break;
+    case 2:
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        robscale::simd::simd_sort_net_dispatch_avx2(buf, n);
+        sink += buf[0];
+      }
+#else
+      for (int r = 0; r < reps; ++r) {
+        double* buf = pool.data() + r * stride;
+        robscale::small_sort(buf, n);
+        sink += buf[0];
+      }
+#endif
+      break;
+  }
+  auto t1 = std::chrono::high_resolution_clock::now();
+
+  double total_ns = std::chrono::duration<double, std::nano>(t1 - t0).count();
+  double per_sort_ns = total_ns / reps;
+  (void)sink;
+  return Rcpp::NumericVector::create(per_sort_ns);
 }

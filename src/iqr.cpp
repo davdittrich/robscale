@@ -32,12 +32,11 @@ double iqr_impl_large(const double* ROBSCALE_RESTRICT xp, int n, double constant
   return robscale::internal::iqr_select_and_interp(buf, n) * constant;
 }
 
-// OPT-I6: n<=16 sort-once-then-index helper.
-// NOINLINE keeps the code for the n>16 micro-path compact (avoids I-cache
-// pressure from inlining the sorting-network code into the pdqselect path).
+// Sort-once-then-index helper for small n.
+// NOINLINE keeps the pdqselect/micro-path code compact in I-cache.
 static ROBSCALE_NOINLINE
 double iqr_impl_small(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
-  double buf[16];
+  double buf[ROBSCALE_SORT_NET_THRESHOLD];
   std::memcpy(buf, xp, static_cast<size_t>(n) * sizeof(double));
   double h1 = (n - 1.0) * 0.25;
   int lo1 = static_cast<int>(h1);
@@ -61,10 +60,9 @@ double iqr_impl(Rcpp::NumericVector x, double constant) {
   const double* xp = x.begin();
   validate_finite(xp, n);
 
-  // OPT-I6: LIKELY branch first so the n>16 pdqselect/micro-path code is laid
-  // out inline (immediately after function entry). The n<=16 sort path is a
-  // NOINLINE out-of-line call — no I-cache pressure on the hot n>16 path.
-  if (ROBSCALE_LIKELY(n > 16)) {
+  // LIKELY branch first so the pdqselect/micro-path code is laid out inline.
+  // The sort-then-index path is a NOINLINE out-of-line call.
+  if (ROBSCALE_LIKELY(n > ROBSCALE_SORT_NET_THRESHOLD)) {
     if (n > IQR_INLINE_LIMIT) return iqr_impl_large(xp, n, constant);
 
     // Micro path (17 <= n <= IQR_INLINE_LIMIT):

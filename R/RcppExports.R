@@ -21,6 +21,42 @@ bench_fr_select_impl <- function(x) {
     .Call(`_robscale_bench_fr_select_impl`, x)
 }
 
+bench_simd_median_avx2_impl <- function(x) {
+    .Call(`_robscale_bench_simd_median_avx2_impl`, x)
+}
+
+bench_simd_median_sel_impl <- function(x) {
+    .Call(`_robscale_bench_simd_median_sel_impl`, x)
+}
+
+bench_simd_median_impl <- function(x) {
+    .Call(`_robscale_bench_simd_median_impl`, x)
+}
+
+bench_simd_sort_impl <- function(x) {
+    .Call(`_robscale_bench_simd_sort_impl`, x)
+}
+
+bench_simd_sort_net_impl <- function(x) {
+    .Call(`_robscale_bench_simd_sort_net_impl`, x)
+}
+
+bench_sort_net_impl <- function(x) {
+    .Call(`_robscale_bench_sort_net_impl`, x)
+}
+
+bench_std_sort_impl <- function(x) {
+    .Call(`_robscale_bench_std_sort_impl`, x)
+}
+
+bench_median_timed_impl <- function(x, reps, method) {
+    .Call(`_robscale_bench_median_timed_impl`, x, reps, method)
+}
+
+bench_sort_timed_impl <- function(x, reps, method) {
+    .Call(`_robscale_bench_sort_timed_impl`, x, reps, method)
+}
+
 cpp_single_estimator_ci_bounds <- function(x, est, estimator_id, n_boot, level, method_code) {
     .Call(`_robscale_cpp_single_estimator_ci_bounds`, x, est, estimator_id, n_boot, level, method_code)
 }

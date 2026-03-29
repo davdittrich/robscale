@@ -25,8 +25,8 @@ static double gmd_core(const double* ROBSCALE_RESTRICT xp, int n,
                        double* ROBSCALE_RESTRICT buf, double constant) {
   const double scale = constant * 2.0 / (static_cast<double>(n) * (n - 1));
   std::memcpy(buf, xp, n * sizeof(double));
-  if (n <= 16)
-    robscale::small_sort(buf, n);
+  if (static_cast<size_t>(n) <= ROBSCALE_SORT_NET_THRESHOLD)
+    robscale::small_sort(buf, static_cast<size_t>(n));
   else
     robscale::qnsn::optimized_sort(buf, buf + n);
 #if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)

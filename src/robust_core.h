@@ -7,6 +7,7 @@
 #include "sort_net.h"
 #include "robscale_config.h"
 #include "qnsn_runtime_config.h"
+#include "simd_median.h"
 
 // --- Platform-specific vectorized tanh ---
 #if defined(__APPLE__) && defined(__MACH__)
@@ -227,10 +228,30 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double median_sorted(const double* x, size_t n) 
   return x[(n / 2) - 1] + (x[n / 2] - x[(n / 2) - 1]) * 0.5;  // overflow-safe
 }
 
+// Runtime CPUID check for SIMD median dispatch (cached static bool).
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+namespace {
+inline bool cpu_has_avx2() {
+  static const bool val = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                           robscale::qnsn::SIMDLevel::AVX2);
+  return val;
+}
+} // anon namespace
+#endif
+
 // Selection based median
 ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= ROBSCALE_SORT_NETWORK_THRESHOLD) {
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  if (cpu_has_avx2()) {
+    switch (n) {
+      case 8:  return robscale::simd::simd_median_sel_8(x);
+      case 16: return robscale::simd::simd_median_sel_16(x);
+      case 32: return robscale::simd::simd_median_sel_32(x);
+    }
+  }
+#endif
+  if (n <= ROBSCALE_MEDIAN_NET_THRESHOLD) {
     return robscale::median_net(x, n);
   }
   size_t h = (n - 1) / 2;
@@ -238,8 +259,6 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (n & 1) return x[h];
 
   double v1 = x[h];
-  // After floyd_rivest_select, x[h+1..n-1] are all >= x[h].
-  // min_element vectorises to MINPD and has no loop-carried branch dependency.
   double v2 = *std::min_element(x + h + 1, x + n);
   return (v1 + v2) * 0.5;
 }

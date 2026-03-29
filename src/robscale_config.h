@@ -35,22 +35,31 @@
 #define ROBSCALE_SORT_BOOST_THRESHOLD  512
 
 /**
- * Threshold for median_select: use median_net (sort-network AND median-network)
- * for n <= this value, floyd_rivest_select (→ std::nth_element for n < 600)
- * for n > this value.
+ * Threshold for median_select: use median_net (selection network) for
+ * n <= this value, floyd_rivest_select for n > this value.
  *
- * Calibrated 2026-03-21 (OPT-A):
- *   - median_net comparator growth is O(n^1.5): n=8→16 swaps, n=16→46,
- *     n=32→128, n=64→337.  Called TWICE per rob_scale_core (median + MAD).
- *   - FR/nth_element is O(n) throughout.
- *   - Theoretical crossover at n~16 (FR overhead ≈ 12 comparisons vs 46 for
- *     network at n=16).  Confirmed by benchmark evidence
- *     (see findings.md F-10 and F-2).
- *   - Set to 16: at n≤16 the network is tighter (16–46 swaps, fits L1
- *     entirely); at n>16 FR wins and the gap grows with n.
+ * Calibrated 2026-03-29 (C++ timed, 300K reps × 3 runs, Zen4 AVX2):
+ *   - median_net beats FR for both odd and even n through n ≈ 36.
+ *   - FR wins on odd n starting ~37 (single-element median, no averaging);
+ *     median_net still competitive on even n much further.
+ *   - 36 is the conservative crossover for both parities.
  */
-#ifndef ROBSCALE_SORT_NETWORK_THRESHOLD
-#define ROBSCALE_SORT_NETWORK_THRESHOLD 16
+#ifndef ROBSCALE_MEDIAN_NET_THRESHOLD
+#define ROBSCALE_MEDIAN_NET_THRESHOLD 36
+#endif
+
+/**
+ * Threshold for full-sort dispatch: use sort_net (branchless sorting network)
+ * for n <= this value, std::sort / optimized_sort for n > this value.
+ *
+ * Calibrated 2026-03-29 (C++ timed, 300K reps × 3 runs, Zen4 AVX2):
+ *   - sort_net beats std::sort by 1.2–3× for all n ≤ 60.
+ *   - Crossover at n ≈ 61 (comparator count O(n log²n) overtakes introsort).
+ *   - 56 gives a safety margin for µarch variation.
+ *   - small_sort in sort_net.h handles n=0..64 via explicit switch cases.
+ */
+#ifndef ROBSCALE_SORT_NET_THRESHOLD
+#define ROBSCALE_SORT_NET_THRESHOLD 56
 #endif
 
 

@@ -206,7 +206,7 @@ double qn_brute_force_exact(const T* x_ptr, size_t n) {
   T sorted_buf[64];
   // Caller (C_qn_impl) already validated finite; clean copy
   std::memcpy(sorted_buf, x_ptr, n * sizeof(T));
-  if (n <= 16) {
+  if (n <= ROBSCALE_SORT_NET_THRESHOLD) {
     robscale::small_sort(sorted_buf, n);
   } else {
     std::sort(sorted_buf, sorted_buf + n);

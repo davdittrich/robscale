@@ -160,7 +160,7 @@ double sn_kernel(const T* sorted_x, size_t n) {
     // Tier-1 serial path: full range, L starts at 0.
     sn_inner_serial(sx, static_cast<int32_t>(n), im, 0, static_cast<int32_t>(n), 0);
     // OPT-S5: n <= 16 fast path — small_sort + direct index avoids FR/pdqselect dispatch.
-    if (n <= 16) {
+    if (n <= ROBSCALE_SORT_NET_THRESHOLD) {
       robscale::small_sort(inner_medians, n);
       double raw = static_cast<double>(inner_medians[(n - 1) / 2]);
       return raw * CONST_SN * get_sn_factor(n);
@@ -238,7 +238,7 @@ double C_sn_impl(const T* x_ptr, size_t n) {
     T sorted_x[SN_MICRO_SIZE];
     // Caller (C_sn_impl) already validated finite; clean copy
     std::memcpy(sorted_x, x_ptr, n * sizeof(T));
-    if (n <= 16) {
+    if (n <= ROBSCALE_SORT_NET_THRESHOLD) {
       robscale::small_sort(sorted_x, n);
     } else {
       optimized_sort(sorted_x, sorted_x + n);

@@ -13,7 +13,7 @@ namespace robscale {
 // Mirrors median_select() semantics but uses pdqselect instead of Floyd-Rivest.
 ROBSCALE_INLINE double pdq_median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= 16) {
+  if (n <= ROBSCALE_MEDIAN_NET_THRESHOLD) {
     robscale::small_sort(x, n);
     if (n & 1) return x[n / 2];
     return (x[(n / 2) - 1] + x[n / 2]) * 0.5;

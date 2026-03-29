@@ -3,7 +3,7 @@ bibentry(
   title    = "robscale: Accelerated Estimation of Robust Location and Scale",
   author   = person("Dennis Alexis Valin", "Dittrich"),
   year     = "2026",
-  note     = "R package version 0.5.3",
+  note     = "R package version 0.5.4",
   url      = "https://github.com/davdittrich/robscale",
   doi      = "10.5281/zenodo.18828607"
 )

@@ -1,3 +1,26 @@
+# robscale 0.5.4
+
+## Performance
+
+* **SIMD median selection networks (AVX2)**: Hybrid SIMD+scalar selection
+  networks for n = 8, 16, 32 are 23–58% faster than scalar `median_net`.
+  Accelerates `robScale`, `robLoc`, `MAD`, and `ADM` median dispatch.
+
+* **Raised sort network threshold (16 → 56)**: Branchless sorting networks
+  (`sort_net`) beat `std::sort` by 1.2–3× for n ≤ 60. Benefits `Qn` exact
+  path (n ≤ 40), `Sn` micro-path, `GMD`, and `IQR` sort-then-index.
+  Ensemble uses a separate lower threshold (20) to avoid L1 I-cache pressure
+  in the bootstrap hot loop.
+
+* **Raised median network threshold (16 → 36)**: Scalar `median_net`
+  (selection networks) beats Floyd-Rivest through n ≈ 36 for both odd and
+  even sample sizes.
+
+* **Earlier ensemble parallelism**: TBB `parallel_for` now fires for all
+  ensemble bootstrap calls with ≥ 2 cores and ≥ 16 replicates (was gated
+  on `n × n_boot ≥ 10000`). Ensemble is 4–8× faster for n = 3–49 on
+  multi-core machines.
+
 # robscale 0.5.3
 
 ## Build fixes
