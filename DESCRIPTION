@@ -27,7 +27,7 @@ LinkingTo: Rcpp, RcppParallel, BH
 Suggests: collapse, devtools, GiniDistance, Hmisc, knitr, revss, rmarkdown,
     robustbase, testthat (>= 3.0.0)
 VignetteBuilder: knitr
-SystemRequirements: GNU make, TBB
+SystemRequirements: GNU make
 Config/testthat/edition: 3
 NeedsCompilation: yes
 RoxygenNote: 7.3.3
