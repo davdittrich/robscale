@@ -388,6 +388,5 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
 // [[Rcpp::export(rng = false)]]
 double C_rob_scale_fast(Rcpp::NumericVector x) {
   // Thin wrapper → production rob_scale_impl (has_loc=false, default params).
-  // Always reflects the current production path; after WU-RS1 calls 8-wide kernel.
   return rob_scale_impl(x, false, 0.0, 1e-4, 80, 1.4901161e-8, 0);
 }

@@ -312,16 +312,13 @@ The CI return type is a named list with `estimate`, `lower`, `upper`, and
 The logistic psi function satisfies $\psi_{\log}(x) = \tanh(x/2)$. `robscale`
 evaluates `tanh` in bulk using the fastest available platform backend.
 The `configure` script selects one of two vectorized `tanh` libraries at
-compile time; at runtime, CPUID selects the widest available instruction set:
+compile time; at runtime, CPUID selects the appropriate instruction set:
 
 1. **Apple Accelerate** (`vvtanh`): array-wide SIMD on macOS.
 2. **glibc libmvec** (Linux x86\_64, glibc $\geq$ 2.35) or **SLEEF**
    (fallback when libmvec is absent). Only one is linked per binary.
-   Within the linked library, CPUID dispatches to:
-   - **AVX-512 8-wide** (`_ZGVeN8v_tanh`): 8 doubles per iteration on
-     AVX-512F hardware.
-   - **AVX2 4-wide** (`_ZGVdN4v_tanh` or `Sleef_tanhd4_u10avx2`): 4
-     doubles per iteration.
+   The AVX2 4-wide kernel (`_ZGVdN4v_tanh` or `Sleef_tanhd4_u10avx2`)
+   processes 4 doubles per iteration.
 3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
 4. **Scalar** `std::tanh`: universal fallback.
 

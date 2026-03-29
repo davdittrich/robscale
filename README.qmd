@@ -625,9 +625,8 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 
 **SIMD vectorization.** The logistic psi function reduces to $\tanh(x/2)$,
 dispatched to the fastest available platform backend: Apple Accelerate
-(`vvtanh`) on macOS; glibc libmvec on Linux x86\_64, using the 8-wide AVX-512
-kernel (`_ZGVeN8v_tanh`) when the CPU supports AVX-512F, otherwise the 4-wide
-AVX2 kernel (`_ZGVdN4v_tanh`); SLEEF as a fallback when libmvec is absent; and
+(`vvtanh`) on macOS; glibc libmvec on Linux x86\_64 using the 4-wide AVX2
+kernel (`_ZGVdN4v_tanh`); SLEEF as a fallback when libmvec is absent; and
 `#pragma omp simd` as a portable fallback. The Gini mean difference weighted
 sum is vectorized separately via an AVX2 FMA kernel (`_mm256_fmadd_pd`) for
 $n \geq 8$. For `robLoc()`, a fused AVX2 kernel accumulates $\psi_i$ and
@@ -721,13 +720,12 @@ graph TD
     IQR & MAD & RS --> T4
 
     subgraph "Hardware Acceleration"
-        G["AVX-512 (8-wide tanh)"]
         G2["AVX2 (4-wide tanh, robLoc fused kernel, GMD FMA)"]
         H[Apple Accelerate]
         I["glibc libmvec / SLEEF (tanh backend)"]
     end
 
-    T1 & T2 & T3 --> G & G2 & H & I
+    T1 & T2 & T3 --> G2 & H & I
 ```
 
 ## Benchmarks
@@ -841,7 +839,7 @@ R) and `GiniDistance::gmd` by **`r gmd_gd_min`--`r gmd_gd_max`x** (both compiled
 
 > [!NOTE]
 > **Source builds recommended.** Installing from source (`install.packages("robscale", type = "source")`)
-> enables the `configure` script to detect SIMD capabilities (AVX-512/AVX2/FMA on x86_64, NEON on ARM64)
+> enables the `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64, NEON on ARM64)
 > and link platform-specific libraries (Apple Accelerate, glibc libmvec, SLEEF). Pre-built CRAN binaries
 > use portable settings and may not include these optimizations. Parallelism thresholds
 > are derived from the detected per-core L2 cache size at runtime on all platforms.

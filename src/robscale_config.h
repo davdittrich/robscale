@@ -171,8 +171,8 @@ struct StackArena {
 };
 
 // --- Runtime SIMD dispatch ---
-// Per-function target attributes: the compiler emits AVX2/FMA or AVX-512F
-// instructions for annotated functions without requiring -mavx2 globally.
+// Per-function target attributes: the compiler emits AVX2/FMA instructions
+// for annotated functions without requiring -mavx2 globally.
 // Produces a portable binary that activates the best available SIMD path
 // at runtime via CPUID.  Supported by GCC 4.9+, all Clang, Rtools MinGW GCC.
 #if (defined(__x86_64__) || defined(_M_X64)) && \
