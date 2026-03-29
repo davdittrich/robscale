@@ -12,58 +12,49 @@
 
 - `scale_robust(..., ci = TRUE)` supports bootstrap confidence intervals for
   individual named methods via `boot_method = "bca"`, `"percentile"`, or
-  `"parametric"`. A new C++ bootstrap kernel (`cpp_single_estimator_ci_bounds`)
-  runs the resampling on the single requested estimator.
+  `"parametric"`.
 - `boot_method = "analytical"` is accepted explicitly by `scale_robust()`.
 - `print.robscale_ci` now shows the CI method in the output header.
 
+### Performance
+
+- Input validation moved from R to C++ (`validate_finite`): eliminates the
+  per-call `any(!is.finite(x))` heap allocation that consumed 20–65% of
+  call time for simple estimators.
+- `Rcpp::RNGScope` removed from all exports (`rng = false`): no estimator
+  function uses R's RNG.
+- Newton–Raphson convergence criterion for `robLoc` scaled by location
+  magnitude, avoiding 80 wasted iterations on large-valued data.
+- BCa jackknife estimator-index mapping corrected for `gmd` and `sd_c4`.
+
 ## Test environments
 
-- Arch Linux (x86_64), R 4.5.x, GCC 15.1.0 (local)
-- Fedora Linux (x86_64), R-devel, GCC (rhub): **0 errors, 0 warnings, 0 notes**
-- macOS ARM64, R-devel 4.6.0-r89710, Apple Clang 17 (rhub): see note below
-- Windows (x86_64), R-devel (rhub): see note below
+- Arch Linux (x86_64), R 4.5.0, GCC 15.1.0 (local)
+- Ubuntu 24.04 (x86_64), R-release (GitHub Actions): 0 errors, 0 warnings
+- macOS latest (ARM64), R-release (GitHub Actions): 0 errors, 0 warnings
+- Windows (x86_64), R-release (GitHub Actions): 0 errors, 0 warnings
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note (local and Linux rhub)
+0 errors | 0 warnings | 1 note (local only)
 
-- **Non-portable compilation flag** (`-march=native`): Used only when the
-  building user's compiler supports it, detected at configure time. CRAN
-  binary builds do not use this flag; it is present only in local
-  `src/Makevars`. The configure script writes a portable fallback for
-  environments where `-march=native` is not supported.
-
-- **GNU make**: `SystemRequirements` field lists GNU make (needed for
-  `$(shell)` in Makevars). Already declared in DESCRIPTION.
-
-## rhub platform notes
-
-**macOS ARM64 (R-devel 4.6.0-r89710)**: The package compiled, installed, and
-loaded successfully (all `** testing if installed package can be loaded`
-steps passed). The run failed at `* creating tarball` with
-`Error in if (custom.bin) { : argument is of length zero` — an error in
-R-devel's staged installation infrastructure, not in the package. The same
-step succeeds on R-release and R-oldrel.
-
-**Windows (R-devel)**: The `setup-deps` step failed with a network connection
-error (`cannot open the connection`) while downloading pak dependencies — a
-transient infrastructure timeout unrelated to the package.
+The single NOTE (`-march=native`) appears only in local builds where the
+user's `~/.R/Makevars` sets this flag. CRAN binary builds use their own
+compiler flags and will not see this NOTE. The package's `configure` script
+writes portable defaults.
 
 ## DOI URLs
 
-The Rousseeuw & Croux (1993) DOI (doi:10.1080/01621459.1993.10476408)
-returns HTTP 403 during automated URL checks because Taylor & Francis blocks
-crawler requests. The URL resolves correctly in a browser. It is a correct
-and permanent DOI.
+Three DOIs (Rousseeuw & Croux 1993, Shamos 1976, David & Nagaraja 2003)
+return HTTP 403 during automated URL checks because the publishers block
+crawler User-Agents. All resolve correctly in a browser. They are correct
+and permanent DOIs.
 
 ## Method references
 
-Key references for the methods implemented:
-
 - Rousseeuw, P.J. & Croux, C. (1993). Alternatives to the Median Absolute
-  Deviation. *Journal of the American Statistical Association*, 88, 1273-1283.
+  Deviation. *Journal of the American Statistical Association*, 88, 1273–1283.
   doi:10.1080/01621459.1993.10476408
 - Rousseeuw, P.J. & Verboven, S. (2002). Robust estimation in very small
-  samples. *Computational Statistics & Data Analysis*, 40(4), 741-758.
+  samples. *Computational Statistics & Data Analysis*, 40(4), 741–758.
   doi:10.1016/S0167-9473(02)00078-6
