@@ -112,6 +112,13 @@ private:
         if (count > 0) smt_factor = count;
       }
       num_physical_cores = std::max(num_logical_cores / smt_factor, size_t(1));
+
+      // Guard: any l2_per_core below 64KB is physically implausible for L2
+      // and indicates a detection error. Fall back to the default (256KB).
+      if (l2_per_core < 65536) {
+        l2_per_core = L2_FALLBACK_KB * 1024;
+        l2_cache_size = l2_per_core;
+      }
     } catch (...) {
       l2_per_core = L2_FALLBACK_KB * 1024;
       l2_cache_size = l2_per_core;
@@ -126,7 +133,8 @@ private:
 #ifdef __APPLE__
     size_t len;
     len = sizeof(l2_cache_size);
-    sysctlbyname("hw.l2cachesize", &l2_cache_size, &len, NULL, 0);
+    if (sysctlbyname("hw.l2cachesize", &l2_cache_size, &len, NULL, 0) != 0)
+      l2_cache_size = L2_FALLBACK_KB * 1024;
     len = sizeof(cache_line_size);
     sysctlbyname("hw.cachelinesize", &cache_line_size, &len, NULL, 0);
     len = sizeof(num_physical_cores);
@@ -137,6 +145,12 @@ private:
       l2_per_core = l2_cache_size / num_physical_cores;
     else
       l2_per_core = l2_cache_size;
+
+    // Guard: any l2_per_core below 64KB is physically implausible for L2
+    if (l2_per_core < 65536) {
+      l2_per_core = L2_FALLBACK_KB * 1024;
+      l2_cache_size = l2_per_core;
+    }
 #endif
   }
 
@@ -167,6 +181,11 @@ private:
         // num_physical_cores — that would give a fraction of the per-core size.
         l2_per_core = l2_cache_size;
       }
+    }
+    // Guard: any l2_per_core below 64KB is physically implausible for L2
+    if (l2_per_core < 65536) {
+      l2_per_core = L2_FALLBACK_KB * 1024;
+      l2_cache_size = l2_per_core;
     }
 #endif
   }

@@ -502,7 +502,7 @@ Figures 1 and 2 show speedup factors relative to reference
 implementations (Figure 1) and absolute wall-clock run times (Figure 2)
 across sample sizes on a AMD Ryzen 9 5900HX with Radeon Graphics (Arch
 Linux, R version 4.5.3 (2026-03-11), build flags:
-`-march=native -mtune=native -O2 -fno-math-errno -pipe -fPIC -fopenmp-simd -DROBSCALE_HAS_OMP_SIMD -I/usr/include -DROBSCALE_HAS_SLEEF -DROBSCALE_HAS_SYSTEM_TBB -DROBSCALE_HAS_GLIBC_MVEC -DROBSCALE_HAS_AVX512_TANH`,
+`-march=native -mtune=native -O2 -fno-math-errno -pipe -fPIC -fopenmp-simd -DROBSCALE_HAS_OMP_SIMD -I/usr/include -DROBSCALE_HAS_SLEEF -DROBSCALE_HAS_SYSTEM_TBB -DROBSCALE_HAS_GLIBC_MVEC`,
 `tanh` backend: glibc libmvec (\_ZGVdN4v_tanh), TBB: system oneTBB
 (.so), benchmarked 2026-03-28). Baseline packages: `robustbase` 0.99.7
 (Maechler et al. 2026), `revss` 3.1.0 (Adler 2020), `Hmisc` 5.2.5

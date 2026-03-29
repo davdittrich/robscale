@@ -45,120 +45,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// bench_median_net_impl
-double bench_median_net_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_median_net_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_median_net_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_fr_select_impl
-double bench_fr_select_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_fr_select_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_fr_select_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_simd_median_avx2_impl
-double bench_simd_median_avx2_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_simd_median_avx2_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_simd_median_avx2_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_simd_median_sel_impl
-double bench_simd_median_sel_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_simd_median_sel_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_simd_median_sel_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_simd_median_impl
-double bench_simd_median_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_simd_median_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_simd_median_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_simd_sort_impl
-double bench_simd_sort_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_simd_sort_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_simd_sort_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_simd_sort_net_impl
-double bench_simd_sort_net_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_simd_sort_net_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_simd_sort_net_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_sort_net_impl
-double bench_sort_net_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_sort_net_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_sort_net_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_std_sort_impl
-double bench_std_sort_impl(Rcpp::NumericVector x);
-RcppExport SEXP _robscale_bench_std_sort_impl(SEXP xSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_std_sort_impl(x));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_median_timed_impl
-Rcpp::NumericVector bench_median_timed_impl(Rcpp::NumericVector x, int reps, int method);
-RcppExport SEXP _robscale_bench_median_timed_impl(SEXP xSEXP, SEXP repsSEXP, SEXP methodSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
-    Rcpp::traits::input_parameter< int >::type method(methodSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_median_timed_impl(x, reps, method));
-    return rcpp_result_gen;
-END_RCPP
-}
-// bench_sort_timed_impl
-Rcpp::NumericVector bench_sort_timed_impl(Rcpp::NumericVector x, int reps, int method);
-RcppExport SEXP _robscale_bench_sort_timed_impl(SEXP xSEXP, SEXP repsSEXP, SEXP methodSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::traits::input_parameter< Rcpp::NumericVector >::type x(xSEXP);
-    Rcpp::traits::input_parameter< int >::type reps(repsSEXP);
-    Rcpp::traits::input_parameter< int >::type method(methodSEXP);
-    rcpp_result_gen = Rcpp::wrap(bench_sort_timed_impl(x, reps, method));
-    return rcpp_result_gen;
-END_RCPP
-}
 // cpp_single_estimator_ci_bounds
 Rcpp::List cpp_single_estimator_ci_bounds(Rcpp::NumericVector x, double est, int estimator_id, int n_boot, double level, int method_code);
 RcppExport SEXP _robscale_cpp_single_estimator_ci_bounds(SEXP xSEXP, SEXP estSEXP, SEXP estimator_idSEXP, SEXP n_bootSEXP, SEXP levelSEXP, SEXP method_codeSEXP) {
@@ -387,17 +273,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_robscale_adm_impl", (DL_FUNC) &_robscale_adm_impl, 3},
     {"_robscale_adm_impl_auto", (DL_FUNC) &_robscale_adm_impl_auto, 2},
     {"_robscale_rob_scale_diag_impl", (DL_FUNC) &_robscale_rob_scale_diag_impl, 3},
-    {"_robscale_bench_median_net_impl", (DL_FUNC) &_robscale_bench_median_net_impl, 1},
-    {"_robscale_bench_fr_select_impl", (DL_FUNC) &_robscale_bench_fr_select_impl, 1},
-    {"_robscale_bench_simd_median_avx2_impl", (DL_FUNC) &_robscale_bench_simd_median_avx2_impl, 1},
-    {"_robscale_bench_simd_median_sel_impl", (DL_FUNC) &_robscale_bench_simd_median_sel_impl, 1},
-    {"_robscale_bench_simd_median_impl", (DL_FUNC) &_robscale_bench_simd_median_impl, 1},
-    {"_robscale_bench_simd_sort_impl", (DL_FUNC) &_robscale_bench_simd_sort_impl, 1},
-    {"_robscale_bench_simd_sort_net_impl", (DL_FUNC) &_robscale_bench_simd_sort_net_impl, 1},
-    {"_robscale_bench_sort_net_impl", (DL_FUNC) &_robscale_bench_sort_net_impl, 1},
-    {"_robscale_bench_std_sort_impl", (DL_FUNC) &_robscale_bench_std_sort_impl, 1},
-    {"_robscale_bench_median_timed_impl", (DL_FUNC) &_robscale_bench_median_timed_impl, 3},
-    {"_robscale_bench_sort_timed_impl", (DL_FUNC) &_robscale_bench_sort_timed_impl, 3},
     {"_robscale_cpp_single_estimator_ci_bounds", (DL_FUNC) &_robscale_cpp_single_estimator_ci_bounds, 6},
     {"_robscale_cpp_scale_ensemble", (DL_FUNC) &_robscale_cpp_scale_ensemble, 2},
     {"_robscale_cpp_scale_ensemble_ci", (DL_FUNC) &_robscale_cpp_scale_ensemble_ci, 4},

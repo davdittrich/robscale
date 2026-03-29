@@ -178,12 +178,9 @@ struct StackArena {
 #if (defined(__x86_64__) || defined(_M_X64)) && \
     (defined(__GNUC__) || defined(__clang__))
   #define ROBSCALE_TARGET_AVX2     __attribute__((target("avx2,fma")))
-  #define ROBSCALE_TARGET_AVX512F  __attribute__((target("avx512f")))
   #define ROBSCALE_HAS_AVX2_DISPATCH   1
-  #define ROBSCALE_HAS_AVX512_DISPATCH 1
 #else
   #define ROBSCALE_TARGET_AVX2
-  #define ROBSCALE_TARGET_AVX512F
 #endif
 
 // Umbrella: any AVX2-vectorized tanh backend available.
