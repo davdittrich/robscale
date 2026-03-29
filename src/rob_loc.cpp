@@ -3,6 +3,7 @@
 #include <Rcpp.h>
 #include <limits>
 #include <memory>
+#include <RcppParallel.h>
 #if defined(ROBSCALE_HAS_SYSTEM_TBB)
 #  include <oneapi/tbb/parallel_reduce.h>
 #  include <oneapi/tbb/blocked_range.h>

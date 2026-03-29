@@ -3,6 +3,7 @@
 #include "pdq_select.h"
 #include <Rcpp.h>
 #include <memory>
+#include <RcppParallel.h>
 #if defined(ROBSCALE_HAS_SYSTEM_TBB)
 #  include <oneapi/tbb/parallel_reduce.h>
 #  include <oneapi/tbb/blocked_range.h>
@@ -299,10 +300,10 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
         double dev_local[4]; // n < minobs (3 when has_loc), always fits
         double mad_orig = robscale::adaptive_mad_select(xp, (int)n, med_orig, dev_local);
         return (mad_orig <= implbound)
-          ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY)
+          ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY, avx2)
           : mad_orig;
       } else {
-        return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+        return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY, avx2);
       }
     }
     return s_init;
@@ -310,7 +311,7 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
 
   if (ROBSCALE_UNLIKELY(s_init <= implbound && fallback == 1)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(s_init == 0.0)) {
-    return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+    return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY, avx2);
   }
 
   // Phase 4: dispatch to parallel kernel for large n.
