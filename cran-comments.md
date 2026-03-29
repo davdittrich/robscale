@@ -1,31 +1,19 @@
-# CRAN submission comments for robscale 0.5.2
+# CRAN submission comments for robscale 0.5.3
 
-## Changes in 0.5.2
+## Changes in 0.5.3
 
-### Bug fix
+### Build fixes (resubmission from 0.5.2)
 
-`scale_robust(x, method = "qn")` with `n >= threshold` previously returned
-`gmd(x)` silently. The `auto_switch` guard now only fires for
-`method = "ensemble"`; named methods are always dispatched as requested.
-
-### New features
-
-- `scale_robust(..., ci = TRUE)` supports bootstrap confidence intervals for
-  individual named methods via `boot_method = "bca"`, `"percentile"`, or
-  `"parametric"`.
-- `boot_method = "analytical"` is accepted explicitly by `scale_robust()`.
-- `print.robscale_ci` now shows the CI method in the output header.
-
-### Performance
-
-- Input validation moved from R to C++ (`validate_finite`): eliminates the
-  per-call `any(!is.finite(x))` heap allocation that consumed 20–65% of
-  call time for simple estimators.
-- `Rcpp::RNGScope` removed from all exports (`rng = false`): no estimator
-  function uses R's RNG.
-- Newton–Raphson convergence criterion for `robLoc` scaled by location
-  magnitude, avoiding 80 wasted iterations on large-valued data.
-- BCa jackknife estimator-index mapping corrected for `gmd` and `sd_c4`.
+- Added `target("avx2,fma")` / `target("avx512f")` attributes to
+  `extern "C"` declarations of libmvec/SLEEF vectorized tanh functions.
+  Clang 21 (CRAN Debian) requires target attributes on `__m256d`/`__m512d`
+  function signatures even in declarations, not just definitions.
+- Unified TBB preprocessor guards across all source files: `qn_estimator.cpp`,
+  `sn_estimator.cpp`, `ensemble.cpp`, and `worker_compat.h` now use the
+  combined `(ROBSCALE_HAS_SYSTEM_TBB || USE_DIRECT_TBB)` pattern, matching
+  `rob_scale.cpp` and `rob_loc.cpp`. This restores direct TBB parallelism
+  for Qn, Sn, and ensemble bootstrap on system-oneTBB builds (CRAN Linux).
+- Eliminated unused-variable warning (`use_avx2` in `qn_estimator.cpp`).
 
 ## Test environments
 
@@ -40,15 +28,13 @@
 
 The single NOTE (`-march=native`) appears only in local builds where the
 user's `~/.R/Makevars` sets this flag. CRAN binary builds use their own
-compiler flags and will not see this NOTE. The package's `configure` script
-writes portable defaults.
+compiler flags and will not see this NOTE.
 
 ## DOI URLs
 
 Three DOIs (Rousseeuw & Croux 1993, Shamos 1976, David & Nagaraja 2003)
 return HTTP 403 during automated URL checks because the publishers block
-crawler User-Agents. All resolve correctly in a browser. They are correct
-and permanent DOIs.
+crawler User-Agents. All resolve correctly in a browser.
 
 ## Method references
 

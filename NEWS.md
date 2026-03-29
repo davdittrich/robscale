@@ -1,3 +1,24 @@
+# robscale 0.5.3
+
+## Build fixes
+
+* **Clang 21 ABI compatibility**: Added `target("avx2,fma")` and
+  `target("avx512f")` attributes to `extern "C"` declarations of
+  libmvec/SLEEF vectorized tanh functions. Clang 21 (CRAN Debian)
+  requires target attributes on `__m256d`/`__m512d` function signatures
+  even at declaration scope.
+
+* **TBB guard alignment**: Unified all TBB preprocessor guards across
+  `qn_estimator.cpp`, `sn_estimator.cpp`, `ensemble.cpp`, and
+  `worker_compat.h` to use the combined
+  `(ROBSCALE_HAS_SYSTEM_TBB || USE_DIRECT_TBB)` pattern. Previously
+  these files only checked `USE_DIRECT_TBB`, causing system-oneTBB
+  builds (CRAN Linux) to fall back to RcppParallel instead of using
+  direct TBB parallelism for Qn, Sn, and ensemble bootstrap.
+
+* **Unused variable warning**: Eliminated `use_avx2` warning on
+  system-oneTBB builds by expanding the guard that consumes it.
+
 # robscale 0.5.2
 
 ## Bug fixes
