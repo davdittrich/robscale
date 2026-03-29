@@ -188,7 +188,7 @@ else
       "cat(system.file('lib', package='RcppParallel', mustWork=FALSE))" \
       2>/dev/null || true)
   fi
-  if [ -n "${RCPP_PAR_LIB}" ] && [ -f "${RCPP_PAR_LIB}/libtbb.so" ]; then
+  if [ -n "${RCPP_PAR_LIB}" ] && { [ -f "${RCPP_PAR_LIB}/libtbb.so" ] || [ -f "${RCPP_PAR_LIB}/libtbb.dylib" ]; }; then
     TBB_DEFINE="-DUSE_DIRECT_TBB"
     TBB_LIBS="-L${RCPP_PAR_LIB} -ltbb -Wl,-rpath,${RCPP_PAR_LIB}"
     echo "  RcppParallel TBB detected at ${RCPP_PAR_LIB}, using -ltbb"
