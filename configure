@@ -83,28 +83,6 @@ CFEOF
   rm -f conftest_glibc.c conftest_glibc
 fi
 
-# Detect glibc libmvec _ZGVeN8v_tanh (AVX-512 8-wide tanh, Linux x86_64)
-# Links from the same libmvec as the 4-wide variant. No separate -l needed
-# when GLIBC_MVEC_LIBS is already set. On non-AVX-512 hardware (Zen 3) the
-# symbol links but is never called; CPUID dispatches to the AVX2 path.
-HAS_AVX512_TANH="no"
-AVX512_TANH_CFLAGS=""
-if [ "${HAS_GLIBC_MVEC}" = "yes" ]; then
-  cat > conftest_mvec512.c << 'CFEOF'
-typedef double v8d __attribute__((vector_size(64)));
-extern v8d _ZGVeN8v_tanh(v8d);
-int main(void) { v8d x = {0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5}; v8d r = _ZGVeN8v_tanh(x); return (int)r[0]; }
-CFEOF
-  if ${CC:-gcc} conftest_mvec512.c -lmvec -o conftest_mvec512 2>/dev/null; then
-    HAS_AVX512_TANH="yes"
-    AVX512_TANH_CFLAGS="-DROBSCALE_HAS_AVX512_TANH"
-    echo "  glibc libmvec _ZGVeN8v_tanh detected (AVX-512 8-wide tanh)"
-  else
-    echo "  _ZGVeN8v_tanh not available (libmvec too old or not AVX-512 enabled)"
-  fi
-  rm -f conftest_mvec512.c conftest_mvec512
-fi
-
 # Detect macOS Accelerate framework (vForce for vectorized tanh)
 ACCELERATE_LIBS=""
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -138,22 +116,70 @@ for incdir in /usr/include /usr/local/include /opt/homebrew/include; do
   fi
 done
 
-# pkg-config fallback if path search failed
+# API validation: confirm detected headers+lib expose oneTBB 2021 interface
+if [ -n "${SYSTEM_TBB_LIB}" ] && [ -n "${SYSTEM_TBB_HEADER}" ]; then
+  cat > conftest_tbb.cpp << 'TBBEOF'
+#include <oneapi/tbb/parallel_reduce.h>
+#include <oneapi/tbb/blocked_range.h>
+int main() {
+  double r = tbb::parallel_reduce(
+    tbb::blocked_range<int>(0,4), 0.0,
+    [](const tbb::blocked_range<int>& b, double s){
+      for(int i=b.begin();i<b.end();++i) s+=i; return s; },
+    [](double a, double b){ return a+b; });
+  return (int)r;
+}
+TBBEOF
+  if ${CXX:-c++} -std=c++11 -I${SYSTEM_TBB_HEADER} conftest_tbb.cpp \
+      -L${SYSTEM_TBB_LIB} -ltbb -o conftest_tbb 2>/dev/null; then
+    echo "  Manual oneTBB 2021 API verified (${SYSTEM_TBB_LIB})"
+  else
+    echo "  Manual TBB found but oneTBB 2021 API check failed, trying pkg-config"
+    SYSTEM_TBB_LIB=""
+    SYSTEM_TBB_HEADER=""
+  fi
+  rm -f conftest_tbb.cpp conftest_tbb
+fi
+
+# pkg-config fallback if path search failed or API validation cleared manual find
 if [ -z "${SYSTEM_TBB_LIB}" ] || [ -z "${SYSTEM_TBB_HEADER}" ]; then
   if pkg-config --exists tbb 2>/dev/null; then
-    SYSTEM_TBB_LIB="pkg-config"
-    SYSTEM_TBB_HEADER="pkg-config"
-    TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB $(pkg-config --cflags tbb)"
-    TBB_LIBS="$(pkg-config --libs tbb)"
-    echo "  System oneTBB detected via pkg-config"
+    cat > conftest_tbb.cpp << 'TBBEOF'
+#include <oneapi/tbb/parallel_reduce.h>
+#include <oneapi/tbb/blocked_range.h>
+int main() {
+  double r = tbb::parallel_reduce(
+    tbb::blocked_range<int>(0,4), 0.0,
+    [](const tbb::blocked_range<int>& b, double s){
+      for(int i=b.begin();i<b.end();++i) s+=i; return s; },
+    [](double a, double b){ return a+b; });
+  return (int)r;
+}
+TBBEOF
+    _tbb_libdir=$(pkg-config --variable=libdir tbb 2>/dev/null)
+    if ${CXX:-c++} -std=c++11 $(pkg-config --cflags tbb) conftest_tbb.cpp \
+        $(pkg-config --libs tbb) -o conftest_tbb 2>/dev/null; then
+      SYSTEM_TBB_LIB="pkg-config"
+      SYSTEM_TBB_HEADER="pkg-config"
+      TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB $(pkg-config --cflags tbb)"
+      if [ -n "${_tbb_libdir}" ]; then
+        TBB_LIBS="$(pkg-config --libs tbb) -Wl,-rpath,${_tbb_libdir}"
+      else
+        TBB_LIBS="$(pkg-config --libs tbb)"
+      fi
+      echo "  System oneTBB detected via pkg-config"
+    else
+      echo "  pkg-config TBB found but oneTBB 2021 API check failed"
+    fi
+    rm -f conftest_tbb.cpp conftest_tbb
   fi
 fi
 
 if [ "${SYSTEM_TBB_LIB}" = "pkg-config" ]; then
   : # TBB_DEFINE and TBB_LIBS already set above by pkg-config
 elif [ -n "${SYSTEM_TBB_LIB}" ] && [ -n "${SYSTEM_TBB_HEADER}" ]; then
-  TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB"
-  TBB_LIBS="-L${SYSTEM_TBB_LIB} -ltbb"
+  TBB_DEFINE="-DROBSCALE_HAS_SYSTEM_TBB -I${SYSTEM_TBB_HEADER}"
+  TBB_LIBS="-L${SYSTEM_TBB_LIB} -ltbb -Wl,-rpath,${SYSTEM_TBB_LIB}"
   echo "  System oneTBB detected (${SYSTEM_TBB_LIB}/libtbb.so), using -ltbb"
 else
   RCPP_PAR_LIB=""
@@ -162,7 +188,7 @@ else
       "cat(system.file('lib', package='RcppParallel', mustWork=FALSE))" \
       2>/dev/null || true)
   fi
-  if [ -n "${RCPP_PAR_LIB}" ] && [ -f "${RCPP_PAR_LIB}/libtbb.so" ]; then
+  if [ -n "${RCPP_PAR_LIB}" ] && { [ -f "${RCPP_PAR_LIB}/libtbb.so" ] || [ -f "${RCPP_PAR_LIB}/libtbb.dylib" ]; }; then
     TBB_DEFINE="-DUSE_DIRECT_TBB"
     TBB_LIBS="-L${RCPP_PAR_LIB} -ltbb -Wl,-rpath,${RCPP_PAR_LIB}"
     echo "  RcppParallel TBB detected at ${RCPP_PAR_LIB}, using -ltbb"
@@ -178,18 +204,17 @@ fi
 rm -f src/*.o src/robscale.so
 
 # Generate Makevars from template
-sed -e "s|@OPENMP_SIMD_FLAG@|${OPENMP_SIMD_FLAG}|" \
-    -e "s|@OPENMP_SIMD_DEFINE@|${OPENMP_SIMD_DEFINE}|" \
-    -e "s|@ACCELERATE_LIBS@|${ACCELERATE_LIBS}|" \
-    -e "s|@SLEEF_CFLAGS@|${SLEEF_CFLAGS}|" \
-    -e "s|@SLEEF_LIBS@|${SLEEF_LIBS}|" \
-    -e "s|@TBB_DEFINE@|${TBB_DEFINE}|" \
-    -e "s|@TBB_LIBS@|${TBB_LIBS}|" \
-    -e "s|@OMP_PARALLEL_CFLAGS@|${OMP_PARALLEL_CFLAGS}|" \
-    -e "s|@OMP_PARALLEL_LIBS@|${OMP_PARALLEL_LIBS}|" \
-    -e "s|@GLIBC_MVEC_CFLAGS@|${GLIBC_MVEC_CFLAGS}|" \
-    -e "s|@GLIBC_MVEC_LIBS@|${GLIBC_MVEC_LIBS}|" \
-    -e "s|@AVX512_TANH_CFLAGS@|${AVX512_TANH_CFLAGS}|" \
+sed -e "s!@OPENMP_SIMD_FLAG@!${OPENMP_SIMD_FLAG}!" \
+    -e "s!@OPENMP_SIMD_DEFINE@!${OPENMP_SIMD_DEFINE}!" \
+    -e "s!@ACCELERATE_LIBS@!${ACCELERATE_LIBS}!" \
+    -e "s!@SLEEF_CFLAGS@!${SLEEF_CFLAGS}!" \
+    -e "s!@SLEEF_LIBS@!${SLEEF_LIBS}!" \
+    -e "s!@TBB_DEFINE@!${TBB_DEFINE}!" \
+    -e "s!@TBB_LIBS@!${TBB_LIBS}!" \
+    -e "s!@OMP_PARALLEL_CFLAGS@!${OMP_PARALLEL_CFLAGS}!" \
+    -e "s!@OMP_PARALLEL_LIBS@!${OMP_PARALLEL_LIBS}!" \
+    -e "s!@GLIBC_MVEC_CFLAGS@!${GLIBC_MVEC_CFLAGS}!" \
+    -e "s!@GLIBC_MVEC_LIBS@!${GLIBC_MVEC_LIBS}!" \
     src/Makevars.in > src/Makevars
 
 echo "  Generated src/Makevars"

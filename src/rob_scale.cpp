@@ -2,7 +2,9 @@
 #include "robust_core.h"
 #include "pdq_select.h"
 #include <Rcpp.h>
+#include <cmath>
 #include <memory>
+#include <RcppParallel.h>
 #if defined(ROBSCALE_HAS_SYSTEM_TBB)
 #  include <oneapi/tbb/parallel_reduce.h>
 #  include <oneapi/tbb/blocked_range.h>
@@ -252,10 +254,9 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
                              double implbound, int maxit,
                              double tol, int fallback) {
   // For n <= ROBSCALE_SORT_NETWORK_THRESHOLD (16), median_net is always the
-  // right path.  Calling it directly avoids: RuntimeConfig::get() (TLS),
-  // the pdq_robscale_threshold comparison, and two function frames — ~3 ns
-  // per call, ~6 ns total (median + MAD), on a ~50–200 ns small-n call.
-  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
+  // For n < 8, call median_net directly (no SIMD kernel exists below 8).
+  // For n >= 8, route through adaptive dispatch so SIMD median fires at 8/16/32.
+  const bool is_tiny = (n < 8);
 
   // OPT-E: cache RuntimeConfig once — used for both the parallel threshold
   // check (below) and the use_avx2 flag passed to rob_scale_compute.
@@ -274,11 +275,11 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
     // OPT-F: deviations stored in w[] (offset=0 dispatch below).
     robscale::bulk_abs_diff(w, xp, (int)n, t);
     s_init = robscale::MAD_CONSISTENCY *
-        (is_small ? robscale::median_net(w, n)
+        (is_tiny ? robscale::median_net(w, n)
                   : robscale::adaptive_robscale_median_select(w, n));
   } else {
     std::memcpy(w, xp, n * sizeof(double));
-    t = is_small ? robscale::median_net(w, n)
+    t = is_tiny ? robscale::median_net(w, n)
                  : robscale::adaptive_robscale_median_select(w, n);
     // OPT-3: compute deviations from xp (source), overwrite w (destination).
     // w was permuted by median_select; xp preserves original order.
@@ -286,7 +287,7 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
     // VSUB per element per NR iteration.  MAD is permutation-invariant.
     robscale::bulk_abs_diff(w, xp, (int)n, t);
     s_init = robscale::MAD_CONSISTENCY *
-        (is_small ? robscale::median_net(w, n)
+        (is_tiny ? robscale::median_net(w, n)
                   : robscale::adaptive_robscale_median_select(w, n));
   }
 
@@ -300,10 +301,10 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
         double dev_local[4]; // n < minobs (3 when has_loc), always fits
         double mad_orig = robscale::adaptive_mad_select(xp, (int)n, med_orig, dev_local);
         return (mad_orig <= implbound)
-          ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY)
+          ? robscale::adm_core(xp, (int)n, med_orig, robscale::ADM_CONSISTENCY, avx2)
           : mad_orig;
       } else {
-        return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+        return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY, avx2);
       }
     }
     return s_init;
@@ -311,7 +312,7 @@ static double rob_scale_core(const double* ROBSCALE_RESTRICT xp, size_t n,
 
   if (ROBSCALE_UNLIKELY(s_init <= implbound && fallback == 1)) return R_NaReal;
   if (ROBSCALE_UNLIKELY(s_init == 0.0)) {
-    return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY);
+    return robscale::adm_core(xp, (int)n, t, robscale::ADM_CONSISTENCY, avx2);
   }
 
   // Phase 4: dispatch to parallel kernel for large n.
@@ -387,6 +388,5 @@ double rob_scale_impl(Rcpp::NumericVector x, bool has_loc, double loc_val,
 // [[Rcpp::export(rng = false)]]
 double C_rob_scale_fast(Rcpp::NumericVector x) {
   // Thin wrapper → production rob_scale_impl (has_loc=false, default params).
-  // Always reflects the current production path; after WU-RS1 calls 8-wide kernel.
   return rob_scale_impl(x, false, 0.0, 1e-4, 80, 1.4901161e-8, 0);
 }

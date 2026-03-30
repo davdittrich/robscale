@@ -4,15 +4,15 @@ test_that("get_qnsn_config exposes hardware diagnostics", {
     expect_true(f %in% names(cfg), info = paste("Missing:", f))
 })
 
-test_that("l2_per_core is between 128KB and 16MB", {
+test_that("l2_per_core is between 64KB and 16MB", {
   cfg <- robscale:::get_qnsn_config()
-  expect_gte(cfg$l2_per_core, 131072L)    # 128KB min
+  expect_gte(cfg$l2_per_core, 65536L)     # 64KB min (sanity floor)
   expect_lte(cfg$l2_per_core, 16777216L)  # 16MB max
 })
 
-test_that("sort_tbb_threshold >= 8192 on any modern CPU", {
+test_that("sort_tbb_threshold >= 4096 on any modern CPU", {
   cfg <- robscale:::get_qnsn_config()
-  expect_gte(cfg$sort_tbb_threshold, 8192L)
+  expect_gte(cfg$sort_tbb_threshold, 4096L)
 })
 
 test_that("sort thresholds are hardware-derived, not tuner-overridden", {

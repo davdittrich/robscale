@@ -7,6 +7,7 @@
 #include "sort_net.h"
 #include "robscale_config.h"
 #include "qnsn_runtime_config.h"
+#include "simd_median.h"
 
 // --- Platform-specific vectorized tanh ---
 #if defined(__APPLE__) && defined(__MACH__)
@@ -27,15 +28,12 @@
 // Vectorized tanh declarations.
 // Backend hierarchy (highest priority first):
 //   1. macOS Accelerate vvtanh (ROBSCALE_HAS_ACCELERATE)
-//   2. glibc libmvec _ZGVeN8v_tanh — AVX-512 8-wide (ROBSCALE_HAS_AVX512_TANH)
-//   3. glibc libmvec _ZGVdN4v_tanh — AVX2 4-wide   (ROBSCALE_HAS_GLIBC_MVEC)
-//   4. SLEEF Sleef_tanhd4_u10avx2  — AVX2 4-wide   (ROBSCALE_HAS_SLEEF)
-//   5. #pragma omp simd / scalar std::tanh
+//   2. glibc libmvec _ZGVdN4v_tanh — AVX2 4-wide   (ROBSCALE_HAS_GLIBC_MVEC)
+//   3. SLEEF Sleef_tanhd4_u10avx2  — AVX2 4-wide   (ROBSCALE_HAS_SLEEF)
+//   4. #pragma omp simd / scalar std::tanh
 //
-// ROBSCALE_HAS_AVX2_TANH: defined when AVX2 tanh backend available (3 or 4).
-// ROBSCALE_HAS_AVX512_TANH: defined when 8-wide AVX-512 tanh available (2).
-#if (defined(ROBSCALE_HAS_AVX2_TANH) || defined(ROBSCALE_HAS_AVX512_TANH)) && \
-    !defined(ROBSCALE_HAS_ACCELERATE)
+// ROBSCALE_HAS_AVX2_TANH: defined when AVX2 tanh backend available (2 or 3).
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   #include <immintrin.h>
   // AVX2 4-wide backend
   // Declarations carry target("avx2,fma") so clang 21+ accepts __m256d
@@ -49,11 +47,6 @@
     // declare it here so the target-attributed wrapper can call it.
     extern "C" ROBSCALE_TARGET_AVX2 __m256d Sleef_tanhd4_u10avx2(__m256d);
     #define ROBSCALE_TANH4_AVX2 Sleef_tanhd4_u10avx2
-  #endif
-  // AVX-512 8-wide backend (glibc libmvec, same -lmvec as the 4-wide variant)
-  #if defined(ROBSCALE_HAS_AVX512_TANH)
-    extern "C" ROBSCALE_TARGET_AVX512F __m512d _ZGVeN8v_tanh(__m512d);
-    #define ROBSCALE_TANH8_AVX512 _ZGVeN8v_tanh
   #endif
 #endif
 
@@ -83,87 +76,10 @@ constexpr double ARE_SD_C4      = 1.00;
 
 // --- Low-level Kernels ---
 
-#if defined(ROBSCALE_HAS_AVX512_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  // AVX-512 tanh: processes 8 doubles per iteration via ROBSCALE_TANH8_AVX512.
-  // ROBSCALE_TARGET_AVX512F enables 512-bit codegen without global -mavx512f.
-  // Called only when SIMDLevel::AVX512 confirmed at runtime; safe on AVX2-only
-  // hardware (function never invoked when AVX-512 absent per CPUID).
-  ROBSCALE_TARGET_AVX512F
-  inline void bulk_tanh_avx512(double* inout, int n) {
-    int i = 0;
-    for (; i + 8 <= n; i += 8) {
-      __m512d v = _mm512_loadu_pd(inout + i);
-      v = ROBSCALE_TANH8_AVX512(v);
-      _mm512_storeu_pd(inout + i, v);
-    }
-    // 4-wide cleanup (may be skipped if n%8 < 4)
-    for (; i + 4 <= n; i += 4) {
-      __m256d v = _mm256_loadu_pd(inout + i);
-      v = ROBSCALE_TANH4_AVX2(v);
-      _mm256_storeu_pd(inout + i, v);
-    }
-    for (; i < n; i++) inout[i] = std::tanh(inout[i]);
-  }
-#endif
-
-#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
-  // AVX2 tanh: processes 4 doubles per iteration via ROBSCALE_TANH4_AVX2.
-  // Resolves to glibc libmvec _ZGVdN4v_tanh (preferred) or SLEEF fallback.
-  // Target attribute enables AVX2 codegen without global -mavx2.
-  ROBSCALE_TARGET_AVX2
-  inline void bulk_tanh_avx2(double* inout, int n) {
-    int i = 0;
-    for (; i + 4 <= n; i += 4) {
-      __m256d v = _mm256_loadu_pd(inout + i);
-      v = ROBSCALE_TANH4_AVX2(v);
-      _mm256_storeu_pd(inout + i, v);
-    }
-    for (; i < n; i++) inout[i] = std::tanh(inout[i]);
-  }
-#endif
-
-// Bulk tanh with pre-hoisted SIMD flags — no TLS read per call.
-// use_avx2: true when AVX2 confirmed; use_avx512: true when AVX-512 confirmed.
-// CPUID features are invariant for process lifetime; hoisting is safe.
-ROBSCALE_HIDDEN inline void bulk_tanh_dispatched(double* inout, int n,
-                                                  bool use_avx2,
-                                                  bool use_avx512 = false) {
-  // n<8: scalar bypass. For n∈[4,7] with AVX2, skips one 4-wide vector
-  // iteration — acceptable: no hot-loop caller passes n<8 here.
-  // (NR kernels use nr_scale_step_avx2/scalar directly.)
-  if (n < 8) {
-    for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
-    return;
-  }
-#if defined(ROBSCALE_HAS_ACCELERATE)
-  (void)use_avx2; (void)use_avx512;
-  vvtanh(inout, inout, &n);
-#else
-  #if defined(ROBSCALE_HAS_AVX512_TANH)
-    if (use_avx512) { bulk_tanh_avx512(inout, n); return; }
-  #endif
-  #if defined(ROBSCALE_HAS_AVX2_TANH)
-    if (use_avx2)   { bulk_tanh_avx2(inout, n);   return; }
-  #endif
-  (void)use_avx2; (void)use_avx512;
-  #if defined(_OPENMP) || defined(ROBSCALE_HAS_OMP_SIMD)
-    #pragma omp simd
-  #endif
-  for (int i = 0; i < n; ++i) inout[i] = std::tanh(inout[i]);
-#endif
-}
-
-// ADM core: constant * mean(|x - center|)
-// ROBSCALE_TARGET_AVX2: enables 256-bit AVX2 auto-vectorisation for this
-// function without requiring a global -mavx2 flag (safe on CRAN).
-// ROBSCALE_RESTRICT: eliminates aliasing analysis so the vectoriser can
-// freely reorder loads.
-// 4-wide dual-accumulator unroll: breaks the single-accumulator 4-cycle
-// latency chain; four independent chains fill one 256-bit AVX2 register
-// (4 doubles) per fused-load+abs+add cycle.
-ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
-ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
-                                double center, double constant) {
+// ADM core: constant * mean(|x - center|).
+// Scalar version: safe on all x86 (no target attribute).
+ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core_scalar(const double* ROBSCALE_RESTRICT x, int n,
+                                                       double center, double constant) {
   double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
   int i = 0;
   for (; i + 3 < n; i += 4) {
@@ -176,22 +92,68 @@ ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
   return constant * (s0 + s1 + s2 + s3) * (1.0 / n);
 }
 
-// ADM core for pre-sorted input: constant * mean(|x - center|).
-// PRECONDITION: x is sorted ascending AND center = exact median of x.
-// Algorithm: accumulate (center - x[i]) for lower half and (x[i] - center) for
-// upper half. Each term is a small difference from center, avoiding catastrophic
-// cancellation that occurs with the upper_sum - lower_sum formula when data is
-// at large magnitude (e.g., 1e15 + small deviations).
-// Two independent SIMD-friendly accumulation loops: no branches, no abs().
+// ADM core (AVX2): constant * mean(|x - center|)
+// ROBSCALE_TARGET_AVX2: enables 256-bit AVX2 auto-vectorisation for this
+// function without requiring a global -mavx2 flag (safe on CRAN).
 ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
-ROBSCALE_INLINE double adm_core_sorted(const double* ROBSCALE_RESTRICT x, int n,
-                                       double center, double constant) {
-  if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;  // n=0: avoid 1.0/0=Inf; n=1: trivially 0
+ROBSCALE_INLINE double adm_core_avx2(const double* ROBSCALE_RESTRICT x, int n,
+                                     double center, double constant) {
+  double s0 = 0.0, s1 = 0.0, s2 = 0.0, s3 = 0.0;
+  int i = 0;
+  for (; i + 3 < n; i += 4) {
+    s0 += std::abs(x[i]   - center);
+    s1 += std::abs(x[i+1] - center);
+    s2 += std::abs(x[i+2] - center);
+    s3 += std::abs(x[i+3] - center);
+  }
+  for (; i < n; ++i) s0 += std::abs(x[i] - center);
+  return constant * (s0 + s1 + s2 + s3) * (1.0 / n);
+}
+
+// ADM core dispatch: AVX2 if available, scalar otherwise.
+ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core(const double* ROBSCALE_RESTRICT x, int n,
+                                                 double center, double constant,
+                                                 bool use_avx2 = false) {
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  if (use_avx2) return adm_core_avx2(x, n, center, constant);
+#endif
+  (void)use_avx2;
+  return adm_core_scalar(x, n, center, constant);
+}
+
+// ADM core for pre-sorted input: constant * mean(|x - center|).
+// Scalar version: safe on all x86.
+ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core_sorted_scalar(const double* ROBSCALE_RESTRICT x, int n,
+                                                              double center, double constant) {
+  if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;
   int k = n / 2;
   double sum_abs = 0.0;
   for (int i = 0; i < k; ++i)             sum_abs += center - x[i];
   for (int i = k + (n & 1); i < n; ++i)   sum_abs += x[i] - center;
   return constant * sum_abs * (1.0 / n);
+}
+
+// ADM core for pre-sorted input (AVX2).
+ROBSCALE_HIDDEN ROBSCALE_TARGET_AVX2
+ROBSCALE_INLINE double adm_core_sorted_avx2(const double* ROBSCALE_RESTRICT x, int n,
+                                            double center, double constant) {
+  if (ROBSCALE_UNLIKELY(n <= 1)) return 0.0;
+  int k = n / 2;
+  double sum_abs = 0.0;
+  for (int i = 0; i < k; ++i)             sum_abs += center - x[i];
+  for (int i = k + (n & 1); i < n; ++i)   sum_abs += x[i] - center;
+  return constant * sum_abs * (1.0 / n);
+}
+
+// ADM core for pre-sorted input dispatch.
+ROBSCALE_HIDDEN ROBSCALE_INLINE double adm_core_sorted(const double* ROBSCALE_RESTRICT x, int n,
+                                                       double center, double constant,
+                                                       bool use_avx2 = false) {
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  if (use_avx2) return adm_core_sorted_avx2(x, n, center, constant);
+#endif
+  (void)use_avx2;
+  return adm_core_sorted_scalar(x, n, center, constant);
 }
 
 // Absolute-deviation kernel (in-place): w[i] = |w[i] - center|.
@@ -227,10 +189,30 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double median_sorted(const double* x, size_t n) 
   return x[(n / 2) - 1] + (x[n / 2] - x[(n / 2) - 1]) * 0.5;  // overflow-safe
 }
 
+// Runtime CPUID check for SIMD median dispatch (cached static bool).
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+namespace {
+inline bool cpu_has_avx2() {
+  static const bool val = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                           robscale::qnsn::SIMDLevel::AVX2);
+  return val;
+}
+} // anon namespace
+#endif
+
 // Selection based median
 ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
-  if (n <= ROBSCALE_SORT_NETWORK_THRESHOLD) {
+#ifdef ROBSCALE_HAS_AVX2_DISPATCH
+  if (cpu_has_avx2()) {
+    switch (n) {
+      case 8:  return robscale::simd::simd_median_sel_8(x);
+      case 16: return robscale::simd::simd_median_sel_16(x);
+      case 32: return robscale::simd::simd_median_sel_32(x);
+    }
+  }
+#endif
+  if (n <= ROBSCALE_MEDIAN_NET_THRESHOLD) {
     return robscale::median_net(x, n);
   }
   size_t h = (n - 1) / 2;
@@ -238,8 +220,6 @@ ROBSCALE_HIDDEN ROBSCALE_INLINE double median_select(double* x, size_t n) {
   if (n & 1) return x[h];
 
   double v1 = x[h];
-  // After floyd_rivest_select, x[h+1..n-1] are all >= x[h].
-  // min_element vectorises to MINPD and has no loop-carried branch dependency.
   double v2 = *std::min_element(x + h + 1, x + n);
   return (v1 + v2) * 0.5;
 }

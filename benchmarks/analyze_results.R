@@ -39,9 +39,9 @@ safe_worker_count <- function(context = "mclapply", worker_mem_mb = 1024L) {
       swap_used_gb <- (swap_total_kb - swap_free_kb) / (1024^2)
   }
 
-  # Memory-based ceiling: each worker needs ~worker_mem_mb; keep 20 % headroom.
+  # Memory-based ceiling: each worker needs ~worker_mem_mb; keep 5 % headroom.
   mem_cap <- if (!is.na(avail_mb)) {
-    max(1L, floor(avail_mb * 0.80 / worker_mem_mb))
+    max(1L, floor(avail_mb * 0.95 / worker_mem_mb))
   } else {
     hard_cap
   }

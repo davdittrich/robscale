@@ -82,3 +82,4 @@
 ^report\.md$
 ^email_draft.*\.md$
 ^mastodon_draft\.md$
+^simd_sorting_report\.md$

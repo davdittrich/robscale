@@ -39,9 +39,12 @@ static constexpr int N_ESTIMATORS = 7;
 // Only indices 0 and 1 are swapped; 2-6 are identity.
 static const int kEstIdToAllIdx[N_ESTIMATORS] = {1, 0, 2, 3, 4, 5, 6};
 
-#if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
-static constexpr int64_t ENSEMBLE_PARALLEL_THRESHOLD = 10000;
-#endif
+// Ensemble-specific sort threshold: lower than global ROBSCALE_SORT_NET_THRESHOLD
+// because sort_net functions for n>20 are too large to stay in L1 I-cache when
+// called n_boot× per bootstrap, interleaved with 7 estimator computations.
+// Calibrated 2026-03-29: sort_net wins through n≈21 in ensemble context;
+// neutral at 22-24; regresses from n≈25 (I-cache thrashing).
+static constexpr size_t ENSEMBLE_SORT_THRESHOLD = 20;
 
 // Compute one bootstrap replicate and write N_ESTIMATORS estimates into the
 // transposed (7 × nboot) boot_results matrix.
@@ -94,8 +97,8 @@ static void ensemble_one_replicate(
   // OPT-G4: boost::float_sort (serial radix) for n > sort_boost_threshold.
   //   tbb::parallel_sort is PROHIBITED: nested TBB inside tbb::parallel_for
   //   causes oversubscription (same constraint as rob_scale_compute here).
-  if (n <= 16) {
-    robscale::small_sort(resample, n);
+  if (static_cast<size_t>(n) <= ENSEMBLE_SORT_THRESHOLD) {
+    robscale::small_sort(resample, static_cast<size_t>(n));
   } else {
     if (static_cast<size_t>(n) <= ROBSCALE_SORT_BOOST_THRESHOLD)
       std::sort(resample, resample + n);
@@ -208,7 +211,12 @@ struct EnsembleCore {
 #endif
 
 #if defined(ROBSCALE_HAS_SYSTEM_TBB) || defined(USE_DIRECT_TBB)
-    if (static_cast<int64_t>(n) * nboot >= ENSEMBLE_PARALLEL_THRESHOLD) {
+    // Gate: at least 2 cores and enough total work to amortize TBB dispatch (~20µs).
+    // Threshold 2000 is low and fixed (machine-independent).
+    // TBB auto-partitioner handles core utilization — specifying a grain size
+    // is counterproductive (measured +30% regression vs auto-partitioner).
+    if (robscale::qnsn::RuntimeConfig::get().hw.num_logical_cores >= 2 &&
+        static_cast<size_t>(nboot) >= 16) {
       tbb::parallel_for(
         tbb::blocked_range<int>(0, nboot),
         [xp, n, br, n_boot, use_avx2](const tbb::blocked_range<int>& range) {
@@ -218,8 +226,6 @@ struct EnsembleCore {
           double* resample = ws.get();
           double* work1 = resample + n;
           double* work2 = work1 + n;
-          // Per-thread typed Qn workspace (no aliasing UB)
-          // Pre-assemble WS struct once per thread — passed by pointer per replicate.
           static constexpr size_t QN_WS_THRESHOLD = 2048;
           std::unique_ptr<float[]>   qn_w(un <= QN_WS_THRESHOLD ? new float[un] : nullptr);
           std::unique_ptr<int32_t[]> qn_iw(un <= QN_WS_THRESHOLD ? new int32_t[un] : nullptr);
@@ -392,8 +398,8 @@ Rcpp::List cpp_single_estimator_ci_bounds(
       for (int i = 0; i < n; ++i)
         resample[i] = xp[static_cast<uint32_t>((static_cast<uint64_t>(rng.next()) * un32_ci) >> 32)];
 
-      if (n <= 16) {
-        robscale::small_sort(resample, n);
+      if (static_cast<size_t>(n) <= ENSEMBLE_SORT_THRESHOLD) {
+        robscale::small_sort(resample, static_cast<size_t>(n));
       } else if (static_cast<size_t>(n) <= ROBSCALE_SORT_BOOST_THRESHOLD) {
         std::sort(resample, resample + n);
       } else {

@@ -1,4 +1,4 @@
-# robscale: Fast Robust Location and Scale Estimation
+# robscale: Accelerated Estimation of Robust Location and Scale
 
 
 [![](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
@@ -17,13 +17,13 @@ variance-weighted bootstrap ensemble for small samples ($n < 20$) and
 auto-switches to the GMD for larger ones. `get_consistency_constant()`
 exposes the finite-sample bias-correction factors used throughout.
 
-Against `revss`, `robscale` achieves **3.8–4.5x** speedups for
+Against `revss`, `robscale` achieves **3.7–4.5x** speedups for
 `robScale()` and **4.0–4.3x** for `robLoc()` at small $n$, with
-**1.6–7.1x** for `adm()` at $n \ge 128$. Against `robustbase`, `qn` and
-`sn` run at **1.7–6.1x** and **2.1–9.1x** respectively, peaking near
-**9.1x** at $n = 10^7$ as TBB parallelism engages. `gmd`, `iqr_scaled`,
-and `mad_scaled` beat their base R counterparts by **2.8–22.1x**,
-**2.9–37.8x**, and **4.2–26.3x** respectively.
+**1.6–7.0x** for `adm()` at $n \ge 128$. Against `robustbase`, `qn` and
+`sn` run at **1.8–6.0x** and **2.1–8.9x** respectively, peaking near
+**8.9x** at $n = 10^7$ as TBB parallelism engages. `gmd`, `iqr_scaled`,
+and `mad_scaled` beat their base R counterparts by **2.7–21.9x**,
+**2.8–37.3x**, and **4.1–26.1x** respectively.
 
 Speed comes from C++17 kernels with platform-specific SIMD
 vectorization, $O(n)$ selection algorithms, stack-allocated memory
@@ -149,7 +149,7 @@ $$\text{GMD}(x) = C \cdot \frac{2}{n(n{-}1)}\sum_{i=1}^{n} (2i - n - 1)\, x_{(i)
 
 where $x_{(1)} \le \ldots \le x_{(n)}$ are the order statistics and
 $C = \sqrt{\pi}/2 \approx 0.8862$. The computation requires a full sort
-($(O(n \log n))$), with sorting networks applied for $n \le 16$.
+($(O(n \log n))$), with branchless sorting networks for $n \le 56$.
 
 The GMD achieves **98% ARE** (Nair 1936) with a **29.3% breakdown
 point**, making it the most statistically efficient robust alternative
@@ -248,9 +248,9 @@ qn(c(1, 2, 3, 5, 7, 8), ci = TRUE)   # with 95% CI
 
 Computes the $S_n$ estimator of scale (Rousseeuw and Croux 1993). $S_n$
 is more statistically efficient than the MAD and maintains a 50%
-breakdown point. `robscale` uses optimal sorting networks for $n \le 16$
-and a highly optimized parallelized inner-median algorithm for general
-samples.
+breakdown point. `robscale` uses branchless sorting networks for
+$n \le 56$ and a highly optimized parallelized inner-median algorithm
+for general samples.
 
 ``` r
 sn(c(1, 2, 3, 5, 7, 8))
@@ -286,8 +286,9 @@ $$\text{MAD}_s(x) = C \cdot \text{med}_i\, |x_i - \text{med}(x)|$$
 
 where $C = 1/\Phi^{-1}(3/4) \approx 1.4826$. Unlike `stats::mad()`, this
 implementation uses adaptive $O(n)$ selection (Floyd–Rivest below a
-cache-derived threshold, pdqselect above) with sorting networks for
-$n \le 16$, avoiding a full sort. The MAD achieves **36.8% ARE**
+cache-derived threshold, pdqselect above) with SIMD selection networks
+for $n \in \{8, 16, 32\}$ on AVX2 hardware and scalar selection networks
+for $n \le 36$, avoiding a full sort. The MAD achieves **36.8% ARE**
 (Rousseeuw and Croux 1993, “about 37%”) with a **50% breakdown point**.
 
 ``` r
@@ -383,23 +384,25 @@ get_consistency_constant("qn", n = 10)  # finite-sample correction at n = 10
 
 **SIMD vectorization.** The logistic psi function reduces to
 $\tanh(x/2)$, dispatched to the fastest available platform backend:
-Apple Accelerate (`vvtanh`) on macOS; glibc libmvec on Linux x86_64,
-using the 8-wide AVX-512 kernel (`_ZGVeN8v_tanh`) when the CPU supports
-AVX-512F, otherwise the 4-wide AVX2 kernel (`_ZGVdN4v_tanh`); SLEEF as a
-fallback when libmvec is absent; and `#pragma omp simd` as a portable
-fallback. The Gini mean difference weighted sum is vectorized separately
-via an AVX2 FMA kernel (`_mm256_fmadd_pd`) for $n \geq 8$. For
-`robLoc()`, a fused AVX2 kernel accumulates $\psi_i$ and
-$\text{d}\psi_i$ in a single pass over the data, reducing memory reads
-by 3$\times$ relative to the standard three-pass approach.
+Apple Accelerate (`vvtanh`) on macOS; glibc libmvec on Linux x86_64
+using the 4-wide AVX2 kernel (`_ZGVdN4v_tanh`); SLEEF as a fallback when
+libmvec is absent; and `#pragma omp simd` as a portable fallback. The
+Gini mean difference weighted sum is vectorized separately via an AVX2
+FMA kernel (`_mm256_fmadd_pd`) for $n \geq 8$. For `robLoc()`, a fused
+AVX2 kernel accumulates $\psi_i$ and $\text{d}\psi_i$ in a single pass
+over the data, reducing memory reads by 3$\times$ relative to the
+standard three-pass approach.
 
-**$O(n)$ median selection.** Median and MAD computation uses optimal
-sorting networks for $n \le 16$ (branchless compare-and-swap sequences,
-compiled to conditional-move instructions at `-O2`), introselect for
-moderate $n$, and Floyd–Rivest at scale. Each estimator chooses between
-Floyd–Rivest and pdqselect based on a runtime crossover threshold
-derived from the per-core L2 cache size, minimizing cache pressure for
-the specific working-set size of that estimator.
+**$O(n)$ median selection.** Median and MAD computation dispatches
+through a three-tier hierarchy: AVX2 SIMD selection networks for
+$n \in \{8, 16, 32\}$ (bitonic merge networks, 23–58% faster than
+scalar), scalar selection networks for $n \le 36$, and Floyd–Rivest
+$O(n)$ selection at scale. Full-sort paths (GMD, $Q_n$ exact, $S_n$) use
+branchless sorting networks for $n \le 56$ (compare-and-swap sequences
+compiled to conditional-move instructions at `-O2`). Each estimator
+chooses between Floyd–Rivest and pdqselect based on a runtime crossover
+threshold derived from the per-core L2 cache size, minimizing cache
+pressure for the specific working-set size of that estimator.
 
 **Stack-allocated memory arenas.** A 128-double micro-buffer (1 KB)
 covers the smallest samples ($n \leq 128$ for MAD, $n \leq 64$ for
@@ -477,8 +480,8 @@ graph TD
     GMD_FAST --> GMD
 
     subgraph "Algorithm Tiers"
-        T1["n <= 16: Sorting networks"]
-        T2["17 <= n < L2 threshold: Optimized scalar C++"]
+        T1["n <= 56: Sorting networks\n(SIMD sel for n=8,16,32;\nscalar sel for n<=36)"]
+        T2["57 <= n < L2 threshold: Optimized scalar C++"]
         T3["n >= L2 threshold: Parallel TBB kernels"]
         T4["Adaptive selection dispatch\n(pdqselect or Floyd-Rivest\nper runtime L2 threshold)"]
     end
@@ -487,13 +490,12 @@ graph TD
     IQR & MAD & RS --> T4
 
     subgraph "Hardware Acceleration"
-        G["AVX-512 (8-wide tanh)"]
         G2["AVX2 (4-wide tanh, robLoc fused kernel, GMD FMA)"]
         H[Apple Accelerate]
         I["glibc libmvec / SLEEF (tanh backend)"]
     end
 
-    T1 & T2 & T3 --> G & G2 & H & I
+    T1 & T2 & T3 --> G2 & H & I
 ```
 
 ## Benchmarks
@@ -502,9 +504,9 @@ Figures 1 and 2 show speedup factors relative to reference
 implementations (Figure 1) and absolute wall-clock run times (Figure 2)
 across sample sizes on a AMD Ryzen 9 5900HX with Radeon Graphics (Arch
 Linux, R version 4.5.3 (2026-03-11), build flags:
-`-march=native -mtune=native -O2 -fno-math-errno -pipe -fPIC -fopenmp-simd -DROBSCALE_HAS_OMP_SIMD -I/usr/include -DROBSCALE_HAS_SLEEF -DROBSCALE_HAS_SYSTEM_TBB -DROBSCALE_HAS_GLIBC_MVEC -DROBSCALE_HAS_AVX512_TANH`,
+`-march=native -mtune=native -O2 -fno-math-errno -pipe -fPIC -fopenmp-simd -DROBSCALE_HAS_OMP_SIMD -I/usr/include -DROBSCALE_HAS_SLEEF -DROBSCALE_HAS_SYSTEM_TBB -I/usr/include -DROBSCALE_HAS_GLIBC_MVEC`,
 `tanh` backend: glibc libmvec (\_ZGVdN4v_tanh), TBB: system oneTBB
-(.so), benchmarked 2026-03-28). Baseline packages: `robustbase` 0.99.7
+(.so), benchmarked 2026-03-30). Baseline packages: `robustbase` 0.99.7
 (Maechler et al. 2026), `revss` 3.1.0 (Adler 2020), `Hmisc` 5.2.5
 (Harrell 2026), `GiniDistance` 0.1.1 (Nguyen and Dang 2022), `collapse`
 2.1.6 (Krantz 2025).
@@ -535,14 +537,15 @@ of TBB parallelism at large $n$.
 
 ### M-estimators (`adm`, `robLoc`, `robScale`)
 
-`robScale()` and `robLoc()` reach **3.8–4.5x** and **4.0–4.3x** over
+`robScale()` and `robLoc()` reach **3.7–4.5x** and **4.0–4.3x** over
 `revss` in the small-sample regime ($n \le 20$). Newton–Raphson
 quadratic convergence (~3 iterations vs. 6–8), the fused single-pass
-AVX2 kernel, stack-allocated arenas, and optimal sorting networks for
-$n \le 16$ drive these gains. `adm()` matches `revss` at small $n$ (both
-~1.5–2.0 µs, dominated by the R→C++ `.Call()` boundary) and leads by
-**1.6–7.1x** at $n \ge 128$ as computation overtakes boundary cost. At
-$n = 16{,}384$, all three estimators retain **2.8–5.3x** gains because
+AVX2 kernel, stack-allocated arenas, SIMD selection networks
+($n \in \{8, 16, 32\}$), and branchless sorting networks ($n \le 56$)
+drive these gains. `adm()` matches `revss` at small $n$ (both ~1.5–2.0
+µs, dominated by the R→C++ `.Call()` boundary) and leads by **1.6–7.0x**
+at $n \ge 128$ as computation overtakes boundary cost. At
+$n = 16{,}384$, all three estimators retain **3.4–5.5x** gains because
 `revss` interpreter overhead scales with iteration count, not just
 vector length.
 
@@ -554,12 +557,12 @@ Table 3
 
 |      $n$ | `robustbase::Qn` | `robscale::qn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
-|        8 | 9.8 µs           | 1.6 µs         | **6.1x** |
-|       16 | 10.6 µs          | 1.7 µs         | **6.1x** |
-|       64 | 14.5 µs          | 5.3 µs         | **2.8x** |
-|     1024 | 451.9 µs         | 218.6 µs       | **2.1x** |
-|    65536 | 45969.5 µs       | 10924.3 µs     | **4.2x** |
-| 10000000 | 10.2 s           | 2.1 s          | **4.9x** |
+|        8 | 9.8 µs           | 1.6 µs         | **6.0x** |
+|       16 | 10.6 µs          | 1.8 µs         | **6.0x** |
+|       64 | 14.5 µs          | 5.2 µs         | **2.8x** |
+|     1024 | 451.9 µs         | 220.1 µs       | **2.0x** |
+|    65536 | 45969.5 µs       | 10690.5 µs     | **4.4x** |
+| 10000000 | 10.2 s           | 2.1 s          | **5.0x** |
 
 </div>
 
@@ -570,18 +573,18 @@ Table 4
 |      $n$ | `robustbase::Sn` | `robscale::sn` | Speedup  |
 |---------:|:-----------------|:---------------|:---------|
 |        8 | 4.4 µs           | 1.6 µs         | **2.7x** |
-|       16 | 4.9 µs           | 1.7 µs         | **3.0x** |
-|       64 | 6.1 µs           | 2.1 µs         | **2.8x** |
-|     1024 | 35.7 µs          | 17.1 µs        | **2.1x** |
-|    65536 | 6893.7 µs        | 909.4 µs       | **7.5x** |
-| 10000000 | 1.5 s            | 0.2 s          | **9.1x** |
+|       16 | 4.9 µs           | 1.7 µs         | **2.9x** |
+|       64 | 6.1 µs           | 2.2 µs         | **2.8x** |
+|     1024 | 35.7 µs          | 17.3 µs        | **2.1x** |
+|    65536 | 6893.7 µs        | 935.8 µs       | **7.4x** |
+| 10000000 | 1.5 s            | 0.2 s          | **8.4x** |
 
 </div>
 
-For small to medium $n$, `robscale` leads by **1.7–6.1x** for `qn` and
-**2.1–9.1x** for `sn`, primarily from eliminating R dispatch overhead
+For small to medium $n$, `robscale` leads by **1.8–6.0x** for `qn` and
+**2.1–8.9x** for `sn`, primarily from eliminating R dispatch overhead
 and using stack memory. At $n = 10^7$, `qn` runs in 2.1 s vs. 10.2 s
-(**4.9x**) and `sn` in 0.2 s vs. 1.5 s (**9.1x**), as TBB parallelism
+(**5.0x**) and `sn` in 0.2 s vs. 1.5 s (**8.4x**), as TBB parallelism
 scales across cores.
 
 ### Single-pass estimators (`gmd`, `iqr_scaled`, `mad_scaled`)
@@ -592,50 +595,50 @@ Table 5
 
 |      $n$ | Comparison             | Speedup   |
 |---------:|:-----------------------|:----------|
-|       64 | gmd vs GiniDistance    | **13.6x** |
-|       64 | gmd vs Hmisc           | **20.5x** |
-|       64 | iqr_scaled vs collapse | **4.8x**  |
-|       64 | iqr_scaled vs stats    | **31.0x** |
-|       64 | mad_scaled vs collapse | **5.4x**  |
-|       64 | mad_scaled vs stats    | **22.2x** |
-|     1024 | gmd vs GiniDistance    | **3.7x**  |
-|     1024 | gmd vs Hmisc           | **5.3x**  |
-|     1024 | iqr_scaled vs collapse | **2.6x**  |
-|     1024 | iqr_scaled vs stats    | **13.8x** |
+|       64 | gmd vs GiniDistance    | **13.4x** |
+|       64 | gmd vs Hmisc           | **20.1x** |
+|       64 | iqr_scaled vs collapse | **4.6x**  |
+|       64 | iqr_scaled vs stats    | **30.2x** |
+|       64 | mad_scaled vs collapse | **5.3x**  |
+|       64 | mad_scaled vs stats    | **21.7x** |
+|     1024 | gmd vs GiniDistance    | **3.6x**  |
+|     1024 | gmd vs Hmisc           | **5.2x**  |
+|     1024 | iqr_scaled vs collapse | **2.5x**  |
+|     1024 | iqr_scaled vs stats    | **13.0x** |
 |     1024 | mad_scaled vs collapse | **1.8x**  |
-|     1024 | mad_scaled vs stats    | **6.4x**  |
-|    65536 | gmd vs GiniDistance    | **3.2x**  |
-|    65536 | gmd vs Hmisc           | **4.0x**  |
+|     1024 | mad_scaled vs stats    | **6.3x**  |
+|    65536 | gmd vs GiniDistance    | **3.0x**  |
+|    65536 | gmd vs Hmisc           | **3.8x**  |
 |    65536 | iqr_scaled vs collapse | **4.4x**  |
-|    65536 | iqr_scaled vs stats    | **5.9x**  |
-|    65536 | mad_scaled vs collapse | **5.5x**  |
-|    65536 | mad_scaled vs stats    | **7.5x**  |
+|    65536 | iqr_scaled vs stats    | **5.8x**  |
+|    65536 | mad_scaled vs collapse | **5.4x**  |
+|    65536 | mad_scaled vs stats    | **7.3x**  |
 | 10000000 | gmd vs GiniDistance    | **4.1x**  |
-| 10000000 | gmd vs Hmisc           | **5.7x**  |
-| 10000000 | iqr_scaled vs collapse | **2.5x**  |
-| 10000000 | iqr_scaled vs stats    | **2.9x**  |
-| 10000000 | mad_scaled vs collapse | **3.8x**  |
-| 10000000 | mad_scaled vs stats    | **4.9x**  |
+| 10000000 | gmd vs Hmisc           | **5.6x**  |
+| 10000000 | iqr_scaled vs collapse | **2.4x**  |
+| 10000000 | iqr_scaled vs stats    | **2.8x**  |
+| 10000000 | mad_scaled vs collapse | **3.6x**  |
+| 10000000 | mad_scaled vs stats    | **4.7x**  |
 
 </div>
 
-`gmd` beats `Hmisc::GiniMd` by **2.8–22.1x** (C++ vs. pure R) and
-`GiniDistance::gmd` by **2.3–14.7x** (both compiled, with `robscale`’s
+`gmd` beats `Hmisc::GiniMd` by **2.7–21.9x** (C++ vs. pure R) and
+`GiniDistance::gmd` by **2.2–14.6x** (both compiled, with `robscale`’s
 edge from sorting networks). `iqr_scaled` leads `stats::IQR` by
-**2.9–37.8x** (dual $O(n)$ pdqselect vs. full sort) and
+**2.8–37.3x** (dual $O(n)$ pdqselect vs. full sort) and
 `collapse::fquantile` by **1.4–5.5x**. `mad_scaled` leads `stats::mad`
-by **4.2–26.3x** and a `collapse::fmedian`-based MAD by **1.1–6.5x**
+by **4.1–26.1x** and a `collapse::fmedian`-based MAD by **1.1–6.4x**
 (adaptive $O(n)$ selection vs. sorting).
 
 > \[!NOTE\] **Source builds recommended.** Installing from source
 > (`install.packages("robscale", type = "source")`) enables the
-> `configure` script to detect SIMD capabilities (AVX-512/AVX2/FMA on
-> x86_64, NEON on ARM64) and link platform-specific libraries (Apple
-> Accelerate, glibc libmvec, SLEEF). Pre-built CRAN binaries use
-> portable settings and may not include these optimizations. Parallelism
-> thresholds are derived from the detected per-core L2 cache size at
-> runtime on all platforms. For maximum performance, add the following
-> to `~/.R/Makevars` before installing:
+> `configure` script to detect SIMD capabilities (AVX2/FMA on x86_64,
+> NEON on ARM64) and link platform-specific libraries (Apple Accelerate,
+> glibc libmvec, SLEEF). Pre-built CRAN binaries use portable settings
+> and may not include these optimizations. Parallelism thresholds are
+> derived from the detected per-core L2 cache size at runtime on all
+> platforms. For maximum performance, add the following to
+> `~/.R/Makevars` before installing:
 >
 >     CXXFLAGS = -O2 -march=native -mtune=native
 

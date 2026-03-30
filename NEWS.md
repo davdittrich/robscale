@@ -1,3 +1,70 @@
+# robscale 0.5.4
+
+## Performance
+
+* **SIMD median selection networks (AVX2)**: Hybrid SIMD+scalar selection
+  networks for n = 8, 16, 32 are 23–58% faster than scalar `median_net`.
+  Accelerates `robScale`, `robLoc`, `MAD`, and `ADM` median dispatch.
+
+* **Raised sort network threshold (16 → 56)**: Branchless sorting networks
+  (`sort_net`) beat `std::sort` by 1.2–3× for n ≤ 60. Benefits `Qn` exact
+  path (n ≤ 40), `Sn` micro-path, `GMD`, and `IQR` sort-then-index.
+  Ensemble uses a separate lower threshold (20) to avoid L1 I-cache pressure
+  in the bootstrap hot loop.
+
+* **Raised median network threshold (16 → 36)**: Scalar `median_net`
+  (selection networks) beats Floyd-Rivest through n ≈ 36 for both odd and
+  even sample sizes.
+
+* **Earlier ensemble parallelism**: TBB `parallel_for` now fires for all
+  ensemble bootstrap calls with ≥ 2 cores and ≥ 16 replicates (was gated
+  on `n × n_boot ≥ 10000`). Ensemble is 4–8× faster for n = 3–49 on
+  multi-core machines.
+
+* **ADM AVX2 auto-vectorization restored**: `adm_core_avx2` now contains
+  the vectorizable loop body directly instead of delegating to
+  `adm_core_scalar` via plain `inline`. Eliminates a 6–9% regression at
+  medium n (1024–4096) caused by lost auto-vectorization across the
+  target-attribute boundary.
+
+## Architecture
+
+* **Dropped AVX-512 dispatch**: Removed `ROBSCALE_TARGET_AVX512F`,
+  `ROBSCALE_HAS_AVX512_DISPATCH`, and the 8-wide AVX-512 tanh path.
+  The tanh backend hierarchy is now: Apple Accelerate → glibc libmvec
+  (AVX2 4-wide) → SLEEF (AVX2 4-wide) → OpenMP SIMD → scalar.
+
+* **Runtime AVX2 dispatch for ADM**: `adm_core` now takes an explicit
+  `use_avx2` flag, computed once at each entry point via
+  `RuntimeConfig::get()`. Non-AVX2 machines take the scalar path safely.
+
+* **L2 cache plausibility guard**: Hardware detection now rejects
+  `l2_per_core` values below 64 KB as implausible and falls back to
+  256 KB. Applied across Linux, macOS, and Windows detection paths.
+
+## Build fixes
+
+* **`configure` sed delimiter**: Replaced `|` delimiter with `!` in the
+  11-expression `sed` block to survive TBB rpath values containing `|`.
+
+* **RcppParallel.h include ordering**: Added `#include <RcppParallel.h>`
+  before system TBB headers in `rob_scale.cpp` and `rob_loc.cpp` so that
+  RcppParallel's bundled TBB 2019 include guards fire first.
+
+* **Explicit `<cmath>` include**: Added direct `#include <cmath>` to
+  `rob_scale.cpp` and `rob_loc.cpp` for portability.
+
+* **macOS TBB detection**: The configure script now checks for
+  `libtbb.dylib` in addition to `libtbb.so` when detecting RcppParallel's
+  bundled TBB.
+
+* **SystemRequirements**: Removed `TBB` from `SystemRequirements` in
+  `DESCRIPTION`. TBB is provided by `RcppParallel` or detected at
+  configure time; listing it as a system requirement was incorrect.
+
+* **`<immintrin.h>` guard**: Narrowed the `<immintrin.h>` include in
+  `qnsn_kernels.h` from an architecture check to `ROBSCALE_HAS_AVX2_DISPATCH`.
+
 # robscale 0.5.3
 
 ## Build fixes

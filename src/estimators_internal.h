@@ -39,8 +39,8 @@ namespace robscale { namespace internal {
 // OPT-G5: scale precomputed outside the accumulation loop.
 inline double gmd(double* buf, int n) {
   if (n < 2) return 0.0;
-  if (n <= 16)
-    robscale::small_sort(buf, n);
+  if (static_cast<size_t>(n) <= ROBSCALE_SORT_NET_THRESHOLD)
+    robscale::small_sort(buf, static_cast<size_t>(n));
   else
     robscale::qnsn::optimized_sort(buf, buf + n);
   // WU-GMD-1: shared kernel in robust_core.h (AVX2 FMA or scalar).
@@ -114,9 +114,9 @@ static inline double iqr_select_and_interp(double* ROBSCALE_RESTRICT buf, int n)
 inline double iqr(const double* ROBSCALE_RESTRICT x, double* ROBSCALE_RESTRICT buf1, int n) {
   if (n < 2) return 0.0;
 
-  // OPT-I6: n<=16 sort-once-then-index fast path.
+  // Sort-once-then-index fast path for small n.
   // buf1 is used for the copy — avoids declaring a separate local buffer.
-  if (n <= 16) {
+  if (static_cast<size_t>(n) <= ROBSCALE_SORT_NET_THRESHOLD) {
     std::memcpy(buf1, x, static_cast<size_t>(n) * sizeof(double));
     double h1 = (n - 1.0) * 0.25;
     int lo1 = static_cast<int>(h1);
@@ -225,11 +225,6 @@ inline double rob_scale(const double* x, double* buf, int n) {
   for (int i = 0; i < n; ++i) buf[i] = std::abs(buf[i] - t);
   double s_init = MAD_CONSISTENCY * robscale::median_select(buf, static_cast<size_t>(n));
 
-  // MAD implosion: return ADM fallback
-  if (s_init <= robscale::IMPLOSION_BOUND) {
-    return robscale::adm_core(x, n, t, ADM_CONSISTENCY);
-  }
-
   // OPT-E: cache AVX2 flag once; avoids a TLS lookup inside rob_scale_compute.
 #if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
@@ -237,6 +232,12 @@ inline double rob_scale(const double* x, double* buf, int n) {
 #else
   const bool avx2 = false;
 #endif
+
+  // MAD implosion: return ADM fallback
+  if (s_init <= robscale::IMPLOSION_BOUND) {
+    return robscale::adm_core(x, n, t, ADM_CONSISTENCY, avx2);
+  }
+
   // NR iteration via nr_scale_compute (both ensemble and production paths).
   return rob_scale_compute(x, static_cast<size_t>(n), t, s_init, 80, 1.4901161e-8, avx2);
 }
@@ -252,16 +253,18 @@ inline double rob_scale_sorted(const double* ROBSCALE_RESTRICT sorted_x,
   const double t      = robscale::median_sorted(sorted_x, n);
   const double mad_raw = robscale::vshaped_mad(sorted_x, static_cast<int>(n), t, buf);
   const double s_init = robscale::MAD_CONSISTENCY * mad_raw;
-  if (s_init <= robscale::IMPLOSION_BOUND) {
-    return robscale::adm_core_sorted(sorted_x, static_cast<int>(n), t,
-                                     robscale::ADM_CONSISTENCY);
-  }
+
 #if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
   const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
                      robscale::qnsn::SIMDLevel::AVX2);
 #else
   const bool avx2 = false;
 #endif
+
+  if (s_init <= robscale::IMPLOSION_BOUND) {
+    return robscale::adm_core_sorted(sorted_x, static_cast<int>(n), t,
+                                     robscale::ADM_CONSISTENCY, avx2);
+  }
   return rob_scale_compute(sorted_x, n, t, s_init, 80, 1.4901161e-8, avx2);
 }
 

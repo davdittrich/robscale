@@ -11,7 +11,13 @@ double adm_impl(Rcpp::NumericVector x, double center, double constant) {
   int n = (int)x.size();
   const double* xp = x.begin();
   validate_finite(xp, n);
-  return robscale::adm_core(xp, n, center, constant);
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+  return robscale::adm_core(xp, n, center, constant, avx2);
 }
 
 // Large-n helper: allocates its own stack/heap buffer so that adm_impl_auto's
@@ -33,7 +39,13 @@ double adm_large_n(const double* ROBSCALE_RESTRICT xp, int n, double constant) {
   }
   std::memcpy(buf, xp, n * sizeof(double));
   double med = robscale::adaptive_median_select(buf, static_cast<size_t>(n));
-  return robscale::adm_core(buf, n, med, constant);
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
+  return robscale::adm_core(buf, n, med, constant, avx2);
 }
 
 // [[Rcpp::export(rng = false)]]
@@ -42,12 +54,18 @@ double adm_impl_auto(Rcpp::NumericVector x, double constant) {
   if (ROBSCALE_UNLIKELY(n == 0)) return 0.0;
   if (ROBSCALE_UNLIKELY(n == 1)) return 0.0;
   validate_finite(x.begin(), n);
+#if defined(ROBSCALE_HAS_AVX2_TANH) && !defined(ROBSCALE_HAS_ACCELERATE)
+  const bool avx2 = (robscale::qnsn::RuntimeConfig::get().hw.simd_level >=
+                     robscale::qnsn::SIMDLevel::AVX2);
+#else
+  const bool avx2 = false;
+#endif
   if (n <= ROBSCALE_MICRO_BUFFER_SIZE) {
     // Only buf_micro lives in this frame — keeps the hot path stack-lean.
     double buf_micro[ROBSCALE_MICRO_BUFFER_SIZE];
     std::memcpy(buf_micro, x.begin(), n * sizeof(double));
     double med = robscale::adaptive_median_select(buf_micro, static_cast<size_t>(n));
-    return robscale::adm_core(buf_micro, n, med, constant);
+    return robscale::adm_core(buf_micro, n, med, constant, avx2);
   }
   return adm_large_n(x.begin(), n, constant);
 }

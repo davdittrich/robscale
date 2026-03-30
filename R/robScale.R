@@ -64,7 +64,7 @@
 #'
 #' \strong{Performance and SIMD.}
 #' The C++ kernel dispatches \code{tanh} to the fastest available backend:
-#' Apple Accelerate on macOS, glibc libmvec (AVX-512 8-wide or AVX2 4-wide)
+#' Apple Accelerate on macOS, glibc libmvec (AVX2 4-wide)
 #' on Linux x86-64, SLEEF when libmvec is absent, or \code{#pragma omp simd}
 #' as a portable fallback.
 #'

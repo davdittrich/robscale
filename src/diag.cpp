@@ -1,20 +1,13 @@
-// diag.cpp — Internal diagnostic and benchmark helpers.
-// None of these functions are part of the user-facing API.
-// They are compiled into the package to support:
-//   M-scale iteration diagnostics: convergence and rho_eval counting for rob_scale
-//   Median crossover benchmarks: median_net vs FR-select threshold calibration
-//
-// All exports are intentionally ugly names (rob_scale_diag_impl,
-// bench_median_net_impl, bench_fr_select_impl) to signal internal status.
+// diag.cpp — Internal diagnostic helper for M-scale iteration analysis.
+// rob_scale_diag_impl mirrors rob_scale_core (Newton-Raphson) with
+// instrumented iteration counts. Used by test-robScale-oscillation.R.
 
 #include "robust_core.h"
-#include "sort_net.h"
 #include "pdq_select.h"
 #include "robscale_config.h"
 #include <Rcpp.h>
 #include <vector>
 #include <cmath>
-#include <algorithm>
 
 // ---------------------------------------------------------------------------
 // M-scale iteration diagnostics
@@ -97,11 +90,10 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
   std::vector<double> w(x_r.begin(), x_r.end());
   std::vector<double> dev(n);
 
-  // Median: for n > ROBSCALE_SORT_NETWORK_THRESHOLD use FR-based select,
-  // else use median_net.  Must match the current threshold.
-  const bool is_small = (n <= ROBSCALE_SORT_NETWORK_THRESHOLD);
+  // Median: n < 8 direct median_net (no SIMD kernel); n >= 8 through
+  // adaptive dispatch (SIMD fires at 8/16/32, median_net for other small n).
   double t;
-  if (is_small) {
+  if (n < 8) {
     t = robscale::median_net(w.data(), n);
   } else {
     t = robscale::adaptive_robscale_median_select(w.data(), n);
@@ -110,7 +102,7 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
   for (size_t i = 0; i < n; ++i) dev[i] = std::abs(w[i] - t);
 
   double s_init;
-  if (is_small) {
+  if (n < 8) {
     s_init = robscale::MAD_CONSISTENCY * robscale::median_net(dev.data(), n);
   } else {
     s_init = robscale::MAD_CONSISTENCY *
@@ -155,42 +147,4 @@ Rcpp::List rob_scale_diag_impl(Rcpp::NumericVector x_r,
     Rcpp::Named("rho_evals")    = stats.rho_evals,
     Rcpp::Named("converged")    = converged
   );
-}
-
-// ---------------------------------------------------------------------------
-// Median crossover benchmark helpers
-//
-// Each function copies x into a local buffer, runs the target selection
-// algorithm, and returns the median.  The copy ensures:
-//   (a) the input vector is not permuted (selection algorithms are in-place)
-//   (b) cache state is comparable across repeated calls
-//
-// Called via:
-//   robscale:::bench_median_net_impl(x)
-//   robscale:::bench_fr_select_impl(x)
-// ---------------------------------------------------------------------------
-
-// [[Rcpp::export(rng = false)]]
-double bench_median_net_impl(Rcpp::NumericVector x) {
-  std::vector<double> buf(x.begin(), x.end());
-  return robscale::median_net(buf.data(), buf.size());
-}
-
-// [[Rcpp::export(rng = false)]]
-double bench_fr_select_impl(Rcpp::NumericVector x) {
-  // Uses median_select from robust_core.h which:
-  //   n <= ROBSCALE_SORT_NETWORK_THRESHOLD: calls median_net (same as above)
-  //   n >  ROBSCALE_SORT_NETWORK_THRESHOLD: calls floyd_rivest_select
-  //     -> which for n < 600 uses std::nth_element
-  // To force the FR/nth_element path for n <= threshold we call
-  // floyd_rivest_select directly rather than going through median_select.
-  std::vector<double> buf(x.begin(), x.end());
-  size_t n = buf.size();
-  if (n == 0) return 0.0;
-  size_t h = (n - 1) / 2;
-  robscale::floyd_rivest_select(buf.data(), buf.data() + h, buf.data() + n);
-  if (n & 1) return buf[h];
-  double v1 = buf[h];
-  double v2 = *std::min_element(buf.data() + h + 1, buf.data() + n);
-  return (v1 + v2) * 0.5;
 }

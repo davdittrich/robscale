@@ -312,16 +312,13 @@ The CI return type is a named list with `estimate`, `lower`, `upper`, and
 The logistic psi function satisfies $\psi_{\log}(x) = \tanh(x/2)$. `robscale`
 evaluates `tanh` in bulk using the fastest available platform backend.
 The `configure` script selects one of two vectorized `tanh` libraries at
-compile time; at runtime, CPUID selects the widest available instruction set:
+compile time; at runtime, CPUID selects the appropriate instruction set:
 
 1. **Apple Accelerate** (`vvtanh`): array-wide SIMD on macOS.
 2. **glibc libmvec** (Linux x86\_64, glibc $\geq$ 2.35) or **SLEEF**
    (fallback when libmvec is absent). Only one is linked per binary.
-   Within the linked library, CPUID dispatches to:
-   - **AVX-512 8-wide** (`_ZGVeN8v_tanh`): 8 doubles per iteration on
-     AVX-512F hardware.
-   - **AVX2 4-wide** (`_ZGVdN4v_tanh` or `Sleef_tanhd4_u10avx2`): 4
-     doubles per iteration.
+   The AVX2 4-wide kernel (`_ZGVdN4v_tanh` or `Sleef_tanhd4_u10avx2`)
+   processes 4 doubles per iteration.
 3. **OpenMP SIMD** (`#pragma omp simd`): compiler-guided portable fallback.
 4. **Scalar** `std::tanh`: universal fallback.
 
@@ -337,20 +334,24 @@ jackknife. This kernel activates for $n \geq 8$ on AVX2 hardware.
 
 `robscale` uses a tiered strategy rather than `sort()`:
 
-- **$n \leq 16$**: optimal sorting networks (verified minimal comparator counts,
-  compiled to branchless machine code at `-O2`):
+- **$n \in \{8, 16, 32\}$ on AVX2 hardware**: SIMD selection networks
+  (bitonic merge, 23--58% faster than scalar selection networks).
+- **$n \leq 36$**: scalar selection networks for median computation.
+- **$n \leq 56$**: branchless sorting networks for full-sort paths (GMD,
+  $Q_n$ exact, $S_n$), compiled to conditional-move instructions at `-O2`:
 
 | $n$ | Comparators |
 | ---: | ---: |
 | 3 | 3 |
 | 4 | 5 |
 | 8 | 19 |
-| 12 | 39 |
 | 16 | 60 |
+| 32 | 185 |
+| 56 | 438 |
 
-- **$17 \leq n < 600$**: `std::nth_element` (introselect, $O(n)$ worst-case).
-- **$n \geq 600$**: Floyd--Rivest algorithm [@floyd1975], which narrows the
-  active window to $O(n^{2/3})$ elements before partitioning.
+- **$37 \leq n$ (selection) / $57 \leq n$ (sort)**: Floyd--Rivest algorithm
+  [@floyd1975] or pdqselect, chosen per-estimator based on a runtime
+  L2-cache-derived crossover threshold.
 
 The crossover between Floyd--Rivest and pdqselect is derived at runtime from
 the per-core L2 cache size; each estimator uses its own threshold based on
