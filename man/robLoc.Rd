@@ -93,7 +93,7 @@ of 80 is a conservative safety limit.
 
 \strong{Performance and SIMD.}
 The C++ kernel dispatches \code{tanh} to the fastest available backend:
-Apple Accelerate on macOS, glibc libmvec (AVX-512 8-wide or AVX2 4-wide)
+Apple Accelerate on macOS, glibc libmvec (AVX2 4-wide)
 on Linux x86-64, SLEEF when libmvec is absent, or \code{#pragma omp simd}
 as a portable fallback. A fused AVX2 kernel accumulates \eqn{\psi_i} and
 \eqn{\mathrm{d}\psi_i} in a single pass, halving memory reads.
