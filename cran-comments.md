@@ -31,9 +31,12 @@
 ## Test environments
 
 - Arch Linux (x86_64), R 4.5.3, GCC 15.2.1 (local)
-- Ubuntu 24.04 (x86_64), R-release (GitHub Actions): pending
-- macOS latest (ARM64), R-release (GitHub Actions): pending
-- Windows (x86_64), R-release (GitHub Actions): pending
+- Ubuntu 24.04 (x86_64), R-release, GCC (GitHub Actions): PASS
+- Ubuntu 24.04 (x86_64), R-devel, GCC (GitHub Actions): PASS
+- macOS latest (ARM64), R-release (GitHub Actions): PASS
+- Windows (x86_64), R-release (GitHub Actions): PASS
+- Windows (x86_64), R-devel (GitHub Actions): FAIL — renv/untar
+  infrastructure bug in dependency install step; package never compiled
 
 ## R CMD check results
 

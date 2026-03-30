@@ -31,6 +31,7 @@ test_regression.R
 test_robustbase.R
 test_side_by_side.R
 findings.md
+report.md
 progress.md
 task_plan.md
 install_log.txt
