@@ -2,9 +2,9 @@
 
 
 [![CRAN
-status](https://www.r-pkg.org/badges/version/robscale.png)](https://cran.r-project.org/package=robscale)
+status](https://www.r-pkg.org/badges/version/robscale.svg)](https://cran.r-project.org/package=robscale)
 [![CRAN
-downloads](https://cranlogs.r-pkg.org/badges/grand-total/robscale.png)](https://cran.r-project.org/package=robscale)
+downloads](https://cranlogs.r-pkg.org/badges/grand-total/robscale.svg)](https://cran.r-project.org/package=robscale)
 [![R-CMD-check](https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
 
