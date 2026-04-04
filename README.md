@@ -1,12 +1,10 @@
 # robscale: Accelerated Estimation of Robust Location and Scale
 
 
-[![CRAN
-status](https://www.r-pkg.org/badges/version/robscale.svg)](https://cran.r-project.org/package=robscale)
-[![CRAN
-downloads](https://cranlogs.r-pkg.org/badges/grand-total/robscale.svg)](https://cran.r-project.org/package=robscale)
-[![R-CMD-check](https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg)](https://doi.org/10.5281/zenodo.18828607)
+<a href="https://cran.r-project.org/package=robscale"><img src="https://www.r-pkg.org/badges/version/robscale" alt="CRAN status"></a>
+<a href="https://cran.r-project.org/package=robscale"><img src="https://cranlogs.r-pkg.org/badges/grand-total/robscale" alt="CRAN downloads"></a>
+<a href="https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml"><img src="https://github.com/davdittrich/robscale/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a>
+<a href="https://doi.org/10.5281/zenodo.18828607"><img src="https://zenodo.org/badge/DOI/10.5281/zenodo.18828607.svg" alt="DOI"></a>
 
 ## Overview
 
