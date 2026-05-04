@@ -56,6 +56,7 @@ src/clean_build.log
 .tldrignore
 src/.tldr/
 CLAUDE.md
+.wolf/
 bin/
 
 # Agent-generated planning/analysis documents
@@ -75,3 +76,5 @@ benchmarks/*.rds
 benchmarks/comprehensive_regression_check.R
 bench/min_time_benchmark.R
 bench/parallel_threshold_sweep.R
+# Added by code-review-graph
+.code-review-graph/
